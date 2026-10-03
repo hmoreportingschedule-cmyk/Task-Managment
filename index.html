@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Task Management Dashboard</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="loginView" class="login-wrap">
+  <div class="login-card">
+    <div class="brand">TASK MANAGEMENT</div>
+    <p class="muted">Employee • Attendance • Tasks • Templates</p>
+    <input id="loginId" placeholder="User ID" autocomplete="username">
+    <input id="loginPassword" type="password" placeholder="Password" autocomplete="current-password">
+    <button id="loginBtn">Sign In</button>
+    <div id="loginMsg" class="msg"></div>
+  </div>
+</div>
+
+<div id="appView" class="hidden">
+  <header class="topbar">
+    <div><b>Task Management</b><span id="roleBadge"></span></div>
+    <div class="top-actions"><span id="userName"></span><button id="logoutBtn" class="ghost">Logout</button></div>
+  </header>
+  <div class="layout">
+    <aside class="sidebar">
+      <button data-page="home" class="nav active">Dashboard</button>
+      <button data-page="attendance" class="nav">Attendance</button>
+      <button data-page="tasks" class="nav">Task Assignment</button>
+      <button data-page="templates" class="nav">Task Templates</button>
+      <button data-page="employees" class="nav adminOnly">Employees / Users</button>
+    </aside>
+    <main class="content">
+      <section id="home" class="page">
+        <h1>Dashboard</h1>
+        <div class="cards">
+          <div class="card"><span>Today's Attendance</span><strong id="statAttendance">—</strong></div>
+          <div class="card"><span>Open Tasks</span><strong id="statTasks">—</strong></div>
+          <div class="card"><span>Templates</span><strong id="statTemplates">—</strong></div>
+          <div class="card"><span>Role</span><strong id="statRole">—</strong></div>
+        </div>
+      </section>
+
+      <section id="attendance" class="page hidden">
+        <div class="section-head"><h2>Attendance</h2><button id="refreshAttendance">Refresh</button></div>
+        <div class="form-grid">
+          <label>Date<input id="attDate" type="date"></label>
+          <label>In Time<input id="attIn" type="time"></label>
+          <label>Out Time<input id="attOut" type="time"></label>
+          <label>Task Minutes<input id="attTaskMinutes" type="number" min="0"></label>
+          <label>Break Minutes<input id="attBreak" type="number" min="0"></label>
+          <label>Weekoff<select id="attWeekoff"><option value="No">No</option><option value="Yes">Yes</option></select></label>
+        </div>
+        <button id="saveAttendance">Save Attendance</button>
+        <div id="attendanceMsg" class="msg"></div>
+        <div class="table-wrap"><table id="attendanceTable"></table></div>
+      </section>
+
+      <section id="tasks" class="page hidden">
+        <div class="section-head"><h2>Task Assignment</h2><button id="refreshTasks">Refresh</button></div>
+        <div class="form-grid">
+          <label class="adminOrHod">Employee ID<input id="taskEmployeeId" placeholder="Employee ID"></label>
+          <label>Task Name<input id="taskName"></label>
+          <label>Task Details<textarea id="taskDetails"></textarea></label>
+          <label>Priority<select id="taskPriority"><option>Normal</option><option>High</option><option>Urgent</option></select></label>
+          <label>Due Date<input id="taskDueDate" type="date"></label>
+          <label>Task Minutes<input id="taskMinutes" type="number" min="0"></label>
+        </div>
+        <button id="saveTask" class="adminOrHod">Assign Task</button>
+        <div id="taskMsg" class="msg"></div>
+        <div class="table-wrap"><table id="tasksTable"></table></div>
+      </section>
+
+      <section id="templates" class="page hidden">
+        <div class="section-head"><h2>Task Templates</h2><button id="newTemplate">New</button></div>
+        <div id="templateEditor" class="panel hidden">
+          <input id="templateId" type="hidden">
+          <div class="form-grid">
+            <label>Template Name<input id="templateName"></label>
+            <label>Category<input id="templateCategory"></label>
+            <label>Priority<select id="templatePriority"><option>Normal</option><option>High</option><option>Urgent</option></select></label>
+            <label>Default Minutes<input id="templateMinutes" type="number" min="0"></label>
+            <label class="wide">Details<textarea id="templateDetails"></textarea></label>
+          </div>
+          <button id="saveTemplate">Save</button><button id="cancelTemplate" class="ghost">Cancel</button>
+        </div>
+        <div class="table-wrap"><table id="templatesTable"></table></div>
+      </section>
+
+      <section id="employees" class="page hidden">
+        <div class="section-head"><h2>Users / Employees</h2><button id="newUser">New User</button></div>
+        <div id="userEditor" class="panel hidden">
+          <input id="editUserId" type="hidden">
+          <div class="form-grid">
+            <label>Employee ID<input id="uEmpId"></label>
+            <label>Name<input id="uName"></label>
+            <label>User ID<input id="uLogin"></label>
+            <label>Password<input id="uPassword" type="password"></label>
+            <label>Role<select id="uRole"><option>Employee</option><option>HOD</option><option>Admin</option><option>Master Admin</option></select></label>
+            <label>Office In<input id="uIn" type="time"></label>
+            <label>Office Out<input id="uOut" type="time"></label>
+            <label>Weekoff<input id="uWeekoff" placeholder="Sunday"></label>
+          </div>
+          <button id="saveUser">Save User</button><button id="cancelUser" class="ghost">Cancel</button>
+          <div id="userMsg" class="msg"></div>
+        </div>
+        <div class="table-wrap"><table id="usersTable"></table></div>
+      </section>
+    </main>
+  </div>
+</div>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
