@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Task Attendance Dashboard</title>
+<title>Task Attendance Dashboard · V.6</title>
 <style>
 :root{--primary:#0b8795;--primary2:#087b87;--bg:#eef8f8;--card:#fff;--text:#12303b;--muted:#607680;--danger:#b42318;--success:#067647;--border:#d5e2e5;--shadow:0 18px 45px rgba(15,55,65,.10)}
 *{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:linear-gradient(135deg,#f4fbfb,#e8f5f5);color:var(--text)}button,input,select,textarea{font:inherit}button{cursor:pointer;border:0}.hidden{display:none!important}
-.wrap{min-height:100vh;padding:28px}.login{width:min(460px,100%);margin:42px auto;background:rgba(255,255,255,.97);border:1px solid #d7e6e9;border-radius:24px;padding:34px;box-shadow:0 24px 65px rgba(15,55,65,.13);position:relative;overflow:hidden}.login:before{content:'';position:absolute;left:0;right:0;top:0;height:5px;background:linear-gradient(90deg,#087f8d,#16a6a8,#087f8d)}.brandMark{width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,#0b8795,#075f69);display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;font-weight:900;box-shadow:0 10px 24px rgba(11,135,149,.22);margin-bottom:18px}.login .sub{font-size:14px}.login .btn{min-height:46px;font-size:15px}.loginFooter{margin-top:17px;padding-top:15px;border-top:1px solid #edf2f3}.sectionHead{display:flex;align-items:center;justify-content:space-between;gap:15px}.modal{position:fixed;inset:0;background:rgba(8,34,41,.45);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:18px;z-index:50}.modalBox{width:min(700px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:20px;border:1px solid #d7e6e9;box-shadow:0 28px 80px rgba(0,0,0,.20);padding:24px}.modalHead{display:flex;align-items:flex-start;justify-content:space-between;gap:15px;margin-bottom:16px}.modalHead h3{margin:0;font-size:20px}.iconBtn{width:36px;height:36px;border-radius:10px;background:#eef6f7;color:#23424b;font-size:23px}.formGrid{display:grid;grid-template-columns:1fr 1fr;gap:2px 14px}.modalActions{display:flex;justify-content:flex-end;gap:10px;margin-top:8px}.actionBtns{display:flex;gap:6px;flex-wrap:wrap}.table .actionBtn{padding:7px 9px;border-radius:8px;background:#e9f4f5;color:#086c76;font-size:11px;font-weight:700}.table .actionBtn.delete{background:#fff0f0;color:#b42318}
+.wrap{min-height:100vh;padding:28px}.login{width:min(460px,100%);margin:42px auto;background:rgba(255,255,255,.97);border:1px solid #d7e6e9;border-radius:24px;padding:34px;box-shadow:0 24px 65px rgba(15,55,65,.13);position:relative;overflow:hidden}.login:before{content:'';position:absolute;left:0;right:0;top:0;height:5px;background:linear-gradient(90deg,#087f8d,#16a6a8,#087f8d)}.brandMark{width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,#0b8795,#075f69);display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;font-weight:900;box-shadow:0 10px 24px rgba(11,135,149,.22);margin-bottom:18px}.login .sub{font-size:14px}.login .btn{min-height:46px;font-size:15px}.loginFooter{margin-top:17px;padding-top:15px;border-top:1px solid #edf2f3}.sectionHead{display:flex;align-items:center;justify-content:space-between;gap:15px}.modal{position:fixed;inset:0;background:rgba(8,34,41,.45);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:18px;z-index:50}.modalBox{width:min(700px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:20px;border:1px solid #d7e6e9;box-shadow:0 28px 80px rgba(0,0,0,.20);padding:24px}.modalHead{display:flex;align-items:flex-start;justify-content:space-between;gap:15px;margin-bottom:16px}.modalHead h3{margin:0;font-size:20px}.iconBtn{width:36px;height:36px;border-radius:10px;background:#eef6f7;color:#23424b;font-size:23px}.modalActions{display:flex;justify-content:flex-end;gap:10px;margin-top:8px}.actionBtns{display:flex;gap:6px;flex-wrap:wrap}.formGrid{display:grid;grid-template-columns:1fr 1fr;gap:2px 14px}.formGrid .field textarea{resize:vertical}.table .actionBtn{padding:7px 9px;border-radius:8px;background:#e9f4f5;color:#086c76;font-size:11px;font-weight:700}.table .actionBtn.delete{background:#fff0f0;color:#b42318}
 h1{font-size:27px;margin:0 0 5px;font-weight:800}.sub{color:var(--muted);margin-bottom:22px}.field{margin:14px 0}.field label{display:block;font-size:13px;font-weight:700;margin-bottom:7px}.field input,.field select,.field textarea{width:100%;padding:13px;border:1px solid #c8d9dd;border-radius:11px;outline:none;background:#fff}.field input:focus,.field select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(11,135,149,.10)}
 .btn{background:var(--primary);color:#fff;border-radius:11px;padding:12px 17px;font-weight:700}.btn:hover{background:var(--primary2)}.btn.secondary{background:#e9f4f5;color:#086c76}.btn.danger{background:#b42318}.btn.small{padding:9px 12px;font-size:13px}
 .alert{padding:11px 13px;border-radius:10px;font-size:13px;margin:12px 0}.alert.error{background:#fff0f0;color:var(--danger)}.alert.ok{background:#ecfdf3;color:var(--success)}.note{font-size:12px;color:var(--muted);line-height:1.5}
@@ -26,7 +26,7 @@ h1{font-size:27px;margin:0 0 5px;font-weight:800}.sub{color:var(--muted);margin-
   <section id="loginView" class="login">
     <div class="brandMark">TA</div>
     <h1>Task Attendance Dashboard</h1>
-    <div class="sub">Secure Attendance Management · V.5</div>
+    <div class="sub">Manual Attendance Management · V.6</div>
     <div id="loginAlert" class="alert error hidden"></div>
     <form id="loginForm">
       <div class="field"><label>Username</label><input id="username" autocomplete="username" required value="admin"></div>
@@ -46,28 +46,49 @@ h1{font-size:27px;margin:0 0 5px;font-weight:800}.sub{color:var(--muted);margin-
     <div id="appAlert" class="alert hidden"></div>
 
     <div class="grid">
-      <div class="card"><div class="label">Today's Status</div><div id="todayStatus" class="metric">—</div></div>
-      <div class="card"><div class="label">Punch In</div><div id="inTime" class="metric" style="font-size:18px">—</div></div>
-      <div class="card"><div class="label">Punch Out</div><div id="outTime" class="metric" style="font-size:18px">—</div></div>
+      <div class="card"><div class="label">Today's Attendance</div><div id="todayStatus" class="metric">—</div></div>
+      <div class="card"><div class="label">In Time</div><div id="inTime" class="metric" style="font-size:18px">—</div></div>
+      <div class="card"><div class="label">Out Time</div><div id="outTime" class="metric" style="font-size:18px">—</div></div>
       <div class="card"><div class="label">Month Present</div><div id="monthPresent" class="metric">0</div></div>
     </div>
 
     <div class="card section">
-      <h3>Attendance Control</h3>
-      <div class="actions">
-        <button class="btn" data-action="in">Punch In</button>
-        <button class="btn secondary" data-action="out">Punch Out</button>
-        <button class="btn secondary" data-action="break1start">Break 1 Start</button>
-        <button class="btn secondary" data-action="break1end">Break 1 End</button>
-        <button class="btn secondary" data-action="break2start">Break 2 Start</button>
-        <button class="btn secondary" data-action="break2end">Break 2 End</button>
-        <button class="btn secondary" data-action="break3start">Break 3 Start</button>
-        <button class="btn secondary" data-action="break3end">Break 3 End</button>
+      <div class="sectionHead">
+        <div>
+          <h3 style="margin-bottom:4px">Add Attendance Manually</h3>
+          <div class="note">Filhal Punch In / Punch Out system disable hai. Employee date aur attendance details manually submit karega.</div>
+        </div>
       </div>
+      <div id="manualAlert" class="alert hidden"></div>
+      <form id="manualAttendanceForm">
+        <div class="formGrid">
+          <div class="field"><label>Date *</label><input id="manualDate" type="date" required></div>
+          <div class="field"><label>Attendance Type</label>
+            <select id="manualType">
+              <option value="Present">Present</option>
+              <option value="Leave">Leave</option>
+              <option value="Weekoff">Weekoff</option>
+            </select>
+          </div>
+          <div class="field"><label>In Time</label><input id="manualIn" type="time"></div>
+          <div class="field"><label>Out Time</label><input id="manualOut" type="time"></div>
+          <div class="field"><label>Break 1 Start</label><input id="manualB1S" type="time"></div>
+          <div class="field"><label>Break 1 End</label><input id="manualB1E" type="time"></div>
+          <div class="field"><label>Break 2 Start</label><input id="manualB2S" type="time"></div>
+          <div class="field"><label>Break 2 End</label><input id="manualB2E" type="time"></div>
+          <div class="field"><label>Break 3 Start</label><input id="manualB3S" type="time"></div>
+          <div class="field"><label>Break 3 End</label><input id="manualB3E" type="time"></div>
+          <div class="field" style="grid-column:1/-1"><label>Reason / Remarks</label><textarea id="manualReason" rows="3" placeholder="Optional remarks..."></textarea></div>
+        </div>
+        <div class="modalActions" style="margin-top:8px">
+          <button id="clearManualBtn" class="btn secondary" type="button">Clear</button>
+          <button id="saveManualBtn" class="btn" type="submit">Submit Attendance</button>
+        </div>
+      </form>
     </div>
 
     <div class="card section">
-      <h3>Today's Breaks</h3>
+      <h3>Today's Attendance Summary</h3>
       <div id="breakStates" class="att"></div>
     </div>
 
@@ -207,7 +228,7 @@ async function loadSummary(){
     const d=await callApi({action:'getDashboardSummary',token});
     if(d.status!=='success') throw new Error(d.message);
     const a=d.today||{};
-    $('todayStatus').textContent=a['Out Time']?'Completed':(a['In Time']?'Present':'Not Punched');
+    $('todayStatus').textContent=a['Leave/Weekoff'] ? a['Leave/Weekoff'] : (a['Out Time']?'Submitted':(a['In Time']?'Present':'Not Added'));
     $('inTime').textContent=fmt(a['In Time']); $('outTime').textContent=fmt(a['Out Time']);
     $('monthPresent').textContent=d.month?.present ?? 0;
     renderBreaks(a);
@@ -222,15 +243,61 @@ function renderBreaks(a){
   $('breakStates').innerHTML=arr.map(x=>`<div class="state"><b>Break ${x.n}</b><br>Start: ${fmt(x.s)}<br>End: ${fmt(x.e)}<br><span class="label">${x.s?(x.e?'Completed':'Open'):'Not Used'}</span></div>`).join('');
 }
 
-document.querySelectorAll('[data-action]').forEach(btn=>btn.addEventListener('click',async()=>{
-  const action=btn.dataset.action; btn.disabled=true;
+function setManualDate(){
+  const now = new Date();
+  const local = new Date(now.getTime()-now.getTimezoneOffset()*60000);
+  $('manualDate').value = local.toISOString().slice(0,10);
+}
+setManualDate();
+
+$('manualType').addEventListener('change',()=>{
+  const leave = $('manualType').value !== 'Present';
+  ['manualIn','manualOut','manualB1S','manualB1E','manualB2S','manualB2E','manualB3S','manualB3E'].forEach(id=>{
+    $(id).disabled=leave;
+    if(leave) $(id).value='';
+  });
+});
+
+$('clearManualBtn').addEventListener('click',()=>{
+  setManualDate();
+  $('manualType').value='Present';
+  ['manualIn','manualOut','manualB1S','manualB1E','manualB2S','manualB2E','manualB3S','manualB3E','manualReason'].forEach(id=>$(id).value='');
+  $('manualType').dispatchEvent(new Event('change'));
+});
+
+$('manualAttendanceForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const b=$('saveManualBtn');
+  const type=$('manualType').value;
+  const payload={
+    action:'saveManualAttendance',
+    token,
+    date:$('manualDate').value,
+    inTime:type==='Present'?$('manualIn').value:'',
+    outTime:type==='Present'?$('manualOut').value:'',
+    break1Start:type==='Present'?$('manualB1S').value:'',
+    break1End:type==='Present'?$('manualB1E').value:'',
+    break2Start:type==='Present'?$('manualB2S').value:'',
+    break2End:type==='Present'?$('manualB2E').value:'',
+    break3Start:type==='Present'?$('manualB3S').value:'',
+    break3End:type==='Present'?$('manualB3E').value:'',
+    leaveWeekoff:type==='Present'?'':type,
+    reason:$('manualReason').value.trim()
+  };
+  if(type==='Present' && (!payload.inTime || !payload.outTime)){
+    alertApp('Present attendance ke liye In Time aur Out Time dono enter kijiye.');
+    return;
+  }
+  b.disabled=true; b.innerHTML='<span class="spinner"></span>Submitting...';
   try{
-    const d=await callApi({action:'attendance',token,attendanceAction:action});
+    const d=await callApi(payload);
     if(d.status!=='success') throw new Error(d.message);
-    alertApp(d.message,true); await loadSummary();
-  }catch(e){alertApp(e.message)}
-  finally{btn.disabled=false}
-}));
+    alertApp(d.message,true);
+    await loadSummary();
+    $('historyBtn').click();
+  }catch(err){alertApp(err.message)}
+  finally{b.disabled=false;b.textContent='Submit Attendance'}
+});
 
 $('historyBtn').addEventListener('click',async()=>{
   try{
