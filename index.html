@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Task Attendance Dashboard · V.7</title>
+<title>Task Attendance Dashboard · V.12</title>
 <style>
 :root{--primary:#0b8795;--primary2:#087b87;--bg:#eef8f8;--card:#fff;--text:#12303b;--muted:#607680;--danger:#b42318;--success:#067647;--border:#d5e2e5;--shadow:0 18px 45px rgba(15,55,65,.10)}
 *{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:linear-gradient(135deg,#f4fbfb,#e8f5f5);color:var(--text)}button,input,select,textarea{font:inherit}button{cursor:pointer;border:0}.hidden{display:none!important}
@@ -50,7 +50,7 @@ h1{font-size:27px;margin:0 0 5px;font-weight:800}.sub{color:var(--muted);margin-
   --shadow:0 10px 30px rgba(8,43,63,.08);
 }
 body{margin:0;background:linear-gradient(135deg,#eef8f8 0%,#f7fbfc 55%,#eaf5f7 100%);color:var(--text);font-family:Arial,Helvetica,sans-serif}
-.v11App{display:grid;grid-template-columns:280px minmax(0,1fr);min-height:100vh}
+.v11App{display:none;grid-template-columns:280px minmax(0,1fr);grid-template-columns:280px minmax(0,1fr);min-height:100vh}
 .v11Sidebar{position:sticky;top:0;height:100vh;box-sizing:border-box;padding:18px 14px;background:linear-gradient(180deg,#062c40 0%,#083d53 58%,#062b3d 100%);color:#fff;overflow:auto;z-index:30}
 .v11Brand{display:flex;align-items:center;gap:10px;padding:7px 10px 18px;border-bottom:1px solid rgba(255,255,255,.13)}
 .v11BrandMark{width:40px;height:40px;border-radius:12px;background:#12a3aa;display:grid;place-items:center;font-weight:900;font-size:19px}
@@ -79,6 +79,9 @@ body{margin:0;background:linear-gradient(135deg,#eef8f8 0%,#f7fbfc 55%,#eaf5f7 1
 @media(max-width:1200px){.v11Kpis{grid-template-columns:repeat(3,1fr)}.v11Grid3{grid-template-columns:1fr 1fr}}
 @media(max-width:900px){.v11App{grid-template-columns:1fr}.v11Sidebar{position:fixed;left:-295px;width:280px;transition:left .2s}.v11Sidebar.open{left:0}.v11MobileMenu{display:block}.v11Main{padding:0 13px 25px}.v11Grid2,.v11Grid3{grid-template-columns:1fr}.v11Top{height:65px}.v11Kpis{grid-template-columns:repeat(2,1fr)}.v11Breaks{grid-template-columns:1fr}.v11Heading h1{font-size:19px}}
 @media(max-width:520px){.v11Kpis{grid-template-columns:1fr 1fr;gap:8px}.v11Kpi{padding:10px}.v11Kpi b{font-size:18px}.v11TopPill{display:none}}
+
+/* ===== V12 Real DOM Layout ===== */
+.v12RealSection{margin-bottom:13px}.v12RealSection>.card{margin-top:0}.v12Coming{min-height:220px;display:flex;flex-direction:column;justify-content:center}.v12Coming p{color:var(--muted);font-size:13px}.v12Info{display:inline-block;margin-top:12px;padding:9px 11px;border-radius:10px;background:#eef8f8;color:#08747f;font-size:11px;font-weight:700;max-width:max-content}
 </style>
 </head>
 <body>
@@ -89,7 +92,7 @@ body{margin:0;background:linear-gradient(135deg,#eef8f8 0%,#f7fbfc 55%,#eaf5f7 1
       <div><div class="v11BrandTitle">Task Management</div><div class="v11BrandSub">Attendance • Progress • Reporting</div></div>
     </div>
     <div class="v11Profile">
-      <img id="v11Photo" class="v11Photo" alt="Profile">
+      <div id="v11PhotoFallback" class="v11Photo" style="display:grid;place-items:center;color:#0b6874;font-size:26px;font-weight:900">TA</div>
       <div id="v11ProfileName" class="v11ProfileName">Employee</div>
       <div id="v11ProfileMeta" class="v11ProfileMeta">EMPLOYEE ID • Department</div>
       <div class="v11Online"><span class="v11Dot"></span> Online</div>
@@ -345,12 +348,7 @@ body{margin:0;background:linear-gradient(135deg,#eef8f8 0%,#f7fbfc 55%,#eaf5f7 1
           <div class="field"><label>Break 3 End</label><input id="manualB3E" type="time"></div>
           <div class="field" style="grid-column:1/-1"><label>Reason / Remarks</label><textarea id="manualReason" rows="3" placeholder="Optional remarks..."></textarea></div>
         </div>
-        <div class="breakRulesNote">
-          <b>Break Rules:</b> Zohar 1:00–2:00 PM / max 20 min · Juma Friday 12:30–3:00 PM / max 60 min ·
-          Asr 3:45–6:15 PM / max 25 min · Magrib 5:40–7:30 PM / max 25 min · Lunch 1:00–4:00 PM / max 25 min.
-          
-        </div>
-        <div class="modalActions" style="margin-top:8px">
+<div class="modalActions" style="margin-top:8px">
           <button id="clearManualBtn" class="btn secondary" type="button">Clear</button>
           <button id="saveManualBtn" class="btn" type="submit">Submit Attendance</button>
         </div>
@@ -468,10 +466,10 @@ async function callApi(payload, timeoutMs=15000){
 }
 
 function showLogin(msg=''){
-  $('appView').classList.add('hidden'); $('loginView').classList.remove('hidden');
+  $('appView').classList.add('hidden'); $('loginView').classList.remove('hidden'); $('v11Shell').style.display='none';
   if(msg){$('loginAlert').textContent=msg;$('loginAlert').classList.remove('hidden')}
 }
-function showApp(){ $('loginView').classList.add('hidden'); $('appView').classList.remove('hidden'); }
+function showApp(){ $('loginView').classList.add('hidden'); $('appView').classList.remove('hidden'); $('v11Shell').style.display='grid'; if(window.v12SyncUser) window.v12SyncUser(); if(window.v12ShowPage) window.v12ShowPage('home'); }
 function alertApp(msg,ok=false){
   const el=$('appAlert'); el.textContent=msg; el.className='alert '+(ok?'ok':'error'); el.classList.remove('hidden');
   setTimeout(()=>el.classList.add('hidden'),5000);
@@ -905,69 +903,83 @@ $('saveAssignmentBtn').addEventListener('click',async()=>{
 loadTemplates();loadAssignmentEmployees();
 
 
-/* ===== V.11 Layout Controller ===== */
+/* ===== V.12 Real Dashboard Layout Controller ===== */
 (function(){
   const pageMap={home:'v11Home',tasks:'v11Tasks',attendance:'v11Attendance',requests:'v11Requests',notifications:'v11Notifications',reports:'v11Reports',performance:'v11Performance',hod:'v11Hod',control:'v11Control',audit:'v11Audit',settings:'v11Settings',profile:'v11ProfilePage'};
-  const legacyMap={tasks:['taskTemplateCard','monthlyAssignmentCard'],attendance:['manualAttendanceForm'],performance:['performanceCard'],hod:['hodCard'],notifications:['notificationCard'],control:['adminSection']};
+  const functional={
+    tasks:['taskTemplateCard','monthlyAssignmentCard'],
+    attendance:['manualAttendanceForm','historyBtn'],
+    notifications:['notificationCard'],
+    performance:['performanceCard'],
+    hod:['hodCard'],
+    control:['adminSection']
+  };
   function q(id){return document.getElementById(id)}
-  function showPage(page){
-    document.querySelectorAll('.v11Page').forEach(x=>x.classList.remove('active'));
-    q(pageMap[page]||'v11Home').classList.add('active');
-    document.querySelectorAll('#v11Nav button[data-page]').forEach(x=>x.classList.toggle('active',x.dataset.page===page));
-    // Reparent selected existing functional sections into the right-side page.
-    Object.values(pageMap).forEach(id=>{const el=q(id);if(el)el.querySelectorAll('.v11LegacyMount').forEach(x=>x.remove())});
-    (legacyMap[page]||[]).forEach(id=>{
-      const el=q(id);
-      const target=q(pageMap[page]);
-      if(el&&target&&!target.contains(el)){
-        const wrap=document.createElement('div');wrap.className='v11LegacyMount';
-        wrap.appendChild(el);target.appendChild(wrap);
-        el.style.display='';
-      }
+  function moveReal(id,target){
+    const el=q(id), box=q(target); if(!el||!box)return;
+    if(el.dataset.v12Moved==='1')return;
+    const wrap=document.createElement('div'); wrap.className='v12RealSection';
+    // For history button, move its nearest card rather than the button itself.
+    const source = id==='historyBtn' ? el.closest('.card') : el;
+    if(!source)return;
+    wrap.appendChild(source); box.appendChild(wrap); source.style.display=''; source.classList.remove('hidden'); source.dataset.v12Moved='1';
+  }
+  function buildPages(){
+    // Move actual DOM nodes, not clones, so existing event handlers continue working.
+    functional.tasks.forEach(id=>moveReal(id,'v11Tasks'));
+    moveReal('manualAttendanceForm','v11Attendance');
+    moveReal('historyBtn','v11Attendance');
+    moveReal('notificationCard','v11Notifications');
+    moveReal('performanceCard','v11Performance');
+    moveReal('hodCard','v11Hod');
+    moveReal('adminSection','v11Control');
+    // Keep user modal functional even though its source sits in the legacy container.
+    const modal=q('userModal'); if(modal && modal.parentElement!==document.body){document.body.appendChild(modal);}
+    // Build professional placeholders for modules whose detailed workflows are still being wired.
+    const cards={
+      requests:['Schedule & Requests','Leave, Weekoff, Meeting, Journey aur Other Requests yahan manage honge.'],
+      reports:['Reports & Analytics','Daily, Weekly, Monthly Attendance + Task + Time reports yahan available honge.'],
+      audit:['Audit & Security','Login, Sessions, Password, Activity Log aur security controls.'],
+      settings:['System Settings','Office Settings, Attendance Rules, Templates, Notifications aur Backup controls.'],
+      profile:['My Profile','Profile, Employee ID, Department, Weekoff aur account details.']
+    };
+    Object.keys(cards).forEach(key=>{
+      const target=q(pageMap[key]); if(!target || target.dataset.built==='1')return;
+      target.innerHTML='<div class="v11Panel v12Coming"><div class="v11PanelHead"><h3>'+cards[key][0]+'</h3></div><p>'+cards[key][1]+'</p><div class="v12Info">Module architecture V.12 active • Existing data safe • Fast loading enabled</div></div>';
+      target.dataset.built='1';
     });
+  }
+  function showPage(page){
+    buildPages();
+    Object.values(pageMap).forEach(id=>{const el=q(id);if(el)el.classList.remove('active')});
+    const target=q(pageMap[page]||'v11Home'); if(target)target.classList.add('active');
+    document.querySelectorAll('#v11Nav button[data-page]').forEach(x=>x.classList.toggle('active',x.dataset.page===page));
     q('v11Sidebar').classList.remove('open');
   }
-  document.querySelectorAll('#v11Nav button[data-page], [data-page-link]').forEach(btn=>{
-    btn.addEventListener('click',()=>showPage(btn.dataset.page||btn.dataset.pageLink));
-  });
+  window.v12ShowPage=showPage;
+  document.querySelectorAll('#v11Nav button[data-page]').forEach(btn=>btn.addEventListener('click',()=>showPage(btn.dataset.page)));
+  document.querySelectorAll('[data-page-link]').forEach(btn=>btn.addEventListener('click',()=>showPage(btn.dataset.pageLink)));
   q('v11MobileMenu').addEventListener('click',()=>q('v11Sidebar').classList.toggle('open'));
   q('v11Bell').addEventListener('click',()=>showPage('notifications'));
-  q('v11Logout').addEventListener('click',()=>{ if(typeof logout==='function') logout(); });
+  q('v11Logout').addEventListener('click',()=>q('logoutBtn').click());
   function clock(){
     const d=new Date();
     q('v11Date').textContent=d.toLocaleDateString('en-IN',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
     q('v11Clock').textContent=d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
   }
-  clock();setInterval(clock,1000);
+  clock(); setInterval(clock,1000);
 
-  // Keep the existing login/dashboard data model; mirror known session values when available.
-  try{
-    if(typeof me!=='undefined' && me){
-      q('v11ProfileName').textContent=me.displayName||me.name||me.username||'Employee';
-      q('v11ProfileMeta').textContent=(me.employeeId||'')+' • '+(me.department||me.role||'Employee');
-    }
-  }catch(e){}
-
-  // Build functional right-side pages from existing cards without changing backend workflows.
-  function cloneInto(targetId, sourceIds, title){
-    const target=q(targetId);if(!target)return;
-    if(target.dataset.built==='1')return;
-    const h=document.createElement('div');h.className='v11Panel';h.style.marginBottom='13px';h.innerHTML='<div class="v11PanelHead"><h3>'+title+'</h3></div>';
-    sourceIds.forEach(id=>{
-      const s=q(id);
-      if(s){const c=s.cloneNode(true);c.style.display='';c.id='v11clone_'+id;h.appendChild(c);}
-    });
-    target.appendChild(h);target.dataset.built='1';
+  // Mirror session information into the sidebar.
+  function syncUser(){
+    try{
+      if(typeof me!=='undefined' && me){
+        q('v11ProfileName').textContent=me.displayName||me.name||me.username||'Employee';
+        q('v11ProfileMeta').textContent=(me.employeeId||'')+' • '+(me.department||me.role||'Employee');
+      }
+    }catch(e){}
   }
-  cloneInto('v11Tasks',['taskTemplateCard','monthlyAssignmentCard'],'Task Management');
-  cloneInto('v11Attendance',['manualAttendanceForm'],'Attendance Management');
-  cloneInto('v11Notifications',['notificationCard'],'Notification Center');
-  cloneInto('v11Performance',['performanceCard'],'Employee Performance');
-  cloneInto('v11Hod',['hodCard'],'HOD Team Dashboard');
-  cloneInto('v11Control',['adminSection'],'Control Management');
-
-  // Initial home view.
-  showPage('home');
+  window.v12SyncUser=syncUser;
+  buildPages(); showPage('home'); syncUser();
 })();
 </script>
 
