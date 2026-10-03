@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Task Attendance Dashboard · V.6</title>
+<title>Task Attendance Dashboard · V.7</title>
 <style>
 :root{--primary:#0b8795;--primary2:#087b87;--bg:#eef8f8;--card:#fff;--text:#12303b;--muted:#607680;--danger:#b42318;--success:#067647;--border:#d5e2e5;--shadow:0 18px 45px rgba(15,55,65,.10)}
 *{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:linear-gradient(135deg,#f4fbfb,#e8f5f5);color:var(--text)}button,input,select,textarea{font:inherit}button{cursor:pointer;border:0}.hidden{display:none!important}
@@ -26,7 +26,7 @@ h1{font-size:27px;margin:0 0 5px;font-weight:800}.sub{color:var(--muted);margin-
   <section id="loginView" class="login">
     <div class="brandMark">TA</div>
     <h1>Task Attendance Dashboard</h1>
-    <div class="sub">Manual Attendance Management · V.6</div>
+    <div class="sub">Manual Attendance Management · V.7</div>
     <div id="loginAlert" class="alert error hidden"></div>
     <form id="loginForm">
       <div class="field"><label>Username</label><input id="username" autocomplete="username" required value="admin"></div>
@@ -99,7 +99,7 @@ h1{font-size:27px;margin:0 0 5px;font-weight:800}.sub{color:var(--muted);margin-
         <input id="endDate" type="date" style="padding:9px;border:1px solid var(--border);border-radius:9px">
         <button id="historyBtn" class="btn secondary small">Load History</button>
       </div>
-      <div class="tablewrap"><table class="table"><thead><tr><th>Date</th><th>Employee</th><th>In</th><th>Out</th><th>Break 1</th><th>Break 2</th><th>Break 3</th></tr></thead><tbody id="historyBody"><tr><td colspan="7">No data loaded.</td></tr></tbody></table></div>
+      <div class="tablewrap"><table class="table"><thead><tr><th>Date</th><th>Employee</th><th>In Time</th><th>Out Time</th><th>Break 1</th><th>Break 2</th><th>Break 3</th></tr></thead><tbody id="historyBody"><tr><td colspan="7">No data loaded.</td></tr></tbody></table></div>
     </div>
 
     <div id="adminSection" class="card section hidden">
@@ -207,7 +207,38 @@ function alertApp(msg,ok=false){
   setTimeout(()=>el.classList.add('hidden'),5000);
 }
 function alertLogin(msg){const el=$('loginAlert');el.textContent=msg;el.className='alert error';el.classList.remove('hidden')}
-function fmt(v){return v?String(v).replace('T',' '):'—'}
+function fmt(v){
+  if(v==null || v==='') return '—';
+  const s=String(v);
+  if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
+  return formatTime12(s);
+}
+function formatDateDMY(v){
+  if(!v) return '—';
+  const s=String(v);
+  const m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : s;
+}
+function formatTime12(v){
+  if(!v) return '—';
+  const s=String(v).trim();
+  const old=s.match(/^(?:1899|1900)-\d{2}-\d{2}T(\d{2}):(\d{2})(?::(\d{2}))?Z?$/);
+  if(old){
+    const d=new Date(s);
+    if(!Number.isNaN(d.getTime())) return d.toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'});
+  }
+  const iso=s.match(/T(\d{2}):(\d{2})/);
+  if(iso && /Z$/.test(s)){
+    const d=new Date(s);
+    if(!Number.isNaN(d.getTime())) return d.toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'});
+  }
+  const hm=s.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if(hm){
+    let h=Number(hm[1]); const m=hm[2]; const ap=h>=12?'PM':'AM'; h=h%12||12; return `${h}:${m} ${ap}`;
+  }
+  if(/AM|PM/i.test(s)) return s;
+  return s;
+}
 
 $('loginForm').addEventListener('submit', async e=>{
   e.preventDefault();
@@ -303,7 +334,7 @@ $('historyBtn').addEventListener('click',async()=>{
   try{
     const d=await callApi({action:'getAttendanceHistory',token,startDate:$('startDate').value,endDate:$('endDate').value});
     if(d.status!=='success') throw new Error(d.message);
-    $('historyBody').innerHTML=d.rows.length?d.rows.map(r=>`<tr><td>${r.Date||''}</td><td>${r['Display Name']||r.Username||''}</td><td>${r['In Time']||'—'}</td><td>${r['Out Time']||'—'}</td><td>${r['Break 1 Start']||'—'} / ${r['Break 1 End']||'—'}</td><td>${r['Break 2 Start']||'—'} / ${r['Break 2 End']||'—'}</td><td>${r['Break 3 Start']||'—'} / ${r['Break 3 End']||'—'}</td></tr>`).join(''):'<tr><td colspan="7">No attendance found.</td></tr>';
+    $('historyBody').innerHTML=d.rows.length?d.rows.map(r=>`<tr><td>${formatDateDMY(r.Date)}</td><td>${esc(r['Display Name']||r.Username||'')}</td><td>${formatTime12(r['In Time'])}</td><td>${formatTime12(r['Out Time'])}</td><td>${formatTime12(r['Break 1 Start'])} / ${formatTime12(r['Break 1 End'])}</td><td>${formatTime12(r['Break 2 Start'])} / ${formatTime12(r['Break 2 End'])}</td><td>${formatTime12(r['Break 3 Start'])} / ${formatTime12(r['Break 3 End'])}</td></tr>`).join(''):'<tr><td colspan="7">No attendance found.</td></tr>';
   }catch(e){alertApp(e.message)}
 });
 
