@@ -7,7 +7,7 @@
 <style>
 :root{--primary:#0b8795;--primary2:#087b87;--bg:#eef8f8;--card:#fff;--text:#12303b;--muted:#607680;--danger:#b42318;--success:#067647;--border:#d5e2e5;--shadow:0 18px 45px rgba(15,55,65,.10)}
 *{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:linear-gradient(135deg,#f4fbfb,#e8f5f5);color:var(--text)}button,input,select,textarea{font:inherit}button{cursor:pointer;border:0}.hidden{display:none!important}
-.wrap{min-height:100vh;padding:28px}.login{width:min(440px,100%);margin:20px auto;background:#fff;border:1px solid var(--border);border-radius:22px;padding:30px;box-shadow:var(--shadow)}
+.wrap{min-height:100vh;padding:28px}.login{width:min(460px,100%);margin:42px auto;background:rgba(255,255,255,.97);border:1px solid #d7e6e9;border-radius:24px;padding:34px;box-shadow:0 24px 65px rgba(15,55,65,.13);position:relative;overflow:hidden}.login:before{content:'';position:absolute;left:0;right:0;top:0;height:5px;background:linear-gradient(90deg,#087f8d,#16a6a8,#087f8d)}.brandMark{width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,#0b8795,#075f69);display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;font-weight:900;box-shadow:0 10px 24px rgba(11,135,149,.22);margin-bottom:18px}.login .sub{font-size:14px}.login .btn{min-height:46px;font-size:15px}.loginFooter{margin-top:17px;padding-top:15px;border-top:1px solid #edf2f3}.sectionHead{display:flex;align-items:center;justify-content:space-between;gap:15px}.modal{position:fixed;inset:0;background:rgba(8,34,41,.45);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:18px;z-index:50}.modalBox{width:min(700px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:20px;border:1px solid #d7e6e9;box-shadow:0 28px 80px rgba(0,0,0,.20);padding:24px}.modalHead{display:flex;align-items:flex-start;justify-content:space-between;gap:15px;margin-bottom:16px}.modalHead h3{margin:0;font-size:20px}.iconBtn{width:36px;height:36px;border-radius:10px;background:#eef6f7;color:#23424b;font-size:23px}.formGrid{display:grid;grid-template-columns:1fr 1fr;gap:2px 14px}.modalActions{display:flex;justify-content:flex-end;gap:10px;margin-top:8px}.actionBtns{display:flex;gap:6px;flex-wrap:wrap}.table .actionBtn{padding:7px 9px;border-radius:8px;background:#e9f4f5;color:#086c76;font-size:11px;font-weight:700}.table .actionBtn.delete{background:#fff0f0;color:#b42318}
 h1{font-size:27px;margin:0 0 5px;font-weight:800}.sub{color:var(--muted);margin-bottom:22px}.field{margin:14px 0}.field label{display:block;font-size:13px;font-weight:700;margin-bottom:7px}.field input,.field select,.field textarea{width:100%;padding:13px;border:1px solid #c8d9dd;border-radius:11px;outline:none;background:#fff}.field input:focus,.field select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(11,135,149,.10)}
 .btn{background:var(--primary);color:#fff;border-radius:11px;padding:12px 17px;font-weight:700}.btn:hover{background:var(--primary2)}.btn.secondary{background:#e9f4f5;color:#086c76}.btn.danger{background:#b42318}.btn.small{padding:9px 12px;font-size:13px}
 .alert{padding:11px 13px;border-radius:10px;font-size:13px;margin:12px 0}.alert.error{background:#fff0f0;color:var(--danger)}.alert.ok{background:#ecfdf3;color:var(--success)}.note{font-size:12px;color:var(--muted);line-height:1.5}
@@ -17,22 +17,25 @@ h1{font-size:27px;margin:0 0 5px;font-weight:800}.sub{color:var(--muted);margin-
 .att{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.state{padding:13px;border-radius:12px;background:#f5fafb;border:1px solid var(--border);font-size:13px}
 .tablewrap{overflow:auto;border:1px solid var(--border);border-radius:12px}.table{width:100%;border-collapse:collapse;min-width:750px}.table th,.table td{padding:10px;border-bottom:1px solid #e6eef0;text-align:left;font-size:12px}.table th{background:#f4f9fa}
 .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.5);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px;margin-right:7px}@keyframes spin{to{transform:rotate(360deg)}}
-@media(max-width:800px){.wrap{padding:14px}.grid{grid-template-columns:repeat(2,1fr)}.att{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}.login{margin:10px auto;padding:23px}}
+@media(max-width:800px){.wrap{padding:14px}.grid{grid-template-columns:repeat(2,1fr)}.att{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}.login{margin:10px auto;padding:27px}.sectionHead{align-items:flex-start;flex-direction:column}.formGrid{grid-template-columns:1fr}.modalBox{padding:19px}.modalActions{flex-direction:column-reverse}.modalActions .btn{width:100%}}
 @media(max-width:480px){.grid{grid-template-columns:1fr 1fr}.login{border-radius:17px}h1{font-size:23px}.btn{width:100%}.actions .btn{width:auto}}
 </style>
 </head>
 <body>
 <div class="wrap">
   <section id="loginView" class="login">
+    <div class="brandMark">TA</div>
     <h1>Task Attendance Dashboard</h1>
-    <div class="sub">Fast Attendance · V.4</div>
+    <div class="sub">Secure Attendance Management · V.5</div>
     <div id="loginAlert" class="alert error hidden"></div>
     <form id="loginForm">
       <div class="field"><label>Username</label><input id="username" autocomplete="username" required value="admin"></div>
       <div class="field"><label>Password</label><input id="password" type="password" autocomplete="current-password" required value="Admin@12345"></div>
       <button id="loginBtn" class="btn" type="submit">Sign In</button>
     </form>
-    <p class="note">Fast mode: authentication ke waqt heavy reports load nahi hoti.</p>
+    <div class="loginFooter">
+      <p class="note" style="margin:0">Fast & secure login · Heavy reports authentication ke waqt load nahi hoti.</p>
+    </div>
   </section>
 
   <section id="appView" class="dashboard hidden">
@@ -79,9 +82,49 @@ h1{font-size:27px;margin:0 0 5px;font-weight:800}.sub{color:var(--muted);margin-
     </div>
 
     <div id="adminSection" class="card section hidden">
-      <h3>Admin — Users</h3>
-      <button id="usersBtn" class="btn secondary small">Load Users</button>
-      <div class="tablewrap" style="margin-top:10px"><table class="table"><thead><tr><th>Username</th><th>Name</th><th>Employee ID</th><th>Department</th><th>Role</th><th>Weekoff</th><th>Access</th></tr></thead><tbody id="usersBody"></tbody></table></div>
+      <div class="sectionHead">
+        <div>
+          <h3 style="margin-bottom:4px">User Management</h3>
+          <div class="note">Create, edit aur delete users. Password frontend mein table par show nahi hota.</div>
+        </div>
+        <div class="actions">
+          <button id="usersBtn" class="btn secondary small">↻ Refresh</button>
+          <button id="createUserBtn" class="btn small">＋ Create User</button>
+        </div>
+      </div>
+      <div class="tablewrap" style="margin-top:12px">
+        <table class="table">
+          <thead><tr><th>Username</th><th>Name</th><th>Employee ID</th><th>Department</th><th>Role</th><th>Weekoff</th><th>Access</th><th>Action</th></tr></thead>
+          <tbody id="usersBody"><tr><td colspan="8">Click Refresh to load users.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="userModal" class="modal hidden">
+      <div class="modalBox">
+        <div class="modalHead">
+          <div><h3 id="userModalTitle">Create User</h3><div class="note">User details securely save honge.</div></div>
+          <button id="closeUserModal" class="iconBtn" type="button">×</button>
+        </div>
+        <div id="userModalAlert" class="alert hidden"></div>
+        <form id="userForm">
+          <input id="formMode" type="hidden" value="create">
+          <div class="formGrid">
+            <div class="field"><label>Username *</label><input id="uUsername" required autocomplete="off"></div>
+            <div class="field"><label>Display Name *</label><input id="uDisplayName" required></div>
+            <div class="field"><label>Employee ID</label><input id="uEmployeeId" placeholder="EMP-0001"></div>
+            <div class="field"><label>Department</label><input id="uDepartment"></div>
+            <div class="field"><label>Role</label><select id="uRole"><option>Employee</option><option>HOD</option><option>Admin</option><option>MasterAdmin</option><option>TaskAdmin/Assistant</option></select></div>
+            <div class="field"><label>Weekoff</label><select id="uWeekoff"><option>Sunday</option><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option></select></div>
+            <div class="field"><label>Web Link Access</label><select id="uAccess"><option>ON</option><option>OFF</option></select></div>
+            <div class="field"><label>Password <span id="passwordHint" class="note"></span></label><input id="uPassword" type="password" autocomplete="new-password"></div>
+          </div>
+          <div class="modalActions">
+            <button id="cancelUserBtn" class="btn secondary" type="button">Cancel</button>
+            <button id="saveUserBtn" class="btn" type="submit">Save User</button>
+          </div>
+        </form>
+      </div>
     </div>
   </section>
 </div>
@@ -154,7 +197,7 @@ $('loginForm').addEventListener('submit', async e=>{
     token=data.token; me=data.user; sessionStorage.setItem('ta_token',token);
     $('userInfo').textContent=`${me.displayName} · ${me.employeeId||'No ID'} · ${me.department||'Department not set'} · ${me.role}`;
     $('adminSection').classList.toggle('hidden',!['Admin','MasterAdmin','HOD','TaskAdmin/Assistant'].includes(me.role));
-    showApp(); await loadSummary();
+    showApp(); await loadSummary(); if(['Admin','MasterAdmin','HOD','TaskAdmin/Assistant'].includes(me.role)) await loadUsers();
   }catch(err){alertLogin(err.message||'Login failed.')}
   finally{b.disabled=false;b.textContent='Sign In'}
 });
@@ -197,13 +240,108 @@ $('historyBtn').addEventListener('click',async()=>{
   }catch(e){alertApp(e.message)}
 });
 
-$('usersBtn').addEventListener('click',async()=>{
+let cachedUsers = [];
+
+$('usersBtn').addEventListener('click', loadUsers);
+$('createUserBtn').addEventListener('click', ()=>openUserModal('create'));
+$('closeUserModal').addEventListener('click', closeUserModal);
+$('cancelUserBtn').addEventListener('click', closeUserModal);
+
+function esc(v){
+  return String(v==null?'':v).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function loadUsers(){
   try{
     const d=await callApi({action:'adminListUsers',token});
     if(d.status!=='success') throw new Error(d.message);
-    $('usersBody').innerHTML=d.users.map(u=>`<tr><td>${u.Username||''}</td><td>${u['Display Name']||''}</td><td>${u['Employee ID']||''}</td><td>${u.Department||''}</td><td>${u.Role||''}</td><td>${u.Weekoff||''}</td><td>${u['Web Link Access']||''}</td></tr>`).join('');
+    cachedUsers=d.users||[];
+    $('usersBody').innerHTML=cachedUsers.length?cachedUsers.map((u,i)=>`<tr>
+      <td>${esc(u.Username)}</td>
+      <td>${esc(u['Display Name'])}</td>
+      <td>${esc(u['Employee ID'])}</td>
+      <td>${esc(u.Department)}</td>
+      <td>${esc(u.Role)}</td>
+      <td>${esc(u.Weekoff)}</td>
+      <td>${esc(u['Web Link Access'])}</td>
+      <td><div class="actionBtns">
+        <button class="actionBtn" onclick="editUser(${i})">Edit</button>
+        <button class="actionBtn delete" onclick="deleteUser(${i})">Delete</button>
+      </div></td>
+    </tr>`).join(''):'<tr><td colspan="8">No users found.</td></tr>';
   }catch(e){alertApp(e.message)}
+}
+
+function openUserModal(mode, user){
+  $('formMode').value=mode;
+  $('userModalTitle').textContent=mode==='create'?'Create New User':'Edit User';
+  $('saveUserBtn').textContent=mode==='create'?'Create User':'Save Changes';
+  $('uUsername').value=user?.Username||'';
+  $('uUsername').readOnly=mode==='edit';
+  $('uDisplayName').value=user?.['Display Name']||'';
+  $('uEmployeeId').value=user?.['Employee ID']||'';
+  $('uDepartment').value=user?.Department||'';
+  $('uRole').value=user?.Role||'Employee';
+  $('uWeekoff').value=user?.Weekoff||'Sunday';
+  $('uAccess').value=user?.['Web Link Access']||'ON';
+  $('uPassword').value='';
+  $('passwordHint').textContent=mode==='edit'?'(blank = keep current)':'(required)';
+  $('userModalAlert').classList.add('hidden');
+  $('userModal').classList.remove('hidden');
+  setTimeout(()=>$('uDisplayName').focus(),50);
+}
+function closeUserModal(){ $('userModal').classList.add('hidden'); }
+function editUser(i){ openUserModal('edit', cachedUsers[i]); }
+
+async function deleteUser(i){
+  const u=cachedUsers[i];
+  if(!u) return;
+  if(String(u.Username).toLowerCase()===String(me?.username||'').toLowerCase()){
+    alertApp('Aap apne logged-in user ko delete nahi kar sakte.'); return;
+  }
+  if(!confirm(`User "${u.Username}" ko delete karna hai?`)) return;
+  try{
+    const d=await callApi({action:'adminDeleteUser',token,username:u.Username});
+    if(d.status!=='success') throw new Error(d.message);
+    alertApp(d.message,true);
+    await loadUsers();
+  }catch(e){alertApp(e.message)}
+}
+
+$('userForm').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const mode=$('formMode').value;
+  const payload={
+    action:mode==='create'?'adminCreateUser':'adminUpdateUser',
+    token,
+    username:$('uUsername').value.trim(),
+    displayName:$('uDisplayName').value.trim(),
+    employeeId:$('uEmployeeId').value.trim(),
+    department:$('uDepartment').value.trim(),
+    role:$('uRole').value,
+    weekoff:$('uWeekoff').value,
+    webLinkAccess:$('uAccess').value
+  };
+  const password=$('uPassword').value;
+  if(mode==='create'){
+    if(!password){ showUserModalError('Create user ke liye password required hai.'); return; }
+    payload.password=password;
+  }else if(password){
+    payload.password=password;
+  }
+  const b=$('saveUserBtn'); b.disabled=true; b.innerHTML='<span class="spinner"></span>Saving...';
+  try{
+    const d=await callApi(payload);
+    if(d.status!=='success') throw new Error(d.message);
+    closeUserModal(); alertApp(d.message,true); await loadUsers();
+  }catch(err){showUserModalError(err.message)}
+  finally{b.disabled=false;b.textContent=mode==='create'?'Create User':'Save Changes'}
 });
+function showUserModalError(msg){
+  const el=$('userModalAlert');el.textContent=msg;el.className='alert error';el.classList.remove('hidden');
+}
+
+$('userModal').addEventListener('click',e=>{if(e.target===$('userModal')) closeUserModal();});
 
 $('logoutBtn').addEventListener('click',async()=>{
   try{await callApi({action:'logout',token})}catch(e){}
