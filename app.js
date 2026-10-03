@@ -30,3 +30,40 @@ $('generateMonthly').onclick=async()=>{try{const templateId=$('monthlyTemplate')
 $('newUser').onclick=()=>{$('userEditor').classList.remove('hidden');['uEmpId','uName','uDepartment','uLogin','uPassword','uIn','uOut','uWeekoff'].forEach(id=>$(id).value='');$('uRole').value='Employee'};$('cancelUser').onclick=()=>$('userEditor').classList.add('hidden');
 $('saveUser').onclick=async()=>{try{await api('users.save',{employeeId:$('uEmpId').value,name:$('uName').value,department:$('uDepartment').value,userId:$('uLogin').value,password:$('uPassword').value,role:$('uRole').value,officeIn:$('uIn').value,officeOut:$('uOut').value,weekoff:$('uWeekoff').value});$('userMsg').textContent='User saved.';loadUsers()}catch(e){$('userMsg').textContent=e.message}};$('refreshAttendance').onclick=loadAttendance;$('refreshTasks').onclick=loadTasks;$('attDate').value=new Date().toISOString().slice(0,10);$('monthlyMonth').value=new Date().toISOString().slice(0,7);
 try{const s=JSON.parse(localStorage.getItem(window.APP_CONFIG.SESSION_KEY));if(s?.token){session=s;$('loginView').classList.add('hidden');$('appView').classList.remove('hidden');$('userName').textContent=s.name;$('roleBadge').textContent=' • '+s.role;document.querySelectorAll('.adminOnly').forEach(x=>x.classList.toggle('hidden',!['Admin','Master Admin'].includes(s.role)));document.querySelectorAll('.adminOrHod').forEach(x=>x.classList.toggle('hidden',!['Admin','Master Admin','HOD'].includes(s.role)));showPage('home')}}catch(e){}
+
+// V.4 User Management
+async function loadUsersV4(){
+  try{const r=await api("users.list"); renderUsersV4(r.rows||[]);}
+  catch(e){alert(e.message)}
+}
+function renderUsersV4(rows){
+  const t=$("usersTable");
+  if(!rows.length){t.innerHTML="<tr><td>No users found</td></tr>";return}
+  const keys=["EmployeeId","Name","Department","UserId","Role","Status","OfficeIn","OfficeOut","Weekoff"];
+  t.innerHTML="<thead><tr>"+keys.map(k=>"<th>"+esc(k)+"</th>").join("")+"<th>Action</th></tr></thead><tbody>"+
+    rows.map(r=>"<tr>"+keys.map(k=>"<td>"+esc(r[k])+"</td>").join("")+
+    "<td><button onclick='editUserV4("+JSON.stringify(r).replace(/'/g,"&#39;")+")'>Edit</button></td></tr>").join("")+"</tbody>";
+}
+function editUserV4(r){
+  $("userEditor").classList.remove("hidden");
+  $("uEmpId").value=r.EmployeeId||"";$("uName").value=r.Name||"";$("uDepartment").value=r.Department||"";
+  $("uLogin").value=r.UserId||"";$("uPassword").value="";$("uRole").value=r.Role||"Employee";
+  $("uStatus").value=r.Status||"Active";$("uIn").value=r.OfficeIn||"";$("uOut").value=r.OfficeOut||"";$("uWeekoff").value=r.Weekoff||"";
+}
+if($("newUser"))$("newUser").onclick=()=>{
+  $("userEditor").classList.remove("hidden");
+  ["uEmpId","uName","uDepartment","uLogin","uPassword","uIn","uOut","uWeekoff"].forEach(id=>$(id).value="");
+  $("uRole").value="Employee";$("uStatus").value="Active";$("userMsg").textContent="";
+};
+if($("cancelUser"))$("cancelUser").onclick=()=>$("userEditor").classList.add("hidden");
+if($("saveUser"))$("saveUser").onclick=async()=>{
+  try{
+    const p={employeeId:$("uEmpId").value,name:$("uName").value,department:$("uDepartment").value,
+      userId:$("uLogin").value,password:$("uPassword").value,role:$("uRole").value,status:$("uStatus").value,
+      officeIn:$("uIn").value,officeOut:$("uOut").value,weekoff:$("uWeekoff").value};
+    const r=await api("users.save",p);$("userMsg").textContent="User saved successfully.";loadUsersV4();
+  }catch(e){$("userMsg").textContent=e.message}
+};
+document.querySelectorAll(".nav").forEach(x=>{
+  if(x.dataset.page==="users") x.onclick=()=>{showPage("users");loadUsersV4();}
+});
