@@ -17,8 +17,19 @@ h1{font-size:27px;margin:0 0 5px;font-weight:800}.sub{color:var(--muted);margin-
 .att{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.state{padding:13px;border-radius:12px;background:#f5fafb;border:1px solid var(--border);font-size:13px}
 .tablewrap{overflow:auto;border:1px solid var(--border);border-radius:12px}.table{width:100%;border-collapse:collapse;min-width:750px}.table th,.table td{padding:10px;border-bottom:1px solid #e6eef0;text-align:left;font-size:12px}.table th{background:#f4f9fa}
 .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.5);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px;margin-right:7px}@keyframes spin{to{transform:rotate(360deg)}}
-@media(max-width:800px){.wrap{padding:14px}.grid{grid-template-columns:repeat(2,1fr)}.att{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}.login{margin:10px auto;padding:27px}.sectionHead{align-items:flex-start;flex-direction:column}.formGrid{grid-template-columns:1fr}.modalBox{padding:19px}.modalActions{flex-direction:column-reverse}.modalActions .btn{width:100%}}
+@media(max-width:800px){.miniMetrics{grid-template-columns:repeat(2,1fr)}.chartTable{grid-template-columns:1fr}.moduleNav{position:static}.wrap{padding:14px}.grid{grid-template-columns:repeat(2,1fr)}.att{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}.login{margin:10px auto;padding:27px}.sectionHead{align-items:flex-start;flex-direction:column}.formGrid{grid-template-columns:1fr}.modalBox{padding:19px}.modalActions{flex-direction:column-reverse}.modalActions .btn{width:100%}}
 @media(max-width:480px){.grid{grid-template-columns:1fr 1fr}.login{border-radius:17px}h1{font-size:23px}.btn{width:100%}.actions .btn{width:auto}}
+
+.moduleNav{display:flex;gap:7px;flex-wrap:wrap;padding:10px;position:sticky;top:8px;z-index:8}
+.moduleBtn{border:0;background:#edf6f7;color:#075f69;padding:9px 12px;border-radius:10px;font-weight:700;font-size:12px;cursor:pointer}
+.moduleBtn.active{background:#0b8996;color:#fff}
+.miniMetrics{display:grid;grid-template-columns:repeat(8,1fr);gap:9px;margin-top:12px}
+.metric{border:1px solid #dbe9eb;background:#f7fbfb;border-radius:12px;padding:10px}.metric span{display:block;font-size:11px;color:#54717a}.metric b{display:block;font-size:19px;margin-top:5px;color:#073b45}
+.chartTable{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:15px}
+.barRow{display:grid;grid-template-columns:45px 1fr 38px;gap:8px;align-items:center;margin:8px 0;font-size:11px}
+.bar{height:10px;border-radius:99px;background:#e8f1f2;overflow:hidden}.bar i{display:block;height:100%;background:#0b8996;border-radius:99px}
+.badge{display:inline-flex;min-width:22px;height:22px;align-items:center;justify-content:center;border-radius:50%;background:#eaf5f6;color:#08707a;font-size:11px}
+.notificationList{display:grid;gap:8px;margin-top:12px}.notification{display:flex;justify-content:space-between;gap:12px;padding:12px;border:1px solid #dbe9eb;border-radius:12px;background:#f8fbfb}.notification.read{opacity:.65}.notification small{color:#718990}
 </style>
 </head>
 <body>
@@ -50,6 +61,41 @@ h1{font-size:27px;margin:0 0 5px;font-weight:800}.sub{color:var(--muted);margin-
       <div class="card"><div class="label">In Time</div><div id="inTime" class="metric" style="font-size:18px">—</div></div>
       <div class="card"><div class="label">Out Time</div><div id="outTime" class="metric" style="font-size:18px">—</div></div>
       <div class="card"><div class="label">Month Present</div><div id="monthPresent" class="metric">0</div></div>
+    </div>
+
+
+    <div class="moduleNav card">
+      <button class="moduleBtn active" data-module="overview">Overview</button>
+      <button class="moduleBtn" data-module="control">Control Management</button>
+      <button class="moduleBtn" data-module="tasks">Task Management</button>
+      <button class="moduleBtn" data-module="attendance">Attendance Management</button>
+      <button class="moduleBtn" data-module="requests">Schedule & Requests</button>
+      <button class="moduleBtn" data-module="notifications">Notification Center</button>
+      <button class="moduleBtn" data-module="reports">Reports & Analytics</button>
+      <button class="moduleBtn" data-module="audit">Audit & Security</button>
+      <button class="moduleBtn" data-module="settings">System Settings</button>
+    </div>
+
+    <div id="performanceCard" class="card section">
+      <div class="sectionHead">
+        <div><h3>Employee Performance Dashboard</h3><div class="note">Assigned Tasks, Completed, Pending, Delayed, On-Time %, Task Minutes aur Progress.</div></div>
+        <div class="actions"><button id="loadPerformanceBtn" class="btn secondary small">Refresh Performance</button></div>
+      </div>
+      <div id="performanceMetrics" class="miniMetrics"></div>
+      <div class="chartTable">
+        <div><h4>Daily / Weekly / Monthly Progress</h4><div id="performanceBars" class="bars"></div></div>
+        <div class="tablewrap"><table class="table"><thead><tr><th>Date</th><th>Assigned</th><th>Completed</th><th>Pending</th><th>Delayed</th></tr></thead><tbody id="performanceBody"><tr><td colspan="5">Loading...</td></tr></tbody></table></div>
+      </div>
+    </div>
+
+    <div id="hodCard" class="card section hidden">
+      <div class="sectionHead"><div><h3>HOD Team Dashboard</h3><div class="note">Sirf assigned/department team ka Attendance, Tasks, Pending, Delayed, Progress aur Workload.</div></div><button id="loadHodBtn" class="btn secondary small">Refresh Team</button></div>
+      <div class="tablewrap"><table class="table"><thead><tr><th>Employee</th><th>Department</th><th>Attendance</th><th>Tasks</th><th>Completed</th><th>Pending</th><th>Delayed</th><th>Progress</th></tr></thead><tbody id="hodBody"></tbody></table></div>
+    </div>
+
+    <div id="notificationCard" class="card section">
+      <div class="sectionHead"><div><h3>🔔 Smart Notification Center <span id="notificationBadge" class="badge">0</span></h3><div class="note">Task, Attendance, Approval, Reminder, Escalation aur announcements.</div></div><button id="loadNotificationsBtn" class="btn secondary small">Refresh</button></div>
+      <div id="notificationList" class="notificationList"><div class="note">Loading notifications...</div></div>
     </div>
 
     <div class="card section">
@@ -86,7 +132,7 @@ h1{font-size:27px;margin:0 0 5px;font-weight:800}.sub{color:var(--muted);margin-
         <div class="breakRulesNote">
           <b>Break Rules:</b> Zohar 1:00–2:00 PM / max 20 min · Juma Friday 12:30–3:00 PM / max 60 min ·
           Asr 3:45–6:15 PM / max 25 min · Magrib 5:40–7:30 PM / max 25 min · Lunch 1:00–4:00 PM / max 25 min.
-          Allowed limit se extra time par Extra Break Report generate hoga.
+          Allowed limit se extra time par Extra Break Report generate hoga. Rules System Settings se centrally controlled rahenge.
         </div>
         <div class="modalActions" style="margin-top:8px">
           <button id="clearManualBtn" class="btn secondary" type="button">Clear</button>
@@ -470,6 +516,62 @@ $('logoutBtn').addEventListener('click',async()=>{
     }catch(e){sessionStorage.removeItem('ta_token');token='';}
   }
 })();
+
+async function loadPerformance(){
+  try{
+    const d=await callApi({action:'employeePerformance',token,year:String(new Date().getFullYear())});
+    if(d.status!=='success') throw new Error(d.message);
+    const m=d.metrics||{};
+    $('performanceMetrics').innerHTML=[
+      ['Assigned Tasks',m.total],['Completed',m.completed],['Pending',m.pending],['Delayed',m.delayed],
+      ['On-Time %',m.onTimePercent+'%'],['Task Minutes',m.taskMinutes],['Completed Minutes',m.completedMinutes],['Avg Completion',m.averageCompletionMinutes+' min']
+    ].map(x=>`<div class="metric"><span>${esc(x[0])}</span><b>${esc(x[1])}</b></div>`).join('');
+    const daily=d.daily||[];
+    $('performanceBody').innerHTML=daily.length?daily.slice(-31).map(r=>`<tr><td>${esc(r.date)}</td><td>${r.assigned}</td><td>${r.completed}</td><td>${r.pending}</td><td>${r.delayed}</td></tr>`).join(''):'<tr><td colspan="5">No task data.</td></tr>';
+    $('performanceBars').innerHTML=daily.slice(-14).map(r=>{
+      const h=Math.min(100, r.assigned?Math.round(r.completed/r.assigned*100):0);
+      return `<div class="barRow"><span>${esc(r.date.slice(5))}</span><div class="bar"><i style="width:${h}%"></i></div><b>${h}%</b></div>`;
+    }).join('')||'<div class="note">No progress data.</div>';
+  }catch(e){$('performanceBody').innerHTML='<tr><td colspan="5">'+esc(e.message)+'</td></tr>'}
+}
+async function loadHod(){
+  try{
+    const d=await callApi({action:'hodTeamDashboard',token,year:String(new Date().getFullYear())});
+    if(d.status!=='success') throw new Error(d.message);
+    $('hodBody').innerHTML=(d.team||[]).map(r=>`<tr><td>${esc(r.name)}<br><small>${esc(r.username)}</small></td><td>${esc(r.department)}</td><td>${r.attendance}</td><td>${r.tasks}</td><td>${r.completed}</td><td>${r.pending}</td><td>${r.delayed}</td><td>${r.progressPercent}%</td></tr>`).join('')||'<tr><td colspan="8">No team records.</td></tr>';
+  }catch(e){$('hodBody').innerHTML='<tr><td colspan="8">'+esc(e.message)+'</td></tr>'}
+}
+async function loadNotifications(){
+  try{
+    const d=await callApi({action:'notifications',token,limit:20});
+    if(d.status!=='success') throw new Error(d.message);
+    const rows=d.notifications||[];
+    $('notificationBadge').textContent=rows.filter(r=>String(r.Read).toUpperCase()!=='YES').length;
+    $('notificationList').innerHTML=rows.length?rows.map((r,i)=>`<div class="notification ${String(r.Read).toUpperCase()==='YES'?'read':''}">
+      <div><b>${esc(r.Title||r.Type||'Notification')}</b><div>${esc(r.Message||'')}</div><small>${esc(r['Created At']||'')}</small></div>
+      ${String(r.Read).toUpperCase()!=='YES'?`<button class="actionBtn" onclick="markNotif('${esc(r['Notification ID'])}')">Mark Read</button>`:''}
+    </div>`).join(''):'<div class="note">No notifications.</div>';
+  }catch(e){$('notificationList').innerHTML='<div class="note">'+esc(e.message)+'</div>'}
+}
+async function markNotif(id){
+  try{const d=await callApi({action:'markNotificationRead',token,notificationId:id});if(d.status!=='success')throw new Error(d.message);await loadNotifications();}catch(e){alertApp(e.message)}
+}
+$('loadPerformanceBtn').addEventListener('click',loadPerformance);
+$('loadNotificationsBtn').addEventListener('click',loadNotifications);
+$('loadHodBtn').addEventListener('click',loadHod);
+
+document.querySelectorAll('.moduleBtn').forEach(btn=>btn.addEventListener('click',()=>{
+  document.querySelectorAll('.moduleBtn').forEach(x=>x.classList.remove('active'));
+  btn.classList.add('active');
+  const map={overview:'performanceCard',control:'adminSection',tasks:'performanceCard',attendance:'manualAttendanceForm',requests:'manualAttendanceForm',notifications:'notificationCard',reports:'performanceCard',audit:'performanceCard',settings:'performanceCard'};
+  const id=map[btn.dataset.module];
+  if(id){const el=$(id);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});}
+}));
+
+loadPerformance();
+loadNotifications();
+if(['HOD','Admin','MasterAdmin'].includes(me?.role)){$('hodCard').classList.remove('hidden');loadHod();}
+
 </script>
 </body>
 </html>
