@@ -71,14 +71,23 @@ button,input{font:inherit}button{cursor:pointer;border:0}.hidden{display:none!im
 </div>
 
 <script>
-const CONFIG={API_URL:'https://script.google.com/macros/s/AKfycbwQ8kUdCoGhek_juQHLluX4EQrZ2urjlFbkvx6F66HCvVbXkqUAIEtWcEInVYN7j1u9bw/exec',VERSION:'V.1'};
+const CONFIG={API_URL:'https://script.google.com/macros/s/AKfycbwQ8kUdCoGhek_juQHLluX4EQrZ2urjlFbkvx6F66HCvVbXkqUAIEtWcEInVYN7j1u9bw/exec',VERSION:'V.2'};
 let token=sessionStorage.getItem('ta_token')||'';
 let currentUser=null;
 let attendance=null;
 
-function api(action,data={}){
-  return fetch(CONFIG.API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,token,...data})})
-    .then(r=>r.json()).catch(()=>({status:'error',message:'Network error. Internet connection check kijiye.'}));
+async function api(action,data={}){
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),15000);
+  try{
+    const r=await fetch(CONFIG.API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,token,...data}),signal:controller.signal});
+    const text=await r.text();
+    let out;
+    try{out=JSON.parse(text)}catch(e){return {status:'error',message:'Backend response JSON nahi hai. Apps Script Web App deployment/access setting check kijiye.'}}
+    return out;
+  }catch(e){
+    return {status:'error',message:e.name==='AbortError'?'Server response timeout. Apps Script deployment check kijiye.':'Network error. Apps Script Web App URL/deployment aur internet connection check kijiye.'};
+  }finally{clearTimeout(timer)}
 }
 function show(el,msg,type=''){
   const e=document.getElementById(el);
