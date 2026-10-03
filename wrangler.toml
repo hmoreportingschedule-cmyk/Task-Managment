@@ -1,0 +1,8 @@
+name = "task-attendance-api"
+main = "worker.js"
+compatibility_date = "2026-10-03"
+
+[vars]
+# For production, set this with:
+# wrangler secret put APPS_SCRIPT_URL
+# Do not put credentials/passwords in this file.

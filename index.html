@@ -3,153 +3,225 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Task Attendance Dashboard — V.1</title>
+<title>Task Attendance Dashboard</title>
 <style>
-:root{--bg:#f4f7f8;--card:#fff;--text:#173238;--muted:#6b7d82;--primary:#087f8c;--primary2:#0aa1a0;--danger:#c0392b;--line:#e1e9eb;--shadow:0 8px 28px rgba(24,55,61,.08)}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:Arial,Helvetica,sans-serif;color:var(--text)}
-button,input{font:inherit}button{cursor:pointer;border:0}.hidden{display:none!important}
-.login-wrap{min-height:100vh;display:grid;place-items:center;padding:20px;background:linear-gradient(145deg,#eaf7f6,#f8fbfb)}
-.login-card{width:min(420px,100%);background:#fff;border:1px solid var(--line);border-radius:20px;padding:28px;box-shadow:var(--shadow)}
-.brand{font-weight:800;font-size:23px;letter-spacing:-.4px}.sub{color:var(--muted);margin:7px 0 22px}
-.field{margin:13px 0}.field label{display:block;font-size:12px;font-weight:700;margin-bottom:7px;color:#4b6268}
-.field input{width:100%;padding:13px;border:1px solid #cddadd;border-radius:11px;outline:none}.field input:focus{border-color:var(--primary)}
-.btn{padding:12px 16px;border-radius:11px;background:#edf3f4;color:var(--text);font-weight:700}.btn.primary{background:var(--primary);color:#fff}.btn.danger{background:#fff0ef;color:var(--danger)}.btn:disabled{opacity:.45;cursor:not-allowed}
-.app{min-height:100vh}.topbar{height:64px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 20px;position:sticky;top:0;z-index:10}.userbox{display:flex;gap:12px;align-items:center}.avatar{width:38px;height:38px;border-radius:50%;background:#dff4f2;display:grid;place-items:center;font-weight:800;color:var(--primary)}
-.container{max-width:1180px;margin:auto;padding:22px}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:0 5px 18px rgba(24,55,61,.04)}
-.kpi{font-size:25px;font-weight:800;margin-top:7px}.label{font-size:12px;color:var(--muted);font-weight:700}.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}.attendance{margin-top:14px}.time{font-size:18px;font-weight:800}.status{display:inline-flex;padding:6px 9px;border-radius:999px;background:#edf7f6;color:#087f8c;font-size:12px;font-weight:800}.msg{padding:10px 12px;border-radius:10px;background:#fff8e6;color:#795b00;margin:12px 0;font-size:13px}.error{background:#fff0ef;color:#a22}.success{background:#edf8f1;color:#19723c}.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:12px}.table{width:100%;border-collapse:collapse;min-width:760px}.table th,.table td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;font-size:13px}.table th{background:#f8fbfb;color:#51666b;position:sticky;top:0}.spinner{display:inline-block;width:14px;height:14px;border:2px solid #c9dfe0;border-top-color:currentColor;border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px}@keyframes spin{to{transform:rotate(360deg)}}.section-title{display:flex;justify-content:space-between;align-items:center;margin:22px 0 10px}.section-title h2{font-size:16px;margin:0}.small{font-size:12px;color:var(--muted)}
-@media(max-width:800px){.grid{grid-template-columns:repeat(2,1fr)}.container{padding:14px}.topbar{padding:0 12px}.brand{font-size:17px}.card{padding:14px}}
-@media(max-width:520px){.grid{grid-template-columns:1fr 1fr}.actions .btn{flex:1 1 44%}.login-card{padding:22px}.topbar{height:58px}.userbox .meta{display:none}}
+:root{--primary:#0b8795;--primary2:#087b87;--bg:#eef8f8;--card:#fff;--text:#12303b;--muted:#607680;--danger:#b42318;--success:#067647;--border:#d5e2e5;--shadow:0 18px 45px rgba(15,55,65,.10)}
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:linear-gradient(135deg,#f4fbfb,#e8f5f5);color:var(--text)}button,input,select,textarea{font:inherit}button{cursor:pointer;border:0}.hidden{display:none!important}
+.wrap{min-height:100vh;padding:28px}.login{width:min(440px,100%);margin:20px auto;background:#fff;border:1px solid var(--border);border-radius:22px;padding:30px;box-shadow:var(--shadow)}
+h1{font-size:27px;margin:0 0 5px;font-weight:800}.sub{color:var(--muted);margin-bottom:22px}.field{margin:14px 0}.field label{display:block;font-size:13px;font-weight:700;margin-bottom:7px}.field input,.field select,.field textarea{width:100%;padding:13px;border:1px solid #c8d9dd;border-radius:11px;outline:none;background:#fff}.field input:focus,.field select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(11,135,149,.10)}
+.btn{background:var(--primary);color:#fff;border-radius:11px;padding:12px 17px;font-weight:700}.btn:hover{background:var(--primary2)}.btn.secondary{background:#e9f4f5;color:#086c76}.btn.danger{background:#b42318}.btn.small{padding:9px 12px;font-size:13px}
+.alert{padding:11px 13px;border-radius:10px;font-size:13px;margin:12px 0}.alert.error{background:#fff0f0;color:var(--danger)}.alert.ok{background:#ecfdf3;color:var(--success)}.note{font-size:12px;color:var(--muted);line-height:1.5}
+.dashboard{max-width:1250px;margin:auto}.top{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:18px}.top h2{margin:0;font-size:24px}.user{font-size:13px;color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px;box-shadow:0 8px 25px rgba(15,55,65,.06)}.metric{font-size:28px;font-weight:800;margin-top:7px}.label{font-size:12px;color:var(--muted)}
+.actions{display:flex;flex-wrap:wrap;gap:9px}.section{margin-top:15px}.section h3{margin:0 0 12px;font-size:17px}
+.att{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.state{padding:13px;border-radius:12px;background:#f5fafb;border:1px solid var(--border);font-size:13px}
+.tablewrap{overflow:auto;border:1px solid var(--border);border-radius:12px}.table{width:100%;border-collapse:collapse;min-width:750px}.table th,.table td{padding:10px;border-bottom:1px solid #e6eef0;text-align:left;font-size:12px}.table th{background:#f4f9fa}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.5);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px;margin-right:7px}@keyframes spin{to{transform:rotate(360deg)}}
+@media(max-width:800px){.wrap{padding:14px}.grid{grid-template-columns:repeat(2,1fr)}.att{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}.login{margin:10px auto;padding:23px}}
+@media(max-width:480px){.grid{grid-template-columns:1fr 1fr}.login{border-radius:17px}h1{font-size:23px}.btn{width:100%}.actions .btn{width:auto}}
 </style>
 </head>
 <body>
-<div id="loginView" class="login-wrap">
-  <div class="login-card">
-    <div class="brand">Task Attendance Dashboard</div>
-    <div class="sub">Fast Attendance • V.3</div>
-    <div id="loginMsg"></div>
-    <div class="field"><label>Username</label><input id="username" autocomplete="username"></div>
-    <div class="field"><label>Password</label><input id="password" type="password" autocomplete="current-password"></div>
-    <button id="loginBtn" class="btn primary" style="width:100%" onclick="login()">Sign In</button>
-    <div class="small" style="margin-top:14px">Lightweight mode: heavy reports are not loaded during login.</div>
-  </div>
-</div>
+<div class="wrap">
+  <section id="loginView" class="login">
+    <h1>Task Attendance Dashboard</h1>
+    <div class="sub">Fast Attendance · V.4</div>
+    <div id="loginAlert" class="alert error hidden"></div>
+    <form id="loginForm">
+      <div class="field"><label>Username</label><input id="username" autocomplete="username" required value="admin"></div>
+      <div class="field"><label>Password</label><input id="password" type="password" autocomplete="current-password" required value="Admin@12345"></div>
+      <button id="loginBtn" class="btn" type="submit">Sign In</button>
+    </form>
+    <p class="note">Fast mode: authentication ke waqt heavy reports load nahi hoti.</p>
+  </section>
 
-<div id="app" class="app hidden">
-  <div class="topbar">
-    <div class="brand">Task Attendance</div>
-    <div class="userbox">
-      <div class="avatar" id="avatar">U</div>
-      <div class="meta"><b id="displayName">User</b><div class="small" id="roleDept"></div></div>
-      <button class="btn" onclick="logout()">Logout</button>
+  <section id="appView" class="dashboard hidden">
+    <div class="top">
+      <div><h2>Task Attendance Dashboard</h2><div id="userInfo" class="user"></div></div>
+      <button id="logoutBtn" class="btn secondary small">Logout</button>
     </div>
-  </div>
-  <main class="container">
-    <div id="pageMsg"></div>
-    <div class="card">
-      <div class="section-title" style="margin-top:0"><h2>Today Attendance</h2><span class="status" id="todayStatus">Loading</span></div>
-      <div class="small" id="dateLabel"></div>
-      <div id="blockMsg"></div>
-      <div class="grid attendance">
-        <div><div class="label">Punch In</div><div class="time" id="inTime">—</div></div>
-        <div><div class="label">Punch Out</div><div class="time" id="outTime">—</div></div>
-        <div><div class="label">Breaks Used</div><div class="time" id="breaksUsed">0 / 3</div></div>
-        <div><div class="label">Approval</div><div class="time" id="approval">Pending</div></div>
-      </div>
+    <div id="appAlert" class="alert hidden"></div>
+
+    <div class="grid">
+      <div class="card"><div class="label">Today's Status</div><div id="todayStatus" class="metric">—</div></div>
+      <div class="card"><div class="label">Punch In</div><div id="inTime" class="metric" style="font-size:18px">—</div></div>
+      <div class="card"><div class="label">Punch Out</div><div id="outTime" class="metric" style="font-size:18px">—</div></div>
+      <div class="card"><div class="label">Month Present</div><div id="monthPresent" class="metric">0</div></div>
+    </div>
+
+    <div class="card section">
+      <h3>Attendance Control</h3>
       <div class="actions">
-        <button class="btn primary" id="punchInBtn" onclick="run('punchIn')">Punch In</button>
-        <button class="btn" id="breakStartBtn" onclick="run('breakStart')">Break Start</button>
-        <button class="btn" id="breakEndBtn" onclick="run('breakEnd')">Break End</button>
-        <button class="btn danger" id="punchOutBtn" onclick="run('punchOut')">Punch Out</button>
+        <button class="btn" data-action="in">Punch In</button>
+        <button class="btn secondary" data-action="out">Punch Out</button>
+        <button class="btn secondary" data-action="break1start">Break 1 Start</button>
+        <button class="btn secondary" data-action="break1end">Break 1 End</button>
+        <button class="btn secondary" data-action="break2start">Break 2 Start</button>
+        <button class="btn secondary" data-action="break2end">Break 2 End</button>
+        <button class="btn secondary" data-action="break3start">Break 3 Start</button>
+        <button class="btn secondary" data-action="break3end">Break 3 End</button>
       </div>
     </div>
 
-    <div class="section-title"><h2>Attendance History</h2><button class="btn" onclick="loadHistory()">Refresh</button></div>
-    <div class="card">
-      <div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>In</th><th>Out</th><th>Break 1</th><th>Break 2</th><th>Break 3</th><th>Status</th></tr></thead><tbody id="historyBody"><tr><td colspan="7">Loading…</td></tr></tbody></table></div>
+    <div class="card section">
+      <h3>Today's Breaks</h3>
+      <div id="breakStates" class="att"></div>
     </div>
-  </main>
+
+    <div class="card section">
+      <h3>Attendance History</h3>
+      <div class="actions" style="margin-bottom:10px">
+        <input id="startDate" type="date" style="padding:9px;border:1px solid var(--border);border-radius:9px">
+        <input id="endDate" type="date" style="padding:9px;border:1px solid var(--border);border-radius:9px">
+        <button id="historyBtn" class="btn secondary small">Load History</button>
+      </div>
+      <div class="tablewrap"><table class="table"><thead><tr><th>Date</th><th>Employee</th><th>In</th><th>Out</th><th>Break 1</th><th>Break 2</th><th>Break 3</th></tr></thead><tbody id="historyBody"><tr><td colspan="7">No data loaded.</td></tr></tbody></table></div>
+    </div>
+
+    <div id="adminSection" class="card section hidden">
+      <h3>Admin — Users</h3>
+      <button id="usersBtn" class="btn secondary small">Load Users</button>
+      <div class="tablewrap" style="margin-top:10px"><table class="table"><thead><tr><th>Username</th><th>Name</th><th>Employee ID</th><th>Department</th><th>Role</th><th>Weekoff</th><th>Access</th></tr></thead><tbody id="usersBody"></tbody></table></div>
+    </div>
+  </section>
 </div>
 
 <script>
-const CONFIG={API_URL:'https://script.google.com/macros/s/AKfycbwQ8kUdCoGhek_juQHLluX4EQrZ2urjlFbkvx6F66HCvVbXkqUAIEtWcEInVYN7j1u9bw/exec',VERSION:'V.3'};
-let token=sessionStorage.getItem('ta_token')||'';
-let currentUser=null;
-let attendance=null;
+/*
+ * V.4 architecture:
+ * Browser -> Cloudflare Worker -> Apps Script -> Google Sheet.
+ * This avoids relying on direct browser CORS behavior from Apps Script.
+ *
+ * Set API_BASE to your Worker URL.
+ * Example: https://task-attendance-api.your-subdomain.workers.dev
+ */
+const API_BASE = 'PASTE_CLOUDFLARE_WORKER_URL_HERE';
+const DIRECT_APPS_SCRIPT = 'https://script.google.com/macros/s/AKfycbwQ8kUdCoGhek_juQHLluX4EQrZ2urjlFbkvx6F66HCvVbXkqUAIEtWcEInVYN7j1u9bw/exec';
+let token = sessionStorage.getItem('ta_token') || '';
+let me = null;
 
-async function api(action,data={}){
-  const controller=new AbortController();
-  const timer=setTimeout(()=>controller.abort(),15000);
+const $ = id => document.getElementById(id);
+const apiUrl = () => {
+  if (!API_BASE || API_BASE.includes('PASTE_')) return DIRECT_APPS_SCRIPT;
+  return API_BASE.replace(/\/+$/,'') + '/api';
+};
+
+async function callApi(payload, timeoutMs=15000){
+  const controller = new AbortController();
+  const timer = setTimeout(()=>controller.abort(), timeoutMs);
   try{
-    const r=await fetch(CONFIG.API_URL,{method:'POST',mode:'cors',redirect:'follow',cache:'no-store',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,token,...data}),signal:controller.signal});
-    const text=await r.text();
-    let out;
-    try{out=JSON.parse(text)}catch(e){return {status:'error',message:'Backend response JSON nahi hai. Apps Script Web App deployment/access setting check kijiye.'}}
-    return out;
+    const r = await fetch(apiUrl(), {
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=UTF-8'},
+      body:JSON.stringify(payload),
+      redirect:'follow',
+      cache:'no-store',
+      signal:controller.signal
+    });
+    const text = await r.text();
+    if(!r.ok) throw new Error('Server HTTP '+r.status);
+    let data;
+    try{data=JSON.parse(text)}catch(e){throw new Error('Backend ne JSON response nahi diya. Apps Script deployment/Worker configuration check kijiye.')}
+    if(data.status==='error' && data.code==='AUTH_REQUIRED'){
+      sessionStorage.removeItem('ta_token'); token=''; showLogin('Session expire ho gayi. Dobara login kijiye.'); return data;
+    }
+    return data;
   }catch(e){
-    return {status:'error',message:e.name==='AbortError'?'Server response timeout. Apps Script deployment check kijiye.':'Network error. Apps Script Web App URL/deployment aur internet connection check kijiye.'};
+    if(e.name==='AbortError') throw new Error('Request timeout. Internet ya backend response check kijiye.');
+    if(String(e.message).includes('Failed to fetch')) throw new Error('API connection fail. Vercel → Cloudflare Worker → Apps Script configuration check kijiye.');
+    throw e;
   }finally{clearTimeout(timer)}
 }
-function show(el,msg,type=''){
-  const e=document.getElementById(el);
-  if(!msg){e.innerHTML='';return}
-  e.innerHTML='<div class="msg '+type+'">'+escapeHtml(msg)+'</div>';
+
+function showLogin(msg=''){
+  $('appView').classList.add('hidden'); $('loginView').classList.remove('hidden');
+  if(msg){$('loginAlert').textContent=msg;$('loginAlert').classList.remove('hidden')}
 }
-function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function setBusy(btn,busy,label){
-  btn.disabled=busy;btn.innerHTML=busy?'<span class="spinner"></span> '+label:label;
+function showApp(){ $('loginView').classList.add('hidden'); $('appView').classList.remove('hidden'); }
+function alertApp(msg,ok=false){
+  const el=$('appAlert'); el.textContent=msg; el.className='alert '+(ok?'ok':'error'); el.classList.remove('hidden');
+  setTimeout(()=>el.classList.add('hidden'),5000);
 }
-async function login(){
-  const btn=document.getElementById('loginBtn'); setBusy(btn,true,'Signing in…'); show('loginMsg','');
-  const r=await api('login',{username:username.value,password:password.value});
-  setBusy(btn,false,'Sign In');
-  if(r.status!=='success'){show('loginMsg',r.message,'error');return}
-  token=r.token;sessionStorage.setItem('ta_token',token);currentUser=r.user;
-  document.getElementById('loginView').classList.add('hidden');document.getElementById('app').classList.remove('hidden');
-  displayName.textContent=currentUser.displayName||currentUser.username;
-  roleDept.textContent=[currentUser.role,currentUser.department,currentUser.employeeId].filter(Boolean).join(' • ');
-  avatar.textContent=(currentUser.displayName||'U').slice(0,1).toUpperCase();
-  await loadState(); loadHistory();
+function alertLogin(msg){const el=$('loginAlert');el.textContent=msg;el.className='alert error';el.classList.remove('hidden')}
+function fmt(v){return v?String(v).replace('T',' '):'—'}
+
+$('loginForm').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const b=$('loginBtn'); b.disabled=true; b.innerHTML='<span class="spinner"></span>Signing In...';
+  try{
+    const data=await callApi({action:'login',username:$('username').value.trim(),password:$('password').value});
+    if(data.status!=='success') throw new Error(data.message||'Login failed.');
+    token=data.token; me=data.user; sessionStorage.setItem('ta_token',token);
+    $('userInfo').textContent=`${me.displayName} · ${me.employeeId||'No ID'} · ${me.department||'Department not set'} · ${me.role}`;
+    $('adminSection').classList.toggle('hidden',!['Admin','MasterAdmin','HOD','TaskAdmin/Assistant'].includes(me.role));
+    showApp(); await loadSummary();
+  }catch(err){alertLogin(err.message||'Login failed.')}
+  finally{b.disabled=false;b.textContent='Sign In'}
+});
+
+async function loadSummary(){
+  try{
+    const d=await callApi({action:'getDashboardSummary',token});
+    if(d.status!=='success') throw new Error(d.message);
+    const a=d.today||{};
+    $('todayStatus').textContent=a['Out Time']?'Completed':(a['In Time']?'Present':'Not Punched');
+    $('inTime').textContent=fmt(a['In Time']); $('outTime').textContent=fmt(a['Out Time']);
+    $('monthPresent').textContent=d.month?.present ?? 0;
+    renderBreaks(a);
+  }catch(e){alertApp(e.message)}
 }
-async function loadState(){
-  const r=await api('getAttendanceState');
-  if(r.status==='error'){if(r.code==='AUTH') return forceLogout(); show('pageMsg',r.message,'error');return}
-  attendance=r.attendance; dateLabel.textContent='Date: '+r.today+' • '+new Date(r.serverTime).toLocaleTimeString();
-  renderAttendance(r);
+function renderBreaks(a){
+  const arr=[1,2,3].map(n=>({
+    n,
+    s:a['Break '+n+' Start']||'',
+    e:a['Break '+n+' End']||''
+  }));
+  $('breakStates').innerHTML=arr.map(x=>`<div class="state"><b>Break ${x.n}</b><br>Start: ${fmt(x.s)}<br>End: ${fmt(x.e)}<br><span class="label">${x.s?(x.e?'Completed':'Open'):'Not Used'}</span></div>`).join('');
 }
-function renderAttendance(r){
-  const a=r.attendance||{}; inTime.textContent=a.inTime||'—';outTime.textContent=a.outTime||'—';
-  const breaks=[a.break1Start&&a.break1End,a.break2Start&&a.break2End,a.break3Start&&a.break3End].filter(Boolean).length;
-  breaksUsed.textContent=breaks+' / 3';approval.textContent=a.approvalStatus||'Pending';
-  const openBreak=(a.break1Start&&!a.break1End)||(a.break2Start&&!a.break2End)||(a.break3Start&&!a.break3End);
-  const blocked=!!r.blocked;
-  todayStatus.textContent=blocked?'Blocked':(a.inTime?'Active':'Not Started');
-  if(blocked) show('blockMsg',r.blockReason,'');
-  else show('blockMsg','');
-  punchInBtn.disabled=blocked||!!a.inTime;
-  breakStartBtn.disabled=blocked||!a.inTime||!!a.outTime||openBreak||breaks>=3;
-  breakEndBtn.disabled=blocked||!openBreak;
-  punchOutBtn.disabled=blocked||!a.inTime||!!a.outTime||openBreak;
-}
-async function run(action){
-  const btn=document.getElementById(action==='punchIn'?'punchInBtn':action==='punchOut'?'punchOutBtn':action==='breakStart'?'breakStartBtn':'breakEndBtn');
-  const label=btn.textContent;setBusy(btn,true,'Processing…');show('pageMsg','');
-  const r=await api(action);
-  setBusy(btn,false,label);
-  if(r.status!=='success'){if(r.code==='AUTH')return forceLogout();show('pageMsg',r.message,'error');return}
-  renderAttendance(r);show('pageMsg','Attendance updated successfully.','success');loadHistory();
-}
-async function loadHistory(){
-  const r=await api('getAttendanceHistory',{from:dateRange(-30),to:dateRange(0)});
-  if(r.status!=='success'){if(r.code==='AUTH')return forceLogout();historyBody.innerHTML='<tr><td colspan="7">'+escapeHtml(r.message)+'</td></tr>';return}
-  if(!r.rows.length){historyBody.innerHTML='<tr><td colspan="7">No attendance found.</td></tr>';return}
-  historyBody.innerHTML=r.rows.map(x=>'<tr><td>'+escapeHtml(x.date)+'</td><td>'+escapeHtml(x.inTime||'—')+'</td><td>'+escapeHtml(x.outTime||'—')+'</td><td>'+escapeHtml((x.break1Start||'—')+' → '+(x.break1End||'—'))+'</td><td>'+escapeHtml((x.break2Start||'—')+' → '+(x.break2End||'—'))+'</td><td>'+escapeHtml((x.break3Start||'—')+' → '+(x.break3End||'—'))+'</td><td>'+escapeHtml(x.approvalStatus||'')+'</td></tr>').join('');
-}
-function dateRange(offset){
- const d=new Date();d.setDate(d.getDate()+offset);return d.toISOString().slice(0,10);
-}
-function logout(){api('logout').finally(forceLogout)}
-function forceLogout(){sessionStorage.removeItem('ta_token');token='';location.reload()}
-if(token){document.getElementById('loginView').classList.add('hidden');document.getElementById('app').classList.remove('hidden');api('getAttendanceState').then(r=>{if(r.status==='success'){currentUser=r.user;displayName.textContent=currentUser.displayName||currentUser.username;roleDept.textContent=[currentUser.role,currentUser.department,currentUser.employeeId].filter(Boolean).join(' • ');avatar.textContent=(currentUser.displayName||'U').slice(0,1).toUpperCase();renderAttendance(r);loadHistory()}else forceLogout()})}
+
+document.querySelectorAll('[data-action]').forEach(btn=>btn.addEventListener('click',async()=>{
+  const action=btn.dataset.action; btn.disabled=true;
+  try{
+    const d=await callApi({action:'attendance',token,attendanceAction:action});
+    if(d.status!=='success') throw new Error(d.message);
+    alertApp(d.message,true); await loadSummary();
+  }catch(e){alertApp(e.message)}
+  finally{btn.disabled=false}
+}));
+
+$('historyBtn').addEventListener('click',async()=>{
+  try{
+    const d=await callApi({action:'getAttendanceHistory',token,startDate:$('startDate').value,endDate:$('endDate').value});
+    if(d.status!=='success') throw new Error(d.message);
+    $('historyBody').innerHTML=d.rows.length?d.rows.map(r=>`<tr><td>${r.Date||''}</td><td>${r['Display Name']||r.Username||''}</td><td>${r['In Time']||'—'}</td><td>${r['Out Time']||'—'}</td><td>${r['Break 1 Start']||'—'} / ${r['Break 1 End']||'—'}</td><td>${r['Break 2 Start']||'—'} / ${r['Break 2 End']||'—'}</td><td>${r['Break 3 Start']||'—'} / ${r['Break 3 End']||'—'}</td></tr>`).join(''):'<tr><td colspan="7">No attendance found.</td></tr>';
+  }catch(e){alertApp(e.message)}
+});
+
+$('usersBtn').addEventListener('click',async()=>{
+  try{
+    const d=await callApi({action:'adminListUsers',token});
+    if(d.status!=='success') throw new Error(d.message);
+    $('usersBody').innerHTML=d.users.map(u=>`<tr><td>${u.Username||''}</td><td>${u['Display Name']||''}</td><td>${u['Employee ID']||''}</td><td>${u.Department||''}</td><td>${u.Role||''}</td><td>${u.Weekoff||''}</td><td>${u['Web Link Access']||''}</td></tr>`).join('');
+  }catch(e){alertApp(e.message)}
+});
+
+$('logoutBtn').addEventListener('click',async()=>{
+  try{await callApi({action:'logout',token})}catch(e){}
+  sessionStorage.removeItem('ta_token'); token=''; me=null; showLogin();
+});
+
+(async function init(){
+  // Do not make a heavy authenticated request before login.
+  if(token){
+    try{
+      const d=await callApi({action:'getDashboardSummary',token},10000);
+      if(d.status==='success'){
+        // Session is valid; user info is intentionally kept minimal here.
+        showApp(); await loadSummary();
+      }else showLogin();
+    }catch(e){sessionStorage.removeItem('ta_token');token='';}
+  }
+})();
 </script>
 </body>
 </html>
