@@ -32,9 +32,183 @@ h1{font-size:27px;margin:0 0 5px;font-weight:800}.sub{color:var(--muted);margin-
 .notificationList{display:grid;gap:8px;margin-top:12px}.notification{display:flex;justify-content:space-between;gap:12px;padding:12px;border:1px solid #dbe9eb;border-radius:12px;background:#f8fbfb}.notification.read{opacity:.65}.notification small{color:#718990}
 
 .templateEditor{background:#f7fbfb;border:1px solid #dbe9eb;border-radius:14px;padding:15px;margin-top:13px}.workHeader{display:flex;align-items:center;justify-content:space-between;margin-top:15px}.workRow{display:grid;grid-template-columns:1fr 1fr 80px 80px;gap:8px;margin:7px 0}.workRow input{min-width:0}
+
+/* ===== V.11 Professional App Shell ===== */
+:root{
+  --navy:#082b3f;
+  --navy2:#0b4056;
+  --teal:#0b8d99;
+  --teal2:#13a5a7;
+  --bg:#eef7f8;
+  --card:#ffffff;
+  --line:#d8e8eb;
+  --text:#092f45;
+  --muted:#65808a;
+  --danger:#dc3545;
+  --success:#149b68;
+  --warning:#f39a19;
+  --shadow:0 10px 30px rgba(8,43,63,.08);
+}
+body{margin:0;background:linear-gradient(135deg,#eef8f8 0%,#f7fbfc 55%,#eaf5f7 100%);color:var(--text);font-family:Arial,Helvetica,sans-serif}
+.v11App{display:grid;grid-template-columns:280px minmax(0,1fr);min-height:100vh}
+.v11Sidebar{position:sticky;top:0;height:100vh;box-sizing:border-box;padding:18px 14px;background:linear-gradient(180deg,#062c40 0%,#083d53 58%,#062b3d 100%);color:#fff;overflow:auto;z-index:30}
+.v11Brand{display:flex;align-items:center;gap:10px;padding:7px 10px 18px;border-bottom:1px solid rgba(255,255,255,.13)}
+.v11BrandMark{width:40px;height:40px;border-radius:12px;background:#12a3aa;display:grid;place-items:center;font-weight:900;font-size:19px}
+.v11BrandTitle{font-size:15px;font-weight:800;line-height:1.15}.v11BrandSub{font-size:10px;color:#b8d1d8;margin-top:3px}
+.v11Profile{text-align:center;padding:18px 8px 14px}
+.v11Photo{width:88px;height:88px;border-radius:50%;object-fit:cover;border:3px solid #18a8b4;background:#e8f7f8;box-shadow:0 5px 18px rgba(0,0,0,.18)}
+.v11ProfileName{font-size:17px;font-weight:800;margin-top:9px}.v11ProfileMeta{font-size:11px;color:#b8d1d8;margin-top:3px}
+.v11Online{display:inline-flex;align-items:center;gap:6px;margin-top:9px;padding:5px 10px;border-radius:99px;background:rgba(20,180,120,.15);color:#74e1ba;font-size:11px}
+.v11Dot{width:7px;height:7px;border-radius:50%;background:#19d88d}
+.v11SideStats{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:5px 2px 15px}
+.v11SideStat{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:9px 7px}.v11SideStat span{display:block;color:#a9c6ce;font-size:9px}.v11SideStat b{display:block;margin-top:4px;font-size:12px}
+.v11Nav{display:grid;gap:5px}.v11Nav button{width:100%;border:0;background:transparent;color:#d9e9ed;text-align:left;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:12px;font-weight:700;display:flex;align-items:center;gap:10px}.v11Nav button:hover{background:rgba(255,255,255,.08)}.v11Nav button.active{background:linear-gradient(90deg,#0d9da7,#087e8d);color:#fff;box-shadow:0 5px 15px rgba(0,0,0,.12)}
+.v11NavIcon{width:20px;text-align:center;font-size:15px}.v11NavBadge{margin-left:auto;background:#e33e50;color:#fff;border-radius:50%;min-width:19px;height:19px;display:grid;place-items:center;font-size:10px}
+.v11SideBottom{border-top:1px solid rgba(255,255,255,.12);margin-top:14px;padding-top:9px}.v11Logout{color:#ffd8dc!important;background:rgba(220,53,69,.16)!important}.v11Logout:hover{background:rgba(220,53,69,.28)!important}
+.v11Main{min-width:0;padding:0 24px 35px}.v11Top{height:76px;display:flex;align-items:center;justify-content:space-between;gap:15px}.v11Heading h1{font-size:24px;margin:0;font-weight:900;letter-spacing:-.3px}.v11Heading p{margin:3px 0 0;color:var(--muted);font-size:11px}.v11TopActions{display:flex;align-items:center;gap:10px}.v11TopPill{background:#fff;border:1px solid var(--line);border-radius:11px;padding:8px 11px;font-size:11px;box-shadow:0 4px 14px rgba(8,43,63,.04)}.v11Bell{position:relative;border:1px solid var(--line);background:#fff;border-radius:11px;width:39px;height:39px;cursor:pointer}.v11BellBadge{position:absolute;right:-4px;top:-5px;background:#e13e4f;color:#fff;border-radius:50%;font-size:9px;min-width:17px;height:17px;display:grid;place-items:center}
+.v11Home{display:block}.v11Page{display:none}.v11Page.active{display:block}
+.v11Kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin-bottom:13px}.v11Kpi{background:#fff;border:1px solid var(--line);border-radius:15px;padding:14px;box-shadow:var(--shadow);min-height:72px}.v11KpiIcon{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;float:left;margin-right:9px;font-size:17px;background:#edf7ff}.v11Kpi span{display:block;font-size:10px;color:var(--muted)}.v11Kpi b{display:block;font-size:22px;margin-top:6px}.v11Kpi small{font-size:10px;color:var(--success)}
+.v11Grid2{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(320px,.85fr);gap:13px}.v11Grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:13px;margin-top:13px}
+.v11Panel{background:#fff;border:1px solid var(--line);border-radius:15px;box-shadow:var(--shadow);padding:15px;min-width:0}.v11PanelHead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}.v11PanelHead h3{margin:0;font-size:15px}.v11Link{color:#087d95;font-size:11px;font-weight:700;cursor:pointer}.v11Table{width:100%;border-collapse:collapse;font-size:11px}.v11Table th{background:#f1f8f9;text-align:left;padding:9px;color:#294b58}.v11Table td{padding:9px;border-top:1px solid #e8f0f2}.v11Tag{display:inline-block;padding:4px 8px;border-radius:7px;font-size:9px;font-weight:800}.v11Pending{background:#fff3d6;color:#a96c00}.v11Done{background:#def7e9;color:#14744d}.v11Overdue{background:#ffe0e4;color:#b32334}.v11High{background:#ffe0e4;color:#b32334}.v11Medium{background:#fff3d6;color:#a96c00}.v11Low{background:#def5f5;color:#08737a}
+.v11ProgressRing{width:128px;height:128px;border-radius:50%;margin:6px auto 9px;background:conic-gradient(#12a36e 0 45%,#e4eef0 45% 100%);display:grid;place-items:center}.v11ProgressRing:after{content:"45%";width:92px;height:92px;border-radius:50%;background:#fff;display:grid;place-items:center;font-weight:900;font-size:22px;color:var(--text)}
+.v11List{display:grid;gap:8px}.v11Notice{display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:1px solid #edf2f3;font-size:11px}.v11Notice:last-child{border-bottom:0}.v11NoticeDot{width:8px;height:8px;border-radius:50%;margin-top:4px;background:#0b9b69;flex:none}.v11NoticeDot.warn{background:#f39a19}.v11NoticeDot.danger{background:#df3d4c}
+.v11Breaks{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.v11Break{padding:10px;border:1px solid var(--line);border-radius:10px;background:#f8fbfc}.v11Break b{font-size:12px}.v11Break div{font-size:10px;color:var(--muted);margin-top:3px}
+.v11Quick{display:grid;grid-template-columns:1fr 1fr;gap:8px}.v11Quick button{border:1px solid var(--line);background:#f7fbfc;border-radius:11px;padding:13px 8px;cursor:pointer;font-size:11px;font-weight:700;color:var(--text)}.v11Quick button:hover{border-color:#8fcbd0;background:#edf8f9}
+.v11Page .section{margin-bottom:13px}
+.v11MobileMenu{display:none;border:0;background:#fff;border:1px solid var(--line);border-radius:10px;width:39px;height:39px}
+@media(max-width:1200px){.v11Kpis{grid-template-columns:repeat(3,1fr)}.v11Grid3{grid-template-columns:1fr 1fr}}
+@media(max-width:900px){.v11App{grid-template-columns:1fr}.v11Sidebar{position:fixed;left:-295px;width:280px;transition:left .2s}.v11Sidebar.open{left:0}.v11MobileMenu{display:block}.v11Main{padding:0 13px 25px}.v11Grid2,.v11Grid3{grid-template-columns:1fr}.v11Top{height:65px}.v11Kpis{grid-template-columns:repeat(2,1fr)}.v11Breaks{grid-template-columns:1fr}.v11Heading h1{font-size:19px}}
+@media(max-width:520px){.v11Kpis{grid-template-columns:1fr 1fr;gap:8px}.v11Kpi{padding:10px}.v11Kpi b{font-size:18px}.v11TopPill{display:none}}
 </style>
 </head>
 <body>
+<div id="v11Shell" class="v11App">
+  <aside id="v11Sidebar" class="v11Sidebar">
+    <div class="v11Brand">
+      <div class="v11BrandMark">TA</div>
+      <div><div class="v11BrandTitle">Task Management</div><div class="v11BrandSub">Attendance • Progress • Reporting</div></div>
+    </div>
+    <div class="v11Profile">
+      <img id="v11Photo" class="v11Photo" alt="Profile">
+      <div id="v11ProfileName" class="v11ProfileName">Employee</div>
+      <div id="v11ProfileMeta" class="v11ProfileMeta">EMPLOYEE ID • Department</div>
+      <div class="v11Online"><span class="v11Dot"></span> Online</div>
+    </div>
+    <div class="v11SideStats">
+      <div class="v11SideStat"><span>Attendance</span><b id="v11AttendanceSide">Not Added</b></div>
+      <div class="v11SideStat"><span>Break Time</span><b id="v11BreakSide">—</b></div>
+    </div>
+    <nav class="v11Nav" id="v11Nav">
+      <button class="active" data-page="home"><span class="v11NavIcon">⌂</span>Dashboard</button>
+      <button data-page="tasks"><span class="v11NavIcon">☷</span>Task Management</button>
+      <button data-page="attendance"><span class="v11NavIcon">▣</span>Attendance Management</button>
+      <button data-page="requests"><span class="v11NavIcon">◫</span>Schedule & Requests</button>
+      <button data-page="notifications"><span class="v11NavIcon">♟</span>Notification Center <span id="v11NavBadge" class="v11NavBadge">0</span></button>
+      <button data-page="reports"><span class="v11NavIcon">▥</span>Reports & Analytics</button>
+      <button data-page="performance"><span class="v11NavIcon">◒</span>Employee Performance</button>
+      <button id="v11HodNav" data-page="hod"><span class="v11NavIcon">♙</span>HOD Team Dashboard</button>
+      <button data-page="control"><span class="v11NavIcon">⚙</span>Control Management</button>
+      <button data-page="audit"><span class="v11NavIcon">◈</span>Audit & Security</button>
+      <button data-page="settings"><span class="v11NavIcon">⚙</span>System Settings</button>
+    </nav>
+    <div class="v11SideBottom">
+      <nav class="v11Nav">
+        <button data-page="profile"><span class="v11NavIcon">●</span>My Profile</button>
+        <button id="v11Logout" class="v11Logout"><span class="v11NavIcon">⏻</span>Logout</button>
+      </nav>
+    </div>
+  </aside>
+
+  <main class="v11Main">
+    <header class="v11Top">
+      <div style="display:flex;align-items:center;gap:10px">
+        <button id="v11MobileMenu" class="v11MobileMenu">☰</button>
+        <div class="v11Heading"><h1>Task Management & Attendance Dashboard</h1><p>Work • Discipline • Progress • Better Tomorrow</p></div>
+      </div>
+      <div class="v11TopActions">
+        <div class="v11TopPill" id="v11Date">—</div>
+        <div class="v11TopPill" id="v11Clock">—</div>
+        <button class="v11Bell" id="v11Bell" title="Notifications">🔔<span id="v11TopBadge" class="v11BellBadge">0</span></button>
+      </div>
+    </header>
+
+    <section id="v11Home" class="v11Page active">
+      <div class="v11Kpis">
+        <div class="v11Kpi"><div class="v11KpiIcon">☷</div><span>Today's Tasks</span><b id="v11KpiTasks">0</b><small id="v11KpiTasksSub">0 Completed</small></div>
+        <div class="v11Kpi"><div class="v11KpiIcon">✓</div><span>Completed</span><b id="v11KpiCompleted">0</b><small>Completed Tasks</small></div>
+        <div class="v11Kpi"><div class="v11KpiIcon">◷</div><span>Pending</span><b id="v11KpiPending">0</b><small>Pending Tasks</small></div>
+        <div class="v11Kpi"><div class="v11KpiIcon">!</div><span>Overdue</span><b id="v11KpiDelayed">0</b><small>Need Attention</small></div>
+        <div class="v11Kpi"><div class="v11KpiIcon">▣</div><span>Attendance</span><b id="v11KpiAttendance">—</b><small>Today's Status</small></div>
+        <div class="v11Kpi"><div class="v11KpiIcon">▥</div><span>Monthly Progress</span><b id="v11KpiProgress">0%</b><small>Task completion</small></div>
+      </div>
+
+      <div class="v11Grid2">
+        <div class="v11Panel">
+          <div class="v11PanelHead"><h3>▣ Today's Tasks</h3><span class="v11Link" data-page-link="tasks">View All</span></div>
+          <div class="tablewrap"><table class="v11Table"><thead><tr><th>#</th><th>Task Name</th><th>Category</th><th>Priority</th><th>Status</th><th>Due Time</th></tr></thead><tbody id="v11TodayTasks"><tr><td colspan="6">Loading...</td></tr></tbody></table></div>
+        </div>
+        <div class="v11Panel">
+          <div class="v11PanelHead"><h3>▥ Task Status Overview</h3><span class="v11Link">This Week</span></div>
+          <div id="v11StatusBars"></div>
+        </div>
+      </div>
+
+      <div class="v11Grid3">
+        <div class="v11Panel">
+          <div class="v11PanelHead"><h3>▣ Attendance Status</h3><span class="v11Link" data-page-link="attendance">Add Attendance</span></div>
+          <div id="v11AttendanceStatus" style="padding:12px;border-radius:11px;background:#fff0f2;color:#c62e3d;font-weight:800">Not Added</div>
+          <div class="v11Breaks" style="margin-top:8px;grid-template-columns:1fr 1fr 1fr">
+            <div class="v11Break"><b>In Time</b><div id="v11In">—</div></div><div class="v11Break"><b>Out Time</b><div id="v11Out">—</div></div><div class="v11Break"><b>Office Hours</b><div id="v11Office">—</div></div>
+          </div>
+        </div>
+        <div class="v11Panel">
+          <div class="v11PanelHead"><h3>☕ Today's Break Time</h3><span class="v11Link" data-page-link="attendance">View All</span></div>
+          <div class="v11Breaks">
+            <div class="v11Break"><b>Zohar</b><div>Not Added</div></div>
+            <div class="v11Break"><b>Asr</b><div>Not Added</div></div>
+            <div class="v11Break"><b>Magrib</b><div>Not Added</div></div>
+          </div>
+          <div class="v11Break" style="margin-top:7px"><b>Lunch Time</b><div>Not Added</div></div>
+        </div>
+        <div class="v11Panel">
+          <div class="v11PanelHead"><h3>◎ Monthly Progress</h3><span class="v11Link">This Month</span></div>
+          <div class="v11ProgressRing"></div>
+          <div style="text-align:center;font-size:11px;color:var(--muted)">Completed vs Total Tasks</div>
+        </div>
+      </div>
+
+      <div class="v11Grid3">
+        <div class="v11Panel">
+          <div class="v11PanelHead"><h3>🔔 Recent Notifications</h3><span class="v11Link" data-page-link="notifications">View All</span></div>
+          <div id="v11RecentNotifications" class="v11List"><div class="v11Notice"><span class="v11NoticeDot"></span>Loading notifications...</div></div>
+        </div>
+        <div class="v11Panel">
+          <div class="v11PanelHead"><h3>◒ Employee Performance</h3><span class="v11Link" data-page-link="performance">This Month</span></div>
+          <div class="v11ProgressRing" style="background:conic-gradient(#13a36e 0 78%,#e4eef0 78% 100%);"></div>
+          <div style="text-align:center;font-weight:800;font-size:13px">78% On-Time</div>
+        </div>
+        <div class="v11Panel">
+          <div class="v11PanelHead"><h3>⚡ Quick Actions</h3></div>
+          <div class="v11Quick"><button data-page-link="attendance">▣<br>Add Attendance</button><button data-page-link="tasks">☷<br>View My Tasks</button><button data-page-link="requests">▤<br>Submit Request</button><button data-page-link="reports">▥<br>View Reports</button></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="v11Tasks" class="v11Page"></section>
+    <section id="v11Attendance" class="v11Page"></section>
+    <section id="v11Requests" class="v11Page"></section>
+    <section id="v11Notifications" class="v11Page"></section>
+    <section id="v11Reports" class="v11Page"></section>
+    <section id="v11Performance" class="v11Page"></section>
+    <section id="v11Hod" class="v11Page"></section>
+    <section id="v11Control" class="v11Page"></section>
+    <section id="v11Audit" class="v11Page"></section>
+    <section id="v11Settings" class="v11Page"></section>
+    <section id="v11ProfilePage" class="v11Page"></section>
+
+    <!-- Existing functional dashboard remains below and is reused by module pages. -->
+    <div id="v11Legacy" style="display:none">
+
 <div class="wrap">
   <section id="loginView" class="login">
     <div class="brandMark">TA</div>
@@ -174,7 +348,7 @@ h1{font-size:27px;margin:0 0 5px;font-weight:800}.sub{color:var(--muted);margin-
         <div class="breakRulesNote">
           <b>Break Rules:</b> Zohar 1:00–2:00 PM / max 20 min · Juma Friday 12:30–3:00 PM / max 60 min ·
           Asr 3:45–6:15 PM / max 25 min · Magrib 5:40–7:30 PM / max 25 min · Lunch 1:00–4:00 PM / max 25 min.
-          Allowed limit se extra time par Extra Break Report generate hoga. Rules System Settings se centrally controlled rahenge.
+          
         </div>
         <div class="modalActions" style="margin-top:8px">
           <button id="clearManualBtn" class="btn secondary" type="button">Clear</button>
@@ -730,6 +904,76 @@ $('saveAssignmentBtn').addEventListener('click',async()=>{
 });
 loadTemplates();loadAssignmentEmployees();
 
+
+/* ===== V.11 Layout Controller ===== */
+(function(){
+  const pageMap={home:'v11Home',tasks:'v11Tasks',attendance:'v11Attendance',requests:'v11Requests',notifications:'v11Notifications',reports:'v11Reports',performance:'v11Performance',hod:'v11Hod',control:'v11Control',audit:'v11Audit',settings:'v11Settings',profile:'v11ProfilePage'};
+  const legacyMap={tasks:['taskTemplateCard','monthlyAssignmentCard'],attendance:['manualAttendanceForm'],performance:['performanceCard'],hod:['hodCard'],notifications:['notificationCard'],control:['adminSection']};
+  function q(id){return document.getElementById(id)}
+  function showPage(page){
+    document.querySelectorAll('.v11Page').forEach(x=>x.classList.remove('active'));
+    q(pageMap[page]||'v11Home').classList.add('active');
+    document.querySelectorAll('#v11Nav button[data-page]').forEach(x=>x.classList.toggle('active',x.dataset.page===page));
+    // Reparent selected existing functional sections into the right-side page.
+    Object.values(pageMap).forEach(id=>{const el=q(id);if(el)el.querySelectorAll('.v11LegacyMount').forEach(x=>x.remove())});
+    (legacyMap[page]||[]).forEach(id=>{
+      const el=q(id);
+      const target=q(pageMap[page]);
+      if(el&&target&&!target.contains(el)){
+        const wrap=document.createElement('div');wrap.className='v11LegacyMount';
+        wrap.appendChild(el);target.appendChild(wrap);
+        el.style.display='';
+      }
+    });
+    q('v11Sidebar').classList.remove('open');
+  }
+  document.querySelectorAll('#v11Nav button[data-page], [data-page-link]').forEach(btn=>{
+    btn.addEventListener('click',()=>showPage(btn.dataset.page||btn.dataset.pageLink));
+  });
+  q('v11MobileMenu').addEventListener('click',()=>q('v11Sidebar').classList.toggle('open'));
+  q('v11Bell').addEventListener('click',()=>showPage('notifications'));
+  q('v11Logout').addEventListener('click',()=>{ if(typeof logout==='function') logout(); });
+  function clock(){
+    const d=new Date();
+    q('v11Date').textContent=d.toLocaleDateString('en-IN',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+    q('v11Clock').textContent=d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  }
+  clock();setInterval(clock,1000);
+
+  // Keep the existing login/dashboard data model; mirror known session values when available.
+  try{
+    if(typeof me!=='undefined' && me){
+      q('v11ProfileName').textContent=me.displayName||me.name||me.username||'Employee';
+      q('v11ProfileMeta').textContent=(me.employeeId||'')+' • '+(me.department||me.role||'Employee');
+    }
+  }catch(e){}
+
+  // Build functional right-side pages from existing cards without changing backend workflows.
+  function cloneInto(targetId, sourceIds, title){
+    const target=q(targetId);if(!target)return;
+    if(target.dataset.built==='1')return;
+    const h=document.createElement('div');h.className='v11Panel';h.style.marginBottom='13px';h.innerHTML='<div class="v11PanelHead"><h3>'+title+'</h3></div>';
+    sourceIds.forEach(id=>{
+      const s=q(id);
+      if(s){const c=s.cloneNode(true);c.style.display='';c.id='v11clone_'+id;h.appendChild(c);}
+    });
+    target.appendChild(h);target.dataset.built='1';
+  }
+  cloneInto('v11Tasks',['taskTemplateCard','monthlyAssignmentCard'],'Task Management');
+  cloneInto('v11Attendance',['manualAttendanceForm'],'Attendance Management');
+  cloneInto('v11Notifications',['notificationCard'],'Notification Center');
+  cloneInto('v11Performance',['performanceCard'],'Employee Performance');
+  cloneInto('v11Hod',['hodCard'],'HOD Team Dashboard');
+  cloneInto('v11Control',['adminSection'],'Control Management');
+
+  // Initial home view.
+  showPage('home');
+})();
 </script>
+
+    </div>
+  </main>
+</div>
+
 </body>
 </html>
