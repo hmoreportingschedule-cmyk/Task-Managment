@@ -1,18 +1,50 @@
-# Task Attendance Dashboard V.7
+# Task Attendance Dashboard V.10 — Task Template & Monthly Assignment
 
 Changed files only:
 - backend_code.js
 - index.html
 - README_SETUP.md
 
-## Display fix
-- Attendance History Date now displays as DD-MM-YYYY. Example: 2026-09-30T18:30:00.000Z -> 30-09-2026.
-- In Time / Out Time now display in 12-hour format such as 11:00 AM and 7:00 PM.
-- Legacy Google Sheets 1899/1900 time-cell timestamps are converted to Asia/Kolkata time.
-- Break times use the same 12-hour format.
-- Backend normalizes attendance date/time values before sending them to the frontend.
+### Task Template
+- Task Name
+- Task Details
+- Category
+- Priority
+- Daily / Weekly / Monthly / One Time
+- Multi-Work
+- Edit
+- Soft Delete
 
-## Replacement
-Google Apps Script: replace backend_code.js / Code.gs.
-GitHub/Vercel: replace index.html.
-Cloudflare Worker: no change.
+### Import
+- `.XLSX`, `.XLS`, `.CSV`
+- SheetJS is loaded only when the Import/Export action is used, so login remains lightweight.
+- Browser file input is automatically cleared after import.
+- Multiple rows with the same Template ID are grouped under one Main Template.
+- Work rows are stored as TemplateWorkItems.
+- Existing data is updated; the system does not delete/recreate the entire dataset.
+
+### Export
+- Current Templates → XLSX
+- Blank XLSX Format
+- Blank CSV Format
+
+### Monthly Assignment
+- Existing Template select
+- Active Employee list
+- Employee Name / Employee ID / Department
+- Select All / Clear / individual checkbox
+- Selected employees only
+- Existing generated tasks are never deleted by generation
+- Same Template + Employee + Month duplicate Main Task is skipped
+
+### Security / Speed
+- Login remains lightweight.
+- Import and generation are separate backend actions and are not run during login.
+- Backend role validation is applied.
+- Active users only are returned for assignment.
+- Audit Log is written.
+- Soft Delete is used.
+- Existing sheets are preserved; missing required columns are appended instead of overwriting existing data.
+
+### Important
+The XLS/XLSX parser is loaded on demand only for the template import/export workflow, not during login.
