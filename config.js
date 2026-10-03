@@ -1,5 +1,5 @@
-window.APP_CONFIG = {
-  API_URL: "https://script.google.com/macros/s/AKfycbyC84fh1gaAeOQlwPPYjEH1_JEiVLhugfDX8OICvdoAOILhu-j0r38cmZotbx8Qr5Sg/exec",
-  APP_VERSION: "V.2.1",
-  SESSION_KEY: "task_management_session_v2"
+window.APP_CONFIG={
+  API_URL:'https://script.google.com/macros/s/AKfycbyC84fh1gaAeOQlwPPYjEH1_JEiVLhugfDX8OICvdoAOILhu-j0r38cmZotbx8Qr5Sg/exec',
+  APP_VERSION:'V.3',
+  SESSION_KEY:'task_management_session_v3'
 };
