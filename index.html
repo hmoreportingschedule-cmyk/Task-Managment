@@ -25,7 +25,7 @@ button,input{font:inherit}button{cursor:pointer;border:0}.hidden{display:none!im
 <div id="loginView" class="login-wrap">
   <div class="login-card">
     <div class="brand">Task Attendance Dashboard</div>
-    <div class="sub">Fast Attendance • V.1</div>
+    <div class="sub">Fast Attendance • V.3</div>
     <div id="loginMsg"></div>
     <div class="field"><label>Username</label><input id="username" autocomplete="username"></div>
     <div class="field"><label>Password</label><input id="password" type="password" autocomplete="current-password"></div>
@@ -71,7 +71,7 @@ button,input{font:inherit}button{cursor:pointer;border:0}.hidden{display:none!im
 </div>
 
 <script>
-const CONFIG={API_URL:'https://script.google.com/macros/s/AKfycbwQ8kUdCoGhek_juQHLluX4EQrZ2urjlFbkvx6F66HCvVbXkqUAIEtWcEInVYN7j1u9bw/exec',VERSION:'V.2'};
+const CONFIG={API_URL:'https://script.google.com/macros/s/AKfycbwQ8kUdCoGhek_juQHLluX4EQrZ2urjlFbkvx6F66HCvVbXkqUAIEtWcEInVYN7j1u9bw/exec',VERSION:'V.3'};
 let token=sessionStorage.getItem('ta_token')||'';
 let currentUser=null;
 let attendance=null;
@@ -80,7 +80,7 @@ async function api(action,data={}){
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),15000);
   try{
-    const r=await fetch(CONFIG.API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,token,...data}),signal:controller.signal});
+    const r=await fetch(CONFIG.API_URL,{method:'POST',mode:'cors',redirect:'follow',cache:'no-store',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,token,...data}),signal:controller.signal});
     const text=await r.text();
     let out;
     try{out=JSON.parse(text)}catch(e){return {status:'error',message:'Backend response JSON nahi hai. Apps Script Web App deployment/access setting check kijiye.'}}
