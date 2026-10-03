@@ -72,13 +72,21 @@ h1{font-size:27px;margin:0 0 5px;font-weight:800}.sub{color:var(--muted);margin-
           </div>
           <div class="field"><label>In Time</label><input id="manualIn" type="time"></div>
           <div class="field"><label>Out Time</label><input id="manualOut" type="time"></div>
+          <div class="field"><label>Break 1</label><select id="manualB1Type"><option value="">Select Break</option><option value="Zohar">Zohar</option><option value="Juma">Juma (Friday)</option></select></div>
           <div class="field"><label>Break 1 Start</label><input id="manualB1S" type="time"></div>
           <div class="field"><label>Break 1 End</label><input id="manualB1E" type="time"></div>
+          <div class="field"><label>Break 2</label><select id="manualB2Type"><option value="">Select Break</option><option value="Asr">Asr</option><option value="Magrib">Magrib</option></select></div>
           <div class="field"><label>Break 2 Start</label><input id="manualB2S" type="time"></div>
           <div class="field"><label>Break 2 End</label><input id="manualB2E" type="time"></div>
+          <div class="field"><label>Break 3</label><select id="manualB3Type"><option value="Lunch">Lunch Time</option></select></div>
           <div class="field"><label>Break 3 Start</label><input id="manualB3S" type="time"></div>
           <div class="field"><label>Break 3 End</label><input id="manualB3E" type="time"></div>
           <div class="field" style="grid-column:1/-1"><label>Reason / Remarks</label><textarea id="manualReason" rows="3" placeholder="Optional remarks..."></textarea></div>
+        </div>
+        <div class="breakRulesNote">
+          <b>Break Rules:</b> Zohar 1:00–2:00 PM / max 20 min · Juma Friday 12:30–3:00 PM / max 60 min ·
+          Asr 3:45–6:15 PM / max 25 min · Magrib 5:40–7:30 PM / max 25 min · Lunch 1:00–4:00 PM / max 25 min.
+          Allowed limit se extra time par Extra Break Report generate hoga.
         </div>
         <div class="modalActions" style="margin-top:8px">
           <button id="clearManualBtn" class="btn secondary" type="button">Clear</button>
@@ -292,6 +300,7 @@ $('manualType').addEventListener('change',()=>{
 $('clearManualBtn').addEventListener('click',()=>{
   setManualDate();
   $('manualType').value='Present';
+  $('manualB1Type').value=''; $('manualB2Type').value=''; $('manualB3Type').value='Lunch';
   ['manualIn','manualOut','manualB1S','manualB1E','manualB2S','manualB2E','manualB3S','manualB3E','manualReason'].forEach(id=>$(id).value='');
   $('manualType').dispatchEvent(new Event('change'));
 });
@@ -306,10 +315,13 @@ $('manualAttendanceForm').addEventListener('submit',async e=>{
     date:$('manualDate').value,
     inTime:type==='Present'?$('manualIn').value:'',
     outTime:type==='Present'?$('manualOut').value:'',
+    break1Type:type==='Present'?$('manualB1Type').value:'',
     break1Start:type==='Present'?$('manualB1S').value:'',
     break1End:type==='Present'?$('manualB1E').value:'',
+    break2Type:type==='Present'?$('manualB2Type').value:'',
     break2Start:type==='Present'?$('manualB2S').value:'',
     break2End:type==='Present'?$('manualB2E').value:'',
+    break3Type:type==='Present'?$('manualB3Type').value:'',
     break3Start:type==='Present'?$('manualB3S').value:'',
     break3End:type==='Present'?$('manualB3E').value:'',
     leaveWeekoff:type==='Present'?'':type,
