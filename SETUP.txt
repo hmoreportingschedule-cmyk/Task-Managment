@@ -1,0 +1,35 @@
+OFFICE TASK REPORTING - V27
+TASK DELETE / EDIT / CLEAR CLEANUP FIX
+
+1. Google Apps Script
+   - Replace the COMPLETE existing backend_code.js with the backend_code.js in this ZIP.
+   - Deploy > Manage deployments > Edit the Web App deployment.
+   - Execute as: Me
+   - Who has access: Anyone with the required access used by your current setup.
+   - IMPORTANT: Create a NEW deployment/version after replacing the script, then copy the NEW /exec URL.
+
+2. Vercel / GitHub Frontend
+   - Replace the complete index.html with this ZIP's index.html.
+   - Make sure GOOGLE_SCRIPT_URL points to the NEW Apps Script /exec URL.
+   - Redeploy Vercel.
+   - Hard refresh browser: Ctrl+F5.
+
+3. What V27 fixes
+   - Task Delete backend authorization accepts Admin / MasterAdmin / SuperAdmin role spellings with or without spaces.
+   - Task Delete resolves the exact Task ID first and uses row fallback only for legacy rows.
+   - TaskWorks belonging to the deleted task are removed.
+   - Dashboard cache is invalidated after delete.
+   - Spreadsheet.flush() is used before returning success.
+   - Clear Testing Tasks frontend/backend role checks are normalized.
+   - Existing Users, Attendance, WorkLogs, Task Templates are not deleted by individual Task Delete.
+
+4. IMPORTANT
+   If an old Apps Script deployment is still connected, the browser can continue calling the old backend even when the frontend is updated. The Apps Script deployment MUST be updated/redeployed.
+
+5. Test
+   A) Login as MasterAdmin.
+   B) Open System Overview.
+   C) Click Delete on one test task.
+   D) Confirm.
+   E) Refresh dashboard and verify the task is gone.
+   F) Click Clear All Testing Tasks to remove remaining test tasks.
