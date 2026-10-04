@@ -203,6 +203,18 @@
             #assignTaskModal .assign-task-content,#userManagementModal .user-management-content{min-height:94vh}
         }
         @media(min-width:768px){#mobileTaskQuickSearchWrap{display:none!important}}
+
+/* V48.7: Native date/time picker icons in Daily Actions */
+#attendanceFormBox input[type="date"]::-webkit-calendar-picker-indicator,
+#attendanceFormBox input[type="time"]::-webkit-calendar-picker-indicator {
+    filter: invert(1) brightness(1.8);
+    opacity: 1;
+    cursor: pointer;
+}
+#attendanceFormBox input[type="date"],
+#attendanceFormBox input[type="time"] {
+    color-scheme: dark;
+}
 </style>
 <style id="v4-manager-polish">
 #hodActionBar.manager-controls{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:14px;padding:18px 20px;background:linear-gradient(110deg,#f2fffc,#e9f5f6);border:1px solid #b7dedb;border-radius:18px}

@@ -94,6 +94,13 @@
                 timeBox.classList.add('hidden');
             }
         }
+        const _attendanceActionEl = document.getElementById('attendanceAction');
+        if (_attendanceActionEl) {
+            if (!_attendanceActionEl.value) _attendanceActionEl.value = 'Punch In';
+            _attendanceActionEl.classList.remove('hidden');
+        }
+        const _manualTimeBoxEl = document.getElementById('manualTimeBox');
+        if (_manualTimeBoxEl && _attendanceActionEl && ['Punch In','Punch Out','Break Start','Break End'].includes(_attendanceActionEl.value)) _manualTimeBoxEl.classList.remove('hidden');
         toggleInputs(); updateAttendanceReasonUI(); updateAttendanceTimingReasonUI();
 
         function getSelectedAttendanceDate(){ return document.getElementById('attendanceDate')?.value || ''; }
@@ -102,8 +109,8 @@
             const sel=document.getElementById('namazTypeSelect'); if(!sel)return;
             const friday=isFridaySelected();
             const current=sel.value;
-            // Friday: Zohar hidden; Juma + Asr + Magrib available.
-            // Other working days: Juma hidden; Zohar + Asr + Magrib available.
+            // Friday: show Juma, Asr, Magrib; hide Zohar.
+            // Other days: show Zohar, Asr, Magrib; hide Juma.
             const options = friday
                 ? [['Juma','Juma'],['Asr','Asr'],['Magrib','Magrib']]
                 : [['Zohar','Zohar'],['Asr','Asr'],['Magrib','Magrib']];
@@ -177,7 +184,7 @@ function parseBreakTimeClient(v){
             let mins=end-start;if(mins<0)mins+=1440;
             if(mins>policy.max){wrap.classList.remove('hidden');if(text)text.innerText=`Allowed ${policy.max} minutes. Actual ${mins} minutes. Extra ${mins-policy.max} minutes duty mein count nahi honge.`;}else{wrap.classList.add('hidden');if(text)text.innerText='';document.getElementById('extraBreakReason').value='';}
         }
-        function updateAttendanceReasonUI(){ toggleOtherReason(); toggleJumaBox(); }
+        function updateAttendanceReasonUI(){ toggleOtherReason(); updateBreakTypeOptions(); }
 
         function formatTime12h(time24) {
             if(!time24) return "";
@@ -1190,6 +1197,7 @@ function parseBreakTimeClient(v){
             const pv=document.getElementById('importPreview'); if(pv)pv.innerHTML='';
             selectImportType('attendance');
             document.getElementById('importCenterModal').style.display='block';
+            bindImportCenterFileInput();
             setTimeout(applyImportRoleTabs,0);
         }
         function closeImportCenterModal(){document.getElementById('importCenterModal').style.display='none';}
@@ -1338,6 +1346,30 @@ function parseBreakTimeClient(v){
                 XLSX.utils.book_append_sheet(wb,ws,'Office Events'); XLSX.writeFile(wb,'Office_Events_Import_Format.xlsx');
             }
         }
+        // Import Center file/drag-drop binding fix
+        function bindImportCenterFileInput(){
+            const input=document.getElementById('importCenterFile');
+            const zone=document.getElementById('importDropZone');
+            if(input && !input.dataset.bound){
+                input.dataset.bound='1';
+                input.addEventListener('change',function(){
+                    const file=this.files&&this.files[0];
+                    if(file)handleImportCenterFile(file);
+                });
+            }
+            if(zone && !zone.dataset.bound){
+                zone.dataset.bound='1';
+                ['dragenter','dragover'].forEach(evt=>zone.addEventListener(evt,function(e){e.preventDefault();e.stopPropagation();zone.classList.add('ring-2','ring-[#7c3aed]');}));
+                ['dragleave','drop'].forEach(evt=>zone.addEventListener(evt,function(e){e.preventDefault();e.stopPropagation();zone.classList.remove('ring-2','ring-[#7c3aed]');}));
+                zone.addEventListener('drop',function(e){
+                    const file=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];
+                    if(file)handleImportCenterFile(file);
+                });
+            }
+        }
+        if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bindImportCenterFileInput);
+        else bindImportCenterFileInput();
+
         function openTaskExcelModal(){document.getElementById('taskExcelFile').value='';document.getElementById('taskExcelPreview').innerHTML='';document.getElementById('taskExcelModal').style.display='block';}
         function closeTaskExcelModal(){document.getElementById('taskExcelModal').style.display='none';}
         function downloadTaskExcelTemplate(){
