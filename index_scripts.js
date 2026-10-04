@@ -2566,7 +2566,7 @@ function parseBreakTimeClient(v){
             if(item.type==='attendance'){reason=document.getElementById('attendanceRejectReason')?.value||'';if(!reason){alert('Attendance reject reason select karein.');return;}}
             else if(item.type==='task'||item.type==='worklog'){reason=document.getElementById('taskRejectReason')?.value||'';if(!reason){alert('Task reject reason select karein.');return;}if(reason==='Other'){other=(document.getElementById('taskRejectReasonOther')?.value||'').trim();if(!other){alert('Other reason likhiye.');return;}}}
             const btn=document.getElementById('approvalRejectSubmit');if(btn)btn.disabled=true;
-            Promise.all(ctx.items.map(x=>approvalCenterPost(x,'Rejected',reason,other))).then(ds=>{const bad=ds.filter(d=>d.status!=='success');if(bad.length)alert('Kuch rejection process nahi ho sake.');else alert('Rejected successfully.');closeApprovalRejectModal();fetchDashboardDataSilently();setTimeout(loadApprovalAttendanceTaskCenter,300);}).catch(()=>alert('Rejection update failed.')).finally(()=>{if(btn)btn.disabled=false;});
+            Promise.all(ctx.items.map(x=>approvalCenterPost(x,'Rejected',reason,other))).then(ds=>{const bad=ds.filter(d=>d.status!=='success');if(bad.length){const msgs=bad.map(d=>d&&d.message).filter(Boolean);alert(msgs.length?msgs.join('\n'):'Rejection update failed.');}else alert('Rejected successfully. Employee ko notification bhej di gayi hai.');closeApprovalRejectModal();fetchDashboardDataSilently();fetchServerNotifications();setTimeout(loadApprovalAttendanceTaskCenter,300);}).catch(()=>alert('Rejection update failed.')).finally(()=>{if(btn)btn.disabled=false;});
         }
         let urgentTaskApprovalContext=null;
         function openUrgentTaskApprovalModal(key){
