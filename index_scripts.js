@@ -83,7 +83,7 @@
             const msg=event?'Aaj office band hai: '+String(event.name||event.eventName||'Holiday')+'. Attendance ki zaroorat nahi.':isWeekoff?'Aaj aapka Weekoff hai. Attendance ki zaroorat nahi.':'';
             notice.textContent=msg;notice.classList.toggle('hidden',!msg);btn.disabled=!!msg;btn.style.opacity=msg?'0.5':'';btn.title=msg;
         }
-        document.addEventListener('change',e=>{if(e.target&&e.target.id==='attendanceDate'){v4UpdateAttendanceAvailability();updateAttendanceReasonUI();updateBreakTypeOptions();} if(e.target&&(e.target.id==='attendanceAction'||e.target.id==='actionReasonSelect'||e.target.id==='namazTypeSelect'||e.target.id==='namazBreakTime'||e.target.id==='lunchBreakTime'||e.target.id==='otherBreakTime')){if(e.target.id==='attendanceAction')toggleInputs(); updateBreakTypeOptions(); updateAttendanceReasonUI(); updateAttendanceTimingReasonUI();}});
+        document.addEventListener('change',e=>{if(e.target&&e.target.id==='attendanceDate'){v4UpdateAttendanceAvailability();updateAttendanceReasonUI();updateBreakTypeOptions();} if(e.target&&(e.target.id==='attendanceAction'||e.target.id==='actionReasonSelect'||e.target.id==='namazTypeSelect'||e.target.id==='namazBreakTime'||e.target.id==='lunchBreakTime')){if(e.target.id==='attendanceAction')toggleInputs(); updateBreakTypeOptions(); updateAttendanceReasonUI(); updateAttendanceTimingReasonUI();}});
         document.addEventListener('input',e=>{if(e.target&&e.target.id==='manualTime'){updateBreakExtraReasonVisibility();updateAttendanceTimingReasonUI();}});
         function toggleInputs() {
             const action = document.getElementById('attendanceAction').value;
@@ -102,12 +102,15 @@
             const sel=document.getElementById('namazTypeSelect'); if(!sel)return;
             const friday=isFridaySelected();
             const current=sel.value;
-            sel.innerHTML=friday
-                ? '<option value="">-- Select Juma --</option><option value="Juma">Juma</option>'
-                : '<option value="">-- Select Zohar --</option><option value="Zohar">Zohar</option>';
-            if((!friday && current==='Zohar') || (friday && current==='Juma')) sel.value=current;
+            // Friday: Zohar hidden; Juma + Asr + Magrib available.
+            // Other working days: Juma hidden; Zohar + Asr + Magrib available.
+            const options = friday
+                ? [['Juma','Juma'],['Asr','Asr'],['Magrib','Magrib']]
+                : [['Zohar','Zohar'],['Asr','Asr'],['Magrib','Magrib']];
+            sel.innerHTML = '<option value="">-- Select Namaz --</option>' + options.map(x=>`<option value="${x[0]}">${x[1]}</option>`).join('');
+            sel.value = options.some(x=>x[0]===current) ? current : '';
             const hint=document.getElementById('namazDayHint');
-            if(hint) hint.textContent=friday ? 'Friday: sirf Juma select ho sakta hai.' : 'Working Day: sirf Zohar select ho sakta hai.';
+            if(hint) hint.textContent = friday ? 'Friday: Juma, Asr ya Magrib select kar sakte hain.' : 'Working Day: Zohar, Asr ya Magrib select kar sakte hain.';
         }
         function selectNamazBreakType(){
             const val=document.getElementById('namazTypeSelect')?.value||'';
@@ -125,7 +128,7 @@
                 sel.value=''; return;
             }
             sel.value=type;
-            const source=type==='Namaz'?'namazBreakTime':type==='Lunch'?'lunchBreakTime':'otherBreakTime';
+            const source=type==='Namaz'?'namazBreakTime':'lunchBreakTime';
             const value=document.getElementById(source)?.value||'';
             if(value) document.getElementById('manualTime').value=value;
             updateBreakExtraReasonVisibility();
@@ -150,7 +153,6 @@
                 if(n==='Juma')return {label:'Juma',max:70};
                 return {label:n==='Zohar'?'Namaz - Zohar':'Namaz',max:25};
             }
-            if(type==='Other') return {label:'Other',max:25};
             return null;
         }
 function parseBreakTimeClient(v){
@@ -289,10 +291,6 @@ function parseBreakTimeClient(v){
             let reason = reasonType;
             if(action==='Break Start' || action==='Break End') {
                 if(reasonType==='Lunch' && ramadanLunchFrozen){ alert('Ramadan mein Lunch option Admin ne freeze kiya hua hai.'); return; }
-                if(reasonType === 'Other') {
-                    reason = document.getElementById('actionReasonOther').value.trim();
-                    if(!reason){ alert('Other Break ka reason likhein.'); return; }
-                }
                 if(reasonType === 'Namaz') {
                     const namaz = getSelectedNamazType();
                     if(!namaz){ alert(isFridaySelected() ? 'Please select Juma.' : 'Please select Zohar.'); return; }
@@ -303,7 +301,7 @@ function parseBreakTimeClient(v){
             
             let rawManualTime = document.getElementById('manualTime').value;
             if(action==='Break Start' || action==='Break End'){
-                const source=reasonType==='Namaz'?'namazBreakTime':reasonType==='Lunch'?'lunchBreakTime':reasonType==='Other'?'otherBreakTime':'';
+                const source=reasonType==='Namaz'?'namazBreakTime':reasonType==='Lunch'?'lunchBreakTime':'';
                 const selectedBreakTime=source ? (document.getElementById(source)?.value||'') : '';
                 if(selectedBreakTime){ rawManualTime=selectedBreakTime; document.getElementById('manualTime').value=selectedBreakTime; }
             }
@@ -367,10 +365,7 @@ function parseBreakTimeClient(v){
                 if(document.getElementById('namazTypeSelect')) document.getElementById('namazTypeSelect').value = '';
                 if(document.getElementById('namazBreakTime')) document.getElementById('namazBreakTime').value = '';
                 if(document.getElementById('lunchBreakTime')) document.getElementById('lunchBreakTime').value = '';
-                if(document.getElementById('otherBreakTime')) document.getElementById('otherBreakTime').value = '';
                 document.getElementById('namazReasonBox').classList.add('hidden');
-                document.getElementById('actionReasonOther').value = '';
-                document.getElementById('actionReasonOther').classList.add('hidden');
                 if(document.getElementById('extraBreakReason')) document.getElementById('extraBreakReason').value='';
                 document.getElementById('extraBreakReasonBox')?.classList.add('hidden');
                 

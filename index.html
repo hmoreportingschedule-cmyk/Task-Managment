@@ -222,6 +222,7 @@
 #hodActionBar>div:nth-child(2)>button i{font-size:19px}#hodActionBar>div:nth-child(2)>button:hover{transform:translateY(-2px);box-shadow:0 6px 15px rgba(0,0,0,.14)}
 #attendanceClosedNotice{border:1px solid #5fc8bd;background:#eafff8;color:#135d58;padding:12px;border-radius:12px;font-size:13px;font-weight:700;line-height:1.5;margin-bottom:12px}
 #attendanceFormBox.is-closed #attendanceAction,#attendanceFormBox.is-closed #manualTimeBox,#attendanceFormBox.is-closed #actionReasonSelect,#attendanceFormBox.is-closed #attendanceBtn{display:none!important}
+#attendanceFormBox input[type="date"]::-webkit-calendar-picker-indicator,#attendanceFormBox input[type="time"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:1;}
 @media(max-width:768px){#hodActionBar.manager-controls{flex-direction:column!important;align-items:stretch!important}#hodActionBar>div:first-child{flex:auto}#hodActionBar>div:nth-child(2){overflow-x:auto}#hodActionBar>div:nth-child(2)>button{flex:0 0 112px}}
 </style>
 <style id="v43-grade-fix">
@@ -297,7 +298,6 @@
                             <option value="">-- Select Break Type --</option>
                             <option value="Lunch">Lunch</option>
                             <option value="Namaz">Namaz</option>
-                            <option value="Other">Other</option>
                         </select>
 
                         <div class="space-y-2 mt-2">
@@ -316,11 +316,6 @@
                                 <p id="lunchFreezeHint" class="text-[10px] text-[#f59e0b] mt-1 hidden">Ramadan mein Lunch Admin ke freeze setting ke mutabiq available nahi hai.</p>
                             </div>
 
-                            <div class="bg-[#2a4d53] border border-[#5a8789] rounded-lg p-3">
-                                <p class="text-sm font-bold text-white mb-2">Break For Other</p>
-                                <input type="time" id="otherBreakTime" class="w-full bg-[#1e3e43] border border-[#5a8789] text-white px-2 py-2 rounded-lg text-xs focus:outline-none focus:border-[#5fd3cc]" onchange="selectBreakTiming('Other')">
-                                <textarea id="actionReasonOther" class="w-full bg-[#1e3e43] border border-[#5a8789] text-white px-2 py-2 rounded-lg mt-2 text-xs focus:outline-none" rows="2" placeholder="Break reason likhein..."></textarea>
-                            </div>
                         </div>
 
                         <div id="namazReasonBox" class="hidden"></div>
