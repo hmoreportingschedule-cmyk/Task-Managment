@@ -332,7 +332,20 @@ function parseBreakTimeClient(v){
             }
             return !!reason;
         }
-        document.addEventListener('change',function(e){if(e.target&&e.target.id==='attendanceDate'){updateAttendanceNonWorkingDay();renderSelectedAttendanceState();updateTodayUrgentTaskButtonState();}});
+        document.addEventListener('change',function(e){
+            if(e.target&&e.target.id==='attendanceDate'){
+                const selectedDate=e.target.value||localDateKey();
+                const logDate=document.getElementById('logWorkDate');
+                if(logDate){
+                    logDate.value=selectedDate;
+                    if(typeof updateLogWorkDateUI==='function') updateLogWorkDateUI();
+                }
+                updateAttendanceNonWorkingDay();
+                renderSelectedAttendanceState();
+                updateTodayUrgentTaskButtonState();
+                updateLogDailyWorkButtonState();
+            }
+        });
 
         function getShiftStartMinsClient(){ const s=document.getElementById('displayOfficeTime')?.innerText||''; const parts=s.toLowerCase().split('to'); return parts.length>1?timeToMins(parts[0].trim()):-1; }
         function getShiftEndMinsClient(){ const s=document.getElementById('displayOfficeTime')?.innerText||''; const parts=s.toLowerCase().split('to'); return parts.length>1?timeToMins(parts[1].trim()):-1; }
@@ -1671,8 +1684,10 @@ function parseBreakTimeClient(v){
         function openLogWorkModal() {
             const modal=document.getElementById('logWorkModal'); if(!modal)return;
             setLogWorkDateConstraints();
+            const dailyActionDate=document.getElementById('attendanceDate')?.value||localDateKey();
             const dateEl=document.getElementById('logWorkDate');
-            const dateKey=dateEl?.value||localDateKey();
+            if(dateEl) dateEl.value=dailyActionDate;
+            const dateKey=dailyActionDate;
             const nonWorking=isLogWorkNonWorkingDate(dateKey);
             const allowed=isLogWorkDateAllowed(dateKey);
             const btn=document.querySelector('button[onclick="openLogWorkModal()"]');
