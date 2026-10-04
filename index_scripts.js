@@ -684,12 +684,12 @@ function parseBreakTimeClient(v){
             return '';
         }
         function isLogWorkDateAllowed(dateKey){
+            // Log Daily Work is always allowed for today + previous 2 days.
+            // Do not let Attendance Entry Start/End override this window.
             const d=parseLocalDateKey(dateKey), today=parseLocalDateKey(localDateKey()); if(!d||!today)return false;
             if(d>today)return false;
-            const start=attendanceEntryStart?parseLocalDateKey(String(attendanceEntryStart).slice(0,10)):null;
-            const end=attendanceEntryEnd?parseLocalDateKey(String(attendanceEntryEnd).slice(0,10)):null;
-            if(start&&end)return d>=start&&d<=end;
-            const min=new Date(today);min.setDate(min.getDate()-2);return d>=min;
+            const min=new Date(today);min.setDate(min.getDate()-2);
+            return d>=min&&d<=today;
         }
         function setLogWorkDateConstraints(){
             const el=document.getElementById('logWorkDate'); if(!el)return;
@@ -1661,7 +1661,7 @@ function parseBreakTimeClient(v){
             const key=document.getElementById('attendanceDate')?.value||localDateKey();
             const reason=isLogWorkNonWorkingDate(key);
             const allowed=isLogWorkDateAllowed(key);
-            const rangeReason=!allowed?'Log Daily Work sirf current date aur previous 2 days ke liye available hai.':'';
+            const rangeReason=!allowed?'Log Daily Work sirf aaj aur previous 2 days ke liye available hai.': '';
             const frozen=!!reason||!allowed;
             btn.disabled=frozen; btn.classList.toggle('opacity-50',frozen); btn.classList.toggle('cursor-not-allowed',frozen);
             btn.title=reason?`Log Daily Work frozen: ${reason}`:(rangeReason||'Log Daily Work');
@@ -1692,7 +1692,7 @@ function parseBreakTimeClient(v){
             const allowed=isLogWorkDateAllowed(dateKey);
             const btn=document.querySelector('button[onclick="openLogWorkModal()"]');
             if(nonWorking){ alert(`Log Daily Work frozen: ${nonWorking}.`); if(btn)btn.disabled=true; return; }
-            if(!allowed){ alert('Log Daily Work sirf current date aur previous 2 days ke liye available hai.'); if(btn)btn.disabled=true; return; }
+            if(!allowed){ alert('Log Daily Work sirf aaj aur previous 2 days ke liye available hai.'); if(btn)btn.disabled=true; return; }
             if(btn)btn.disabled=false;
             modal.style.display='block';
             ensureWorkLogsLoaded(true).catch(()=>{}).finally(()=>{populateLogTaskDropdown(globalAllTasks,dateKey);updateCompletionCheckboxState();});
@@ -1730,7 +1730,7 @@ function parseBreakTimeClient(v){
         function submitWorkLog() {
             const taskSel=document.getElementById('logTaskSelect'), tIdx=taskSel.value, tName=taskSel.options[taskSel.selectedIndex]?.text||'', mins=document.getElementById('logTimeMins').value, desc=document.getElementById('logDesc').value, workDate=document.getElementById('logWorkDate')?.value||localDateKey(), username=document.getElementById('displayUser').innerText;
             const nonWorking=isLogWorkNonWorkingDate(workDate);
-            if(!isLogWorkDateAllowed(workDate)){alert('Log Daily Work sirf current date aur previous 2 days ke liye available hai.');return;}
+            if(!isLogWorkDateAllowed(workDate)){alert('Log Daily Work sirf aaj aur previous 2 days ke liye available hai.');return;}
             if(nonWorking){alert(`Log Daily Work frozen: ${nonWorking}.`);return;}
             if(!tIdx||!mins){alert('Please select task and enter time!');return;}
             const before=!!document.getElementById('requestBeforeCompletion')?.checked;
