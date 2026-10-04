@@ -34,12 +34,14 @@
             const tzOffset = today.getTimezoneOffset() * 60000;
             const localToday = (new Date(today - tzOffset)).toISOString().split('T')[0];
             const localYesterday = (new Date(yesterday - tzOffset)).toISOString().split('T')[0];
+            const twoDaysAgo = new Date(today); twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+            const localTwoDaysAgo = (new Date(twoDaysAgo - tzOffset)).toISOString().split('T')[0];
             dateInput.max = localToday;
             if(attendanceEntryStart && attendanceEntryEnd){
-                dateInput.min = attendanceEntryStart;
+                dateInput.min = attendanceEntryStart < localTwoDaysAgo ? attendanceEntryStart : localTwoDaysAgo;
                 dateInput.max = attendanceEntryEnd > localToday ? attendanceEntryEnd : localToday;
             } else {
-                dateInput.min = localYesterday;
+                dateInput.min = localTwoDaysAgo;
                 dateInput.max = localToday;
             }
             dateInput.value = localToday;
@@ -81,8 +83,8 @@
             const msg=event?'Aaj office band hai: '+String(event.name||event.eventName||'Holiday')+'. Attendance ki zaroorat nahi.':isWeekoff?'Aaj aapka Weekoff hai. Attendance ki zaroorat nahi.':'';
             notice.textContent=msg;notice.classList.toggle('hidden',!msg);btn.disabled=!!msg;btn.style.opacity=msg?'0.5':'';btn.title=msg;
         }
-        document.addEventListener('change',e=>{if(e.target&&e.target.id==='attendanceDate'){v4UpdateAttendanceAvailability();updateAttendanceReasonUI();} if(e.target&&(e.target.id==='attendanceAction'||e.target.id==='actionReasonSelect'||e.target.id==='namazReasonSelect'||e.target.id==='jumaReasonSelect')){if(e.target.id==='attendanceAction')toggleInputs(); updateAttendanceReasonUI();}});
-        document.addEventListener('input',e=>{if(e.target&&e.target.id==='manualTime')updateBreakExtraReasonVisibility();});
+        document.addEventListener('change',e=>{if(e.target&&e.target.id==='attendanceDate'){v4UpdateAttendanceAvailability();updateAttendanceReasonUI();} if(e.target&&(e.target.id==='attendanceAction'||e.target.id==='actionReasonSelect'||e.target.id==='namazReasonSelect'||e.target.id==='jumaReasonSelect')){if(e.target.id==='attendanceAction')toggleInputs(); updateAttendanceReasonUI(); updateAttendanceTimingReasonUI();}});
+        document.addEventListener('input',e=>{if(e.target&&e.target.id==='manualTime'){updateBreakExtraReasonVisibility();updateAttendanceTimingReasonUI();}});
         function toggleInputs() {
             const action = document.getElementById('attendanceAction').value;
             const timeBox = document.getElementById('manualTimeBox');
@@ -92,7 +94,7 @@
                 timeBox.classList.add('hidden');
             }
         }
-        toggleInputs(); updateAttendanceReasonUI();
+        toggleInputs(); updateAttendanceReasonUI(); updateAttendanceTimingReasonUI();
 
         function getSelectedAttendanceDate(){ return document.getElementById('attendanceDate')?.value || ''; }
         function isFridaySelected(){ const d=getSelectedAttendanceDate(); if(!d)return false; const dt=new Date(d+'T12:00:00'); return !Number.isNaN(dt.getTime()) && dt.getDay()===5; }
@@ -243,6 +245,22 @@
         }
         document.addEventListener('change',function(e){if(e.target&&e.target.id==='attendanceDate')updateAttendanceNonWorkingDay();});
 
+        function getShiftStartMinsClient(){ const s=document.getElementById('displayOfficeTime')?.innerText||''; const parts=s.toLowerCase().split('to'); return parts.length>1?timeToMins(parts[0].trim()):-1; }
+        function getShiftEndMinsClient(){ const s=document.getElementById('displayOfficeTime')?.innerText||''; const parts=s.toLowerCase().split('to'); return parts.length>1?timeToMins(parts[1].trim()):-1; }
+        function updateAttendanceTimingReasonUI(){
+            const action=document.getElementById('attendanceAction')?.value||'', date=document.getElementById('attendanceDate')?.value||'', manual=document.getElementById('manualTime')?.value||'';
+            const wrap=document.getElementById('attendanceTimingReasonBox'), sel=document.getElementById('attendanceTimingReasonSelect'), ta=document.getElementById('attendanceTimingReason');
+            if(!wrap||!sel||!ta)return; let needed=''; const mm=timeToMins(manual); const sm=getShiftStartMinsClient(), em=getShiftEndMinsClient();
+            if(action==='Punch In' && mm>=0 && sm>=0 && mm>sm) needed='Delay Hone Hone Ka Reason';
+            if(action==='Punch Out' && mm>=0 && em>=0 && mm<em) needed='Before Jaane Ka Reasion';
+            if(needed){
+                wrap.classList.remove('hidden');
+                sel.innerHTML = `<option value="${needed}">${needed}</option>`;
+                sel.value=needed; sel.disabled=false;
+                ta.classList.remove('hidden'); ta.placeholder='Write your reason here...';
+            } else { wrap.classList.add('hidden'); sel.innerHTML='<option value="">-- Select Reason --</option>'; sel.value=''; sel.disabled=false; ta.value=''; ta.classList.add('hidden'); }
+        }
+
         function markAttendance() {
             if(updateAttendanceNonWorkingDay())return;
             const action = document.getElementById('attendanceAction').value;
@@ -271,7 +289,7 @@
                 alert("Select Time manually!"); return;
             }
 
-            if (action === 'Punch Out') {
+            if (action === 'Punch Out' && selectedDate === (()=>{const d=new Date();const tz=d.getTimezoneOffset()*60000;return new Date(d-tz).toISOString().split('T')[0]})()) {
                 const shiftStr = document.getElementById('displayOfficeTime').innerText;
                 const parts = shiftStr.toLowerCase().split('to');
                 if (parts.length > 1) {
@@ -299,6 +317,8 @@
             formData.append('reason', reason);
             formData.append('manualTime', manualTime12h);
             formData.append('selectedDate', selectedDate);
+            formData.append('timingReasonType', document.getElementById('attendanceTimingReasonSelect')?.value || '');
+            formData.append('timingReason', document.getElementById('attendanceTimingReason')?.value.trim() || '');
             formData.append('extraBreakReason', document.getElementById('extraBreakReason')?.value.trim() || '');
             formData.append('sessionToken', sessionToken);
 

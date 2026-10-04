@@ -317,6 +317,15 @@
                         <p id="jumaDayHint" class="text-[10px] text-[#f59e0b] mt-1 hidden">Juma sirf Friday ko select ki ja sakti hai.</p>
                     </div>
                     <textarea id="actionReasonOther" class="w-full bg-[#2a4d53] border border-[#5a8789] text-white px-2 py-2 rounded-lg mb-3 text-xs hidden focus:outline-none focus:border-[#5fd3cc]" rows="2" placeholder="Write your reason here..."></textarea>
+                    <div id="attendanceTimingReasonBox" class="mb-3 hidden">
+                        <label class="text-xs font-semibold text-[#f59e0b]">Attendance Reason:</label>
+                        <select id="attendanceTimingReasonSelect" class="w-full bg-[#2a4d53] border border-[#f59e0b] text-white px-2 py-2 rounded-lg mb-2 text-xs" disabled>
+                            <option value="">-- Select Reason --</option>
+                            <option value="Delay Hone Hone Ka Reason">Delay Hone Hone Ka Reason</option>
+                            <option value="Before Jaane Ka Reasion">Before Jaane Ka Reasion</option>
+                        </select>
+                        <textarea id="attendanceTimingReason" class="w-full bg-[#2a4d53] border border-[#f59e0b] text-white px-2 py-2 rounded-lg text-xs" rows="2" placeholder="Write your reason here..."></textarea>
+                    </div>
                     <div id="extraBreakReasonBox" class="mb-3 hidden">
                         <label class="text-xs font-semibold text-[#f59e0b]">Extra Time Reason (Required):</label>
                         <textarea id="extraBreakReason" class="w-full bg-[#2a4d53] border border-[#f59e0b] text-white px-2 py-2 rounded-lg text-xs focus:outline-none" rows="2" placeholder="Maximum time se zyada kyun laga? Reason likhein..."></textarea>
