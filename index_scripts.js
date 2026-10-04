@@ -822,8 +822,9 @@ function parseBreakTimeClient(v){
                         let eBadge = task.empStatus === 'Completed' ? 'text-green-600 font-bold bg-green-50 px-2 py-1 rounded' : 'text-yellow-600 font-semibold bg-yellow-50 px-2 py-1 rounded';
                         const managerStatusLabel = task.empStatus === 'Completed' && String(task.completionType||'').toLowerCase()==='before' ? 'Before • Completed' : task.empStatus;
                         empStatusHTML = `<span class="${eBadge}">${managerStatusLabel}</span>`;
-                        hodStatusHTML = `
-                            <select onchange="updateTaskDB(${task.rowIndex}, 'hod', this.value, ${JSON.stringify(task.assignedTo)})" class="border border-[#7db0b1] rounded-md px-2 py-1 bg-white text-xs font-semibold text-[#2a4d53] cursor-pointer focus:ring-1 focus:ring-[#259b94]" ${hodLocked}>
+                        hodStatusHTML = String(task.hodStatus||'').toLowerCase()==='approved'
+                            ? '<span class="px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">Approved</span>'
+                            : `<select onchange="updateTaskDB(${task.rowIndex}, 'hod', this.value, ${JSON.stringify(task.assignedTo)})" class="border border-[#7db0b1] rounded-md px-2 py-1 bg-white text-xs font-semibold text-[#2a4d53] cursor-pointer focus:ring-1 focus:ring-[#259b94]">
                                 <option value="Pending" ${task.hodStatus === 'Pending' ? 'selected' : ''}>Pending</option>
                                 <option value="Approved" ${task.hodStatus === 'Approved' ? 'selected' : ''}>Approve</option>
                                 <option value="Rejected" ${task.hodStatus === 'Rejected' ? 'selected' : ''}>Reject</option>
@@ -836,8 +837,9 @@ function parseBreakTimeClient(v){
                                 <option value="Completed" ${task.empStatus === 'Completed' ? 'selected' : ''}>Completed</option>
                                 <option value="Incomplete" ${task.empStatus === 'Incomplete' ? 'selected' : ''}>Incomplete</option>
                             </select>`;
-                        hodStatusHTML = `
-                            <select onchange="updateTaskDB(${task.rowIndex}, 'hod', this.value, ${JSON.stringify(task.assignedTo)})" class="border border-[#7db0b1] rounded-md px-2 py-1 bg-white text-xs font-semibold text-[#2a4d53] cursor-pointer focus:ring-1 focus:ring-[#259b94]">
+                        hodStatusHTML = String(task.hodStatus||'').toLowerCase()==='approved'
+                            ? '<span class="px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">Approved</span>'
+                            : `<select onchange="updateTaskDB(${task.rowIndex}, 'hod', this.value, ${JSON.stringify(task.assignedTo)})" class="border border-[#7db0b1] rounded-md px-2 py-1 bg-white text-xs font-semibold text-[#2a4d53] cursor-pointer focus:ring-1 focus:ring-[#259b94]">
                                 <option value="Pending" ${task.hodStatus === 'Pending' ? 'selected' : ''}>Pending</option>
                                 <option value="Approved" ${task.hodStatus === 'Approved' ? 'selected' : ''}>Approve</option>
                                 <option value="Rejected" ${task.hodStatus === 'Rejected' ? 'selected' : ''}>Reject</option>
@@ -989,8 +991,10 @@ function parseBreakTimeClient(v){
                 
                 let reqLocked = (status === 'Approved' && !isAdmin) ? 'disabled' : '';
 
-                if (isHOD && (status === 'Pending' || leave !== '-')) {
-                    stateBadge = `<select onchange="updateAttStatus(${r.rowIndex}, this.value, ${JSON.stringify(r.user)})" class="border border-[#7db0b1] rounded-md px-2 py-1 text-xs font-bold text-[#2a4d53] outline-none cursor-pointer focus:ring-1 focus:ring-[#259b94]" ${reqLocked}>
+                if (String(status||'').toLowerCase()==='approved') {
+                    stateBadge = '<span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold shadow-sm">Approved</span>';
+                } else if (isHOD && (status === 'Pending' || leave !== '-')) {
+                    stateBadge = `<select onchange="updateAttStatus(${r.rowIndex}, this.value, ${JSON.stringify(r.user)})" class="border border-[#7db0b1] rounded-md px-2 py-1 text-xs font-bold text-[#2a4d53] outline-none cursor-pointer focus:ring-1 focus:ring-[#259b94]">
                                     <option value="Pending" ${status==='Pending'?'selected':''}>Pending Req</option>
                                     <option value="Approved" ${status==='Approved'?'selected':''}>Approve</option>
                                     <option value="Rejected" ${status==='Rejected'?'selected':''}>Reject</option>
@@ -2438,7 +2442,19 @@ function parseBreakTimeClient(v){
         function approvalCenterSingleAction(key,status){
             const item=approvalCenterFind(key);if(!item)return;
             if(status==='Rejected'){openApprovalRejectModal(key);return;}
-            approvalCenterPost(item,status).then(d=>{alert(d.message||status);if(d.status==='success'){fetchDashboardDataSilently();setTimeout(loadApprovalAttendanceTaskCenter,250);}}).catch(()=>alert('Approval update failed.'));
+            const row=document.querySelector(`#approvalCenterBody .approval-center-check[data-key=\"${CSS.escape(String(key))}\"]`)?.closest('tr');
+            const btn=row?.querySelector('button'); if(btn){btn.disabled=true;btn.textContent='Saving...';}
+            // Optimistic UI: remove the item immediately; backend continues the save in the background.
+            if(row)row.remove();
+            approvalCenterPost(item,status).then(d=>{
+                if(d.status==='success'){
+                    fetchDashboardDataSilently();
+                    setTimeout(loadApprovalAttendanceTaskCenter,200);
+                }else{
+                    alert(d.message||'Approval update failed.');
+                    loadApprovalAttendanceTaskCenter();
+                }
+            }).catch(()=>{alert('Approval update failed.');loadApprovalAttendanceTaskCenter();});
         }
         async function bulkApprovalCenterAction(status){
             const keys=Array.from(document.querySelectorAll('#approvalCenterBody .approval-center-check:checked')).map(c=>c.dataset.key);if(!keys.length){alert('Pehle approval items select karein.');return;}
@@ -2447,9 +2463,12 @@ function parseBreakTimeClient(v){
                 const types=new Set(items.map(x=>x.type)); if(types.size>1){alert('Bulk Reject mein ek hi type (Task ya Attendance) select karein.');return;}
                 approvalRejectContext={mode:'bulk',items:items}; const first=items[0]; document.getElementById('approvalRejectTitle').textContent=first.type==='attendance'?'Attendance Reject Reason':'Task Reject Reason'; document.getElementById('taskRejectReasonBox').style.display=first.type==='task'?'block':'none'; document.getElementById('attendanceRejectReasonBox').style.display=first.type==='attendance'?'block':'none'; document.getElementById('taskRejectOtherBox').style.display='none'; document.getElementById('taskRejectReason').value=''; document.getElementById('attendanceRejectReason').value=''; document.getElementById('taskRejectReasonOther').value=''; document.getElementById('approvalRejectModal').style.display='block'; return;
             }
-            if(!confirm(`${items.length} item(s) ko Approve karna hai?`))return; let ok=0,fail=0;
-            for(const item of items){try{const d=await approvalCenterPost(item,status);if(d.status==='success')ok++;else fail++;}catch(e){fail++;}}
-            alert(`${ok} approved successfully.${fail?` ${fail} item(s) failed.`:''}`);fetchDashboardDataSilently();setTimeout(loadApprovalAttendanceTaskCenter,300);
+            if(!confirm(`${items.length} item(s) ko Approve karna hai?`))return;
+            const buttons=document.querySelectorAll('#approvalCenterBody .approval-center-check:checked'); buttons.forEach(c=>{const b=c.closest('tr')?.querySelector('button');if(b){b.disabled=true;b.textContent='Saving...';} c.closest('tr')?.remove();});
+            const results=await Promise.all(items.map(item=>approvalCenterPost(item,status).catch(()=>({status:'error'}))));
+            const fail=results.filter(d=>d.status!=='success').length;
+            if(fail){alert(`${items.length-fail} approved successfully. ${fail} item(s) failed.`);}
+            fetchDashboardDataSilently();setTimeout(loadApprovalAttendanceTaskCenter,200);
         }
 
         function openAttendanceExcelModal(){document.getElementById('attendanceExcelFile').value='';document.getElementById('attendanceExcelPreview').innerHTML='';document.getElementById('attendanceExcelModal').style.display='block';}
