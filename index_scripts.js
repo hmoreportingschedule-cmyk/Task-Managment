@@ -2815,8 +2815,8 @@ function parseBreakTimeClient(v){
             const box=document.getElementById('progressReportDetails'); if(!box)return;
             box.innerHTML=stats.map(s=>{
                 const taskRows=s.tasks.slice().sort((a,b)=>(progressReportDateObj(a.endDate)||new Date(0))-(progressReportDateObj(b.endDate)||new Date(0))).map(t=>`<tr><td>${progressReportEscape(t.taskName||'-')}</td><td>${progressReportEscape(t.startDate||'-')} → ${progressReportEscape(t.endDate||'-')}</td><td>${progressReportEscape(t.priority||'Normal')}</td><td>${progressReportEscape(t.empStatus||'Pending')}</td><td>${Number(t.timeSpent)||0} min</td></tr>`).join('')||'<tr><td colspan="5" class="p-4 text-center text-gray-500">No tasks found.</td></tr>';
-                const parseProgressTimeMinutes=v=>{const s=String(v||'').trim(); if(!s)return null; const m=s.match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?/i); if(!m)return null; let h=Number(m[1]),mi=Number(m[2]); const ap=(m[3]||'').toUpperCase(); if(ap==='PM'&&h<12)h+=12; if(ap==='AM'&&h===12)h=0; return h*60+mi;}; const progressTotalWorkingMinutes=a=>{const st=parseProgressTimeMinutes(a.InTime),en=parseProgressTimeMinutes(a.OutTime); if(st===null||en===null)return '-'; let total=en-st; if(total<0)total+=1440; const extra=Number(a.ExtraBreakMinutes)||0; return Math.max(0,Math.round(total-extra));}; const attRows=s.rows.map(a=>`<tr><td>${progressReportEscape(a.Date||'-')}</td><td>${a.InTime||'-'}</td><td>${a.OutTime||'-'}</td><td>${progressReportEscape(a.Leave||'-')}</td><td>${progressReportEscape(a.ExtraBreakMinutes ? (a.ExtraBreakMinutes+' min') : '-')}</td><td>${progressReportEscape(a.BreakTimeForIjara||'-')}</td><td>${progressReportEscape(a.Reason||'-')}</td><td>${progressTotalWorkingMinutes(a)==='-'?'-':progressTotalWorkingMinutes(a)+' min'}</td></tr>`).join('')||'<tr><td colspan="8" class="p-4 text-center text-gray-500">No attendance records found.</td></tr>';
-                return `<div class="progress-report-section"><div class="flex flex-wrap justify-between items-center gap-2 mb-3"><div><h3 class="text-xl font-extrabold text-[#112a2e]">${progressReportEscape(s.emp)}${s.employeeId?` <span class=\"text-sm text-gray-500\">(${progressReportEscape(s.employeeId)})</span>`:''}</h3><div class="text-xs text-gray-500">Attendance ${s.attendancePct}% · Task ${s.taskPct}% · Overall ${s.overall}%</div></div><div class="text-sm font-bold text-[#259b94]">${s.completed}/${s.tasks.length} Tasks Complete</div></div><div class="grid grid-cols-2 md:grid-cols-6 gap-2 mb-4"><div class="bg-[#f0f7f7] p-3 rounded-lg"><b>${s.present}</b><small class="block text-gray-500">Present</small></div><div class="bg-red-50 p-3 rounded-lg"><b>${s.absent}</b><small class="block text-gray-500">Absent</small></div><div class="bg-amber-50 p-3 rounded-lg"><b>${s.leave}</b><small class="block text-gray-500">Leave</small></div><div class="bg-blue-50 p-3 rounded-lg"><b>${s.weekoff}</b><small class="block text-gray-500">Weekoff</small></div><div class="bg-green-50 p-3 rounded-lg"><b>${s.completed}</b><small class="block text-gray-500">Completed</small></div><div class="bg-orange-50 p-3 rounded-lg"><b>${s.tasks.length-s.completed}</b><small class="block text-gray-500">Pending</small></div></div><div class="overflow-x-auto mb-4"><h4 class="font-bold mb-2">Attendance Details</h4><table class="progress-report-mini-table"><thead><tr><th>Date</th><th>In Time</th><th>Out Time</th><th>Status</th><th>Extra Break Time</th><th>Break Time For Ijara</th><th>Reason</th></tr></thead><tbody>${attRows}</tbody></table></div><div class="overflow-x-auto"><h4 class="font-bold mb-2">Task Details</h4><table class="progress-report-mini-table"><thead><tr><th>Task</th><th>Timeline</th><th>Priority</th><th>Status</th><th>Time</th></tr></thead><tbody>${taskRows}</tbody></table></div></div>`;
+                const parseProgressTimeMinutes=v=>{const s=String(v||'').trim(); if(!s)return null; const m=s.match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?/i); if(!m)return null; let h=Number(m[1]),mi=Number(m[2]); const ap=(m[3]||'').toUpperCase(); if(ap==='PM'&&h<12)h+=12; if(ap==='AM'&&h===12)h=0; return h*60+mi;}; const progressTotalWorkingMinutes=a=>{const st=parseProgressTimeMinutes(a.InTime),en=parseProgressTimeMinutes(a.OutTime); if(st===null||en===null)return '-'; let total=en-st; if(total<0)total+=1440; const extra=Number(a.ExtraBreakMinutes)||0; return Math.max(0,Math.round(total-extra));}; const attRows=s.rows.map(a=>{const st=String(a.Status||'').trim();const statusLabel=st?st:(a.InTime?'Pending':'-');return `<tr><td>${progressReportEscape(a.Date||'-')}</td><td>${a.InTime||'-'}</td><td>${a.OutTime||'-'}</td><td>${progressReportEscape(statusLabel)}</td><td>${progressReportEscape(a.ExtraBreakMinutes ? (a.ExtraBreakMinutes+' min') : '-')}</td><td>${progressReportEscape(a.BreakTimeForIjara||'-')}</td><td>${progressReportEscape(a.Reason||'-')}</td><td>${progressTotalWorkingMinutes(a)==='-'?'-':progressTotalWorkingMinutes(a)+' min'}</td></tr>`;}).join('')||'<tr><td colspan="8" class="p-4 text-center text-gray-500">No attendance records found.</td></tr>';
+                return `<div class="progress-report-section"><div class="flex flex-wrap justify-between items-center gap-2 mb-3"><div><h3 class="text-xl font-extrabold text-[#112a2e]">${progressReportEscape(s.emp)}${s.employeeId?` <span class=\"text-sm text-gray-500\">(${progressReportEscape(s.employeeId)})</span>`:''}</h3><div class="text-xs text-gray-500">Attendance ${s.attendancePct}% · Task ${s.taskPct}% · Overall ${s.overall}%</div></div><div class="text-sm font-bold text-[#259b94]">${s.completed}/${s.tasks.length} Tasks Complete</div></div><div class="grid grid-cols-2 md:grid-cols-6 gap-2 mb-4"><div class="bg-[#f0f7f7] p-3 rounded-lg"><b>${s.present}</b><small class="block text-gray-500">Present</small></div><div class="bg-red-50 p-3 rounded-lg"><b>${s.absent}</b><small class="block text-gray-500">Absent</small></div><div class="bg-amber-50 p-3 rounded-lg"><b>${s.leave}</b><small class="block text-gray-500">Leave</small></div><div class="bg-blue-50 p-3 rounded-lg"><b>${s.weekoff}</b><small class="block text-gray-500">Weekoff</small></div><div class="bg-green-50 p-3 rounded-lg"><b>${s.completed}</b><small class="block text-gray-500">Completed</small></div><div class="bg-orange-50 p-3 rounded-lg"><b>${s.tasks.length-s.completed}</b><small class="block text-gray-500">Pending</small></div></div><div class="overflow-x-auto mb-4"><h4 class="font-bold mb-2">Attendance Details</h4><table class="progress-report-mini-table"><thead><tr><th>Date</th><th>In Time</th><th>Out Time</th><th>Status</th><th>Extra Break Time</th><th>Break Time For Ijara</th><th>Reason</th><th>Total Working Minutes</th></tr></thead><tbody>${attRows}</tbody></table></div><div class="overflow-x-auto"><h4 class="font-bold mb-2">Task Details</h4><table class="progress-report-mini-table"><thead><tr><th>Task</th><th>Timeline</th><th>Priority</th><th>Status</th><th>Time</th></tr></thead><tbody>${taskRows}</tbody></table></div></div>`;
             }).join('');
         }
         function renderProgressReport(){
@@ -3282,6 +3282,21 @@ function parseBreakTimeClient(v){
         }
 
         function renderOneViewTable(members, records, monthYear, selectedUser) {
+            // Attendance is Present only after approval; support both YYYY-MM-DD and DD-MM-YYYY records.
+            const normalizeAttendanceStatus = (r) => {
+                const st=String(r?.status||r?.Status||'').trim().toLowerCase();
+                if(st==='approved'||st==='present'||st==='p') return 'P';
+                if(st==='rejected') return 'A';
+                if(String(r?.leave||r?.Leave||'').toLowerCase().includes('leave')) return 'L';
+                if(String(r?.leave||r?.Leave||'').toLowerCase().includes('weekoff')) return 'W';
+                return '';
+            };
+            const attendanceDayNumber = (value) => {
+                const raw=String(value||'').trim();
+                let m=raw.match(/^\d{4}-\d{2}-(\d{2})$/); if(m) return Number(m[1]);
+                m=raw.match(/^(\d{2})-\d{2}-\d{4}$/); if(m) return Number(m[1]);
+                return NaN;
+            };
             const [yStr,mStr]=monthYear.split('-'), year=parseInt(yStr,10), month=parseInt(mStr,10);
             const daysInMonth=new Date(year,month,0).getDate();
             let visibleMembers=(selectedUser&&selectedUser!=='All')?[selectedUser]:members;
@@ -3293,12 +3308,9 @@ function parseBreakTimeClient(v){
             const matrix={}; visibleMembers.forEach(m=>matrix[m]={});
             records.forEach(r=>{
                 if(!matrix[r.user]) return;
-                const parts=String(r.date).split('-'), d=parseInt(parts[0],10);
-                let status='';
-                const recStatus=String(r.status||'').toLowerCase();
-                if(recStatus==='approved') status='P';
-                else if(String(r.leave||'').toLowerCase().includes('leave')) status='L';
-                else if(String(r.leave||'').toLowerCase().includes('weekoff')) status='W';
+                const d=attendanceDayNumber(r.date);
+                if(!Number.isFinite(d)||d<1||d>daysInMonth) return;
+                const status=normalizeAttendanceStatus(r);
                 if(status==='P'||!matrix[r.user][d]) matrix[r.user][d]=status;
             });
             const tbody=document.getElementById('oneViewTbody'); tbody.innerHTML='';
