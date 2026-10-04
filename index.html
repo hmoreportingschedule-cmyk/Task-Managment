@@ -481,6 +481,9 @@
                     </div>
 
                     <div class="flex flex-wrap gap-2 justify-end">
+                        <button onclick="openApprovalAttendanceTaskModal()" class="hod-only admin-only bg-[#7c3aed] hover:bg-[#6d28d9] text-white px-4 py-2 rounded-lg shadow-sm font-semibold flex items-center gap-2 text-sm transition">
+                            <i class="fas fa-clipboard-check"></i> Approval Attendence &amp; Task
+                        </button>
                         <button onclick="openWhatsAppReportModal()" class="bg-[#25D366] hover:bg-[#1da851] text-white px-4 py-2 rounded-lg shadow-sm font-semibold flex items-center gap-2 text-sm transition">
                             <i class="fab fa-whatsapp"></i> WhatsApp Report
                         </button>
@@ -1105,6 +1108,40 @@
             <span onclick="closeAttendanceRequestsModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-800 cursor-pointer text-2xl">&times;</span>
             <h3 class="text-2xl font-bold text-[#112a2e] mb-2"><i class="fas fa-user-clock text-[#7c3aed]"></i> Attendance Requests</h3>
             <div id="attendanceRequestsList" class="space-y-3 max-h-[60vh] overflow-y-auto"></div>
+        </div>
+    </div>
+
+    <!-- APPROVAL ATTENDANCE & TASK MODAL -->
+    <div id="approvalAttendanceTaskModal" class="modal">
+        <div class="modal-content relative bg-white border border-gray-300 shadow-2xl max-w-7xl">
+            <span onclick="closeApprovalAttendanceTaskModal()" class="absolute top-2 right-4 text-gray-500 hover:text-red-500 cursor-pointer text-3xl font-bold">&times;</span>
+            <div class="flex flex-wrap justify-between items-center gap-3 mb-5 pr-8">
+                <div><h2 class="text-2xl font-bold text-[#112a2e]"><i class="fas fa-clipboard-check text-[#7c3aed]"></i> Approval Attendence &amp; Task</h2><p class="text-sm text-gray-500">Attendance, Task, Adjustment aur Leave approvals ko employee/date/month/task wise manage karein.</p></div>
+                <button onclick="loadApprovalAttendanceTaskCenter()" class="bg-[#7c3aed] text-white px-4 py-2 rounded-lg font-bold"><i class="fas fa-sync-alt mr-1"></i> Refresh</button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-6 gap-3 mb-4 bg-[#f7f5ff] border border-[#ddd6fe] rounded-xl p-4">
+                <div><label class="block text-xs font-bold text-gray-600 mb-1">Approval Type</label><select id="approvalCenterType" onchange="renderApprovalAttendanceTaskCenter()" class="w-full border p-2 rounded-lg text-sm"><option value="all">All</option><option value="attendance">Attendance</option><option value="task">Task</option><option value="adjustment">Adjustment</option><option value="leave">Leave</option></select></div>
+                <div><label class="block text-xs font-bold text-gray-600 mb-1">Employee</label><select id="approvalCenterEmployee" onchange="renderApprovalAttendanceTaskCenter()" class="w-full border p-2 rounded-lg text-sm"><option value="">All Employees</option></select></div>
+                <div><label class="block text-xs font-bold text-gray-600 mb-1">Task</label><input id="approvalCenterTask" oninput="renderApprovalAttendanceTaskCenter()" class="w-full border p-2 rounded-lg text-sm" placeholder="Search task..."></div>
+                <div><label class="block text-xs font-bold text-gray-600 mb-1">Month</label><input id="approvalCenterMonth" type="month" onchange="renderApprovalAttendanceTaskCenter()" class="w-full border p-2 rounded-lg text-sm"></div>
+                <div><label class="block text-xs font-bold text-gray-600 mb-1">From Date</label><input id="approvalCenterFrom" type="date" onchange="renderApprovalAttendanceTaskCenter()" class="w-full border p-2 rounded-lg text-sm"></div>
+                <div><label class="block text-xs font-bold text-gray-600 mb-1">To Date</label><input id="approvalCenterTo" type="date" onchange="renderApprovalAttendanceTaskCenter()" class="w-full border p-2 rounded-lg text-sm"></div>
+            </div>
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+                <div class="text-sm font-bold text-[#2a4d53]">Pending / Review Items: <span id="approvalCenterCount">0</span></div>
+                <div class="flex flex-wrap gap-2">
+                    <button onclick="toggleApprovalCenterSelectAll(true)" class="border border-gray-300 bg-white px-3 py-2 rounded-lg text-xs font-bold">Select All</button>
+                    <button onclick="toggleApprovalCenterSelectAll(false)" class="border border-gray-300 bg-white px-3 py-2 rounded-lg text-xs font-bold">Clear All</button>
+                    <button onclick="bulkApprovalCenterAction('Approved')" class="bg-[#259b94] text-white px-4 py-2 rounded-lg text-xs font-bold">Approve Selected</button>
+                    <button onclick="bulkApprovalCenterAction('Rejected')" class="bg-red-500 text-white px-4 py-2 rounded-lg text-xs font-bold">Reject Selected</button>
+                </div>
+            </div>
+            <div class="overflow-x-auto border rounded-lg max-h-[62vh] overflow-y-auto">
+                <table class="w-full text-left border-collapse whitespace-nowrap">
+                    <thead class="sticky top-0 z-10"><tr class="bg-[#f0f7f7] text-[#4b6d70] uppercase text-xs font-bold"><th class="p-3"><input id="approvalCenterSelectAll" type="checkbox" onchange="toggleApprovalCenterSelectAll(this.checked)"></th><th class="p-3">Type</th><th class="p-3">Employee</th><th class="p-3">Task / Request</th><th class="p-3">Date</th><th class="p-3">Details</th><th class="p-3">Status</th><th class="p-3">Action</th></tr></thead>
+                    <tbody id="approvalCenterBody"></tbody>
+                </table>
+            </div>
         </div>
     </div>
 

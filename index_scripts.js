@@ -2327,6 +2327,83 @@ function parseBreakTimeClient(v){
         function uploadOfficeEventsOnce(){ const f=document.getElementById('officeEventsExcelFile').files[0]; if(!f){alert('Office Events ki Excel file select karein.');return;} const rd=new FileReader(); rd.onload=function(ev){try{const wb=XLSX.read(new Uint8Array(ev.target.result),{type:'array'}),ws=wb.Sheets[wb.SheetNames[0]],arr=XLSX.utils.sheet_to_json(ws,{defval:''}); if(!arr.length){alert('Excel mein data nahi hai.');return;} const excelDate=v=>{if(v instanceof Date)return v.toISOString().slice(0,10);if(typeof v==='number'){const d=XLSX.SSF.parse_date_code(v);if(d)return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;} const x=String(v||'').trim();if(/^\d{2}\/\d{2}\/\d{4}$/.test(x)){const p=x.split('/');return `${p[2]}-${p[1]}-${p[0]}`;}return x;}; const rows=arr.map(r=>({eventName:r['Event Name']||r['Event']||'',fromDate:excelDate(r['From Date']||r['Date']),toDate:excelDate(r['To Date']||r['From Date']||r['Date']),type:r['Type']||'Office Closed',details:r['Details']||''})); document.getElementById('officeEventsPreview').innerHTML=`<div class="bg-purple-50 border border-purple-200 rounded-lg p-3 font-semibold">${rows.length} event row(s) ready for import.</div>`; const fd=new FormData();fd.append('action','uploadOfficeEvents');fd.append('rowsJson',JSON.stringify(rows));fd.append('sessionToken',sessionToken);fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(d=>{alert(d.message||'Office events imported.');document.getElementById('officeEventsExcelFile').value='';if(d.status==='success'){globalOfficeEvents=rows.concat(globalOfficeEvents||[]);updateAttendanceNonWorkingDay();closeOfficeEventsModal();fetchDashboardDataSilently();}if(d.failed&&d.failed.length)alert(d.failed.join('\n'));}).catch(()=>alert('Office Events upload failed.'));}catch(e){alert('Excel format read nahi ho saka: '+e.message);}};rd.readAsArrayBuffer(f); }
 
         function downloadAttendanceExcelTemplate(){const rows=[['Date','Employee ID','In Time','Out Time','Break Start','Break End','Leave/Weekoff','Reason','Approval Status'],['2026-09-21','EMP001','09:30:00 AM','06:30:00 PM','','','','Manual Entry','Approved']];const wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(rows);XLSX.utils.book_append_sheet(wb,ws,'Attendance');XLSX.writeFile(wb,'Attendance_One_Time_Upload_Format.xlsx');}
+        // ================= APPROVAL ATTENDENCE & TASK CENTER =================
+        let approvalCenterItems = [];
+        function approvalCenterDateKey(v){ const s=String(v||'').trim(); if(!s)return ''; const m=s.match(/(20\d{2})-(\d{2})-(\d{2})/); return m?m[0]:s.slice(0,10); }
+        function approvalCenterInRange(date, month, from, to){
+            const d=approvalCenterDateKey(date); if(!d)return !month&&!from&&!to;
+            if(month && d.slice(0,7)!==month)return false;
+            if(from && d<from)return false;
+            if(to && d>to)return false;
+            return true;
+        }
+        function approvalCenterRoleAllowed(){
+            const role=String(document.getElementById('displayRole')?.innerText||'').toLowerCase();
+            return role.includes('admin')||role.includes('hod')||role.includes('master');
+        }
+        function buildApprovalCenterItems(){
+            const out=[];
+            (globalAttendanceRequests||[]).forEach(r=>{
+                if(String(r.status||'').toLowerCase()!=='pending')return;
+                out.push({key:'attendance|'+r.rowIndex,type:'attendance',typeLabel:'Attendance',employee:r.employee||'',task:'Attendance Request',date:r.date||'',details:r.reason||'-',status:r.status||'Pending',rowIndex:r.rowIndex,action:'attendance'});
+            });
+            (globalAdvanceScheduleRequests||[]).forEach(r=>{
+                if(String(r.status||'').toLowerCase()!=='pending')return;
+                const rt=String(r.requestType||'');
+                const kind=rt.toLowerCase().includes('leave')?'leave':rt.toLowerCase().includes('weekoff')||rt.toLowerCase().includes('adjust')?'adjustment':'adjustment';
+                out.push({key:'schedule|'+r.rowIndex,type:kind,typeLabel:kind==='leave'?'Leave':'Adjustment',employee:r.employee||'',task:rt||'Schedule Request',date:r.requestDate||'',details:r.details||r.location||'-',status:r.status||'Pending',rowIndex:r.rowIndex,action:'schedule'});
+            });
+            (globalAllTasks||[]).forEach(t=>{
+                const empStatus=String(t.empStatus||'').toLowerCase(), hodStatus=String(t.hodStatus||'').toLowerCase();
+                // Completion/Before-completion requests are the task approvals that close the task after approval.
+                if(empStatus==='completion requested') out.push({key:'task-completion|'+(t.taskId||t.rowIndex),type:'task',typeLabel:'Task',employee:t.assignedTo||t.employee||'',task:t.taskName||'Task',date:t.endDate||t.startDate||'',details:'Before/Completion approval required',status:t.empStatus||'Completion Requested',rowIndex:t.rowIndex,taskId:t.taskId||'',action:'taskCompletion',targetUser:t.assignedTo||t.employee||''});
+                else if(hodStatus==='pending' && String(t.assignedBy||'').trim()) out.push({key:'task-approval|'+(t.taskId||t.rowIndex),type:'task',typeLabel:'Task',employee:t.assignedTo||t.employee||'',task:t.taskName||'Task',date:t.startDate||'',details:'Task approval pending',status:t.hodStatus||'Pending',rowIndex:t.rowIndex,taskId:t.taskId||'',action:'taskApproval',targetUser:t.assignedTo||t.employee||''});
+            });
+            return out;
+        }
+        function openApprovalAttendanceTaskModal(){
+            if(!approvalCenterRoleAllowed()){alert('Sirf HOD/Admin/MasterAdmin approval center open kar sakte hain.');return;}
+            const modal=document.getElementById('approvalAttendanceTaskModal'); if(!modal)return;
+            const empSel=document.getElementById('approvalCenterEmployee');
+            if(empSel){const names=Array.from(new Set(approvalCenterItems.map(x=>x.employee).filter(Boolean))).sort();empSel.innerHTML='<option value="">All Employees</option>'+names.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');}
+            document.getElementById('approvalCenterType').value='all'; document.getElementById('approvalCenterTask').value=''; document.getElementById('approvalCenterMonth').value=''; document.getElementById('approvalCenterFrom').value=''; document.getElementById('approvalCenterTo').value='';
+            modal.style.display='block'; loadApprovalAttendanceTaskCenter();
+        }
+        function closeApprovalAttendanceTaskModal(){const m=document.getElementById('approvalAttendanceTaskModal');if(m)m.style.display='none';}
+        function loadApprovalAttendanceTaskCenter(){
+            approvalCenterItems=buildApprovalCenterItems();
+            const empSel=document.getElementById('approvalCenterEmployee'); if(empSel){const current=empSel.value;const names=Array.from(new Set(approvalCenterItems.map(x=>x.employee).filter(Boolean))).sort();empSel.innerHTML='<option value="">All Employees</option>'+names.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');if(names.includes(current))empSel.value=current;}
+            renderApprovalAttendanceTaskCenter();
+        }
+        function renderApprovalAttendanceTaskCenter(){
+            const box=document.getElementById('approvalCenterBody'); if(!box)return;
+            const type=document.getElementById('approvalCenterType')?.value||'all', emp=(document.getElementById('approvalCenterEmployee')?.value||'').toLowerCase(), task=(document.getElementById('approvalCenterTask')?.value||'').toLowerCase().trim(), month=document.getElementById('approvalCenterMonth')?.value||'', from=document.getElementById('approvalCenterFrom')?.value||'', to=document.getElementById('approvalCenterTo')?.value||'';
+            const list=approvalCenterItems.filter(x=>(type==='all'||x.type===type)&&(!emp||String(x.employee).toLowerCase()===emp)&&(!task||String(x.task).toLowerCase().includes(task))&&approvalCenterInRange(x.date,month,from,to));
+            const count=document.getElementById('approvalCenterCount');if(count)count.textContent=list.length;
+            if(!list.length){box.innerHTML='<tr><td colspan="8" class="p-8 text-center text-gray-500">No pending approval found.</td></tr>';return;}
+            box.innerHTML=list.map(x=>`<tr class="border-t hover:bg-gray-50"><td class="p-3"><input type="checkbox" class="approval-center-check" data-key="${escapeHtml(x.key)}"></td><td class="p-3"><span class="px-2 py-1 rounded-full text-[10px] font-bold ${x.type==='task'?'bg-blue-50 text-blue-700':x.type==='leave'?'bg-amber-50 text-amber-700':'bg-purple-50 text-purple-700'}">${escapeHtml(x.typeLabel)}</span></td><td class="p-3 font-bold text-[#112a2e]">${escapeHtml(x.employee)}</td><td class="p-3 font-semibold">${escapeHtml(x.task)}</td><td class="p-3">${escapeHtml(x.date||'-')}</td><td class="p-3 text-xs text-gray-600 max-w-[320px] whitespace-normal">${escapeHtml(x.details||'-')}</td><td class="p-3 text-xs font-bold text-orange-600">${escapeHtml(x.status)}</td><td class="p-3"><div class="flex gap-1"><button onclick="approvalCenterSingleAction('${escapeHtml(x.key)}','Approved')" class="bg-[#259b94] text-white px-3 py-1.5 rounded text-xs font-bold">Approve</button><button onclick="approvalCenterSingleAction('${escapeHtml(x.key)}','Rejected')" class="bg-red-500 text-white px-3 py-1.5 rounded text-xs font-bold">Reject</button></div></td></tr>`).join('');
+        }
+        function toggleApprovalCenterSelectAll(checked){document.querySelectorAll('#approvalCenterBody .approval-center-check').forEach(c=>c.checked=!!checked);const h=document.getElementById('approvalCenterSelectAll');if(h)h.checked=!!checked;}
+        function approvalCenterFind(key){return approvalCenterItems.find(x=>x.key===key)||null;}
+        function approvalCenterPost(item,status){
+            const fd=new FormData();fd.append('sessionToken',sessionToken);
+            if(item.action==='attendance'){fd.append('action','reviewAttendanceRequest');fd.append('rowIndex',item.rowIndex);fd.append('status',status);}
+            else if(item.action==='schedule'){fd.append('action','updateAdvanceScheduleRequest');fd.append('rowIndex',item.rowIndex);fd.append('status',status);}
+            else {fd.append('action','updateTaskStatus');fd.append('targetUser',item.targetUser||'');fd.append('rowIndex',item.rowIndex);fd.append('type','hod');fd.append('status',status);}
+            return fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json());
+        }
+        function approvalCenterSingleAction(key,status){
+            const item=approvalCenterFind(key);if(!item)return;
+            approvalCenterPost(item,status).then(d=>{alert(d.message||status);if(d.status==='success'){fetchDashboardDataSilently();setTimeout(loadApprovalAttendanceTaskCenter,250);}}).catch(()=>alert('Approval update failed.'));
+        }
+        async function bulkApprovalCenterAction(status){
+            const keys=Array.from(document.querySelectorAll('#approvalCenterBody .approval-center-check:checked')).map(c=>c.dataset.key);if(!keys.length){alert('Pehle approval items select karein.');return;}
+            if(!confirm(`${keys.length} item(s) ko ${status==='Approved'?'Approve':'Reject'} karna hai?`))return;
+            let ok=0,fail=0;
+            for(const key of keys){const item=approvalCenterFind(key);if(!item)continue;try{const d=await approvalCenterPost(item,status);if(d.status==='success')ok++;else fail++;}catch(e){fail++;}}
+            alert(`${ok} approved/rejected successfully.${fail?` ${fail} item(s) failed.`:''}`);fetchDashboardDataSilently();setTimeout(loadApprovalAttendanceTaskCenter,300);
+        }
+
         function openAttendanceExcelModal(){document.getElementById('attendanceExcelFile').value='';document.getElementById('attendanceExcelPreview').innerHTML='';document.getElementById('attendanceExcelModal').style.display='block';}
         function closeAttendanceExcelModal(){document.getElementById('attendanceExcelModal').style.display='none';}
         function uploadAttendanceExcelOnce(){const f=document.getElementById('attendanceExcelFile').files[0];if(!f){alert('Excel file select karein.');return;}const rd=new FileReader();rd.onload=function(ev){try{const wb=XLSX.read(new Uint8Array(ev.target.result),{type:'array'}),ws=wb.Sheets[wb.SheetNames[0]],arr=XLSX.utils.sheet_to_json(ws,{defval:''});if(!arr.length){alert('Excel mein data nahi hai.');return;}const excelDate=v=>{if(v instanceof Date)return v.toISOString().split('T')[0];if(typeof v==='number'){const d=XLSX.SSF.parse_date_code(v);if(d)return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;}return String(v||'').trim();}; const excelTime=v=>{if(v instanceof Date)return v.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true});if(typeof v==='number'&&v>=0&&v<1){const total=Math.round(v*86400),h=Math.floor(total/3600)%24,m=Math.floor((total%3600)/60),sec=total%60,ap=h>=12?'PM':'AM',hh=h%12||12;return `${String(hh).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')} ${ap}`;}return String(v||'').trim();}; const rows=arr.map(r=>({date:excelDate(r['Date']||r['date']),employee:r['Employee ID']||r['Employee']||r['Username']||r['username'],inTime:excelTime(r['In Time']||r['InTime']),outTime:excelTime(r['Out Time']||r['OutTime']),breakStart:excelTime(r['Break Start']),breakEnd:excelTime(r['Break End']),leave:r['Leave/Weekoff']||r['Leave']||'',reason:r['Reason']||'',status:r['Approval Status']||'Approved'}));document.getElementById('attendanceExcelPreview').innerHTML=`<div class="bg-green-50 border border-green-200 rounded-lg p-3 font-semibold">${rows.length} row(s) ready for one-time import.</div>`;const fd=new FormData();fd.append('action','bulkAttendanceUpload');fd.append('rowsJson',JSON.stringify(rows));fd.append('sessionToken',sessionToken);fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(d=>{alert(d.message||'Import completed');if(d.failed&&d.failed.length)alert(d.failed.join('\n'));if(d.status==='success'){document.getElementById('attendanceExcelFile').value='';closeAttendanceExcelModal();fetchDashboardDataSilently();}}).catch(()=>alert('Excel upload failed.'));}catch(e){alert('Excel format read nahi ho saka: '+e.message);}};rd.readAsArrayBuffer(f);}
