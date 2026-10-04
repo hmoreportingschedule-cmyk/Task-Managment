@@ -1,12 +1,15 @@
-V33 REPLACEMENT PATHS
+Office Task Reporting — V40 Full Fix
 
-1. Vercel/GitHub project root:
-   index.html
-   index_scripts.js
+GitHub/Vercel (project root):
+1. index.html
+2. index_scripts.js
 
-2. Google Apps Script project:
-   backend_code.js
+Google Apps Script: replace the full backend_code.js.
 
-IMPORTANT: index.html now explicitly loads ./index_scripts.js. Do not paste index_scripts.js into Apps Script. Keep both frontend files in the same Vercel/GitHub folder.
+V40 fixes:
+- Advance Schedule Requests: legacy 8-column sheet migration to 17-column schema; pending requests are reliably listed for Admin/HOD; direct approval button added; Admin fallback notifications added.
+- Monthly Grade card: white background, “Monthly Grade” capitalization, existing label colours preserved, percentage digits black.
+- Employee-only Monthly Grade Details: View Details function restored and wired.
+- Daily Actions remains limited to Punch In, Punch Out, Break Start, Break End.
 
-Deploy the updated Google Apps Script backend as a new version after replacing backend_code.js.
+Important: Deploy the new backend_code.js as a new Apps Script Web App version, then ensure index_scripts.js points to that deployed Web App URL.
