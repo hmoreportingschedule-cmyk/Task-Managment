@@ -248,8 +248,15 @@
 <style id="v48-9-daily-actions-polish">
 /* V48.9: Employee sidebar 1.5-inch wider on desktop without changing mobile width. */
 @media (min-width:768px){
-  #dashboard-section > div:first-child{width:25rem!important;flex:0 0 25rem!important;}
+  #dashboard-section > div:first-child{width:22rem!important;flex:0 0 22rem!important;}
   #dashboard-section > .flex-1{min-width:0;}
+}
+/* V49.0: Employee sidebar reduced by 0.5 inch from V48.9; keep content neatly fitted. */
+@media (min-width:768px){
+  #dashboard-section > div:first-child{padding-left:16px!important;padding-right:16px!important;}
+  #dashboard-section > div:first-child h2{font-size:1.35rem!important;line-height:1.15!important;margin-bottom:1.5rem!important;}
+  #dashboard-section > div:first-child #displayUser{font-size:0.78rem!important;}
+  #dashboard-section > div:first-child .emp-only{min-width:0!important;}
 }
 /* V48.9: Native calendar/time picker icons must remain white. */
 #attendanceFormBox input[type="date"]::-webkit-calendar-picker-indicator,
