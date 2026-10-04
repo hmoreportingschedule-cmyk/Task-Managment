@@ -2445,7 +2445,7 @@ function parseBreakTimeClient(v){
             });
             return out;
         }
-        function approvalCenterStatusMatches(x,status){return status==='all'||String(x.status||'').toLowerCase()===status;}
+        function approvalCenterStatusMatches(x,status){const s=String(x.status||'').toLowerCase();return status==='all'||s===status||(status==='pending'&&s==='pending approval');}
         function openApprovalAttendanceTaskModal(){
             if(!approvalCenterRoleAllowed()){alert('Sirf HOD/Admin/MasterAdmin approval center open kar sakte hain.');return;}
             const modal=document.getElementById('approvalAttendanceTaskModal'); if(!modal)return;
