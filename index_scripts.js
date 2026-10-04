@@ -1615,6 +1615,34 @@
             const metricEfficiencyEl = document.getElementById('metricEfficiency'); if (metricEfficiencyEl) metricEfficiencyEl.innerText = `${taskPerc}%`;
         }
 
+        function openMonthlyGradeDetails(){
+            if(!document.body.classList.contains('employee-mode')) return;
+            const modal=document.getElementById('monthlyGradeDetailsModal');
+            if(!modal) return;
+            const task=document.getElementById('taskPercText')?.innerText || '0%';
+            const att=document.getElementById('attPercText')?.innerText || '0%';
+            const overall=document.getElementById('indivScore')?.innerText || '';
+            const grade=document.getElementById('monthlyGrade')?.innerText || '-';
+            const taskEl=document.getElementById('gradeDetailTask');
+            const attEl=document.getElementById('gradeDetailAtt');
+            const overallEl=document.getElementById('gradeDetailOverall');
+            const gradeEl=document.getElementById('gradeDetailGrade');
+            if(taskEl) taskEl.innerText=task;
+            if(attEl) attEl.innerText=att;
+            if(overallEl) overallEl.innerText=overall && overall !== '-' ? `${overall}%` : '-';
+            if(gradeEl){
+                gradeEl.innerText=grade;
+                const letter=String(grade).trim().charAt(0).toUpperCase();
+                gradeEl.className='text-3xl font-extrabold mt-1';
+                applyGradeColor(gradeEl,letter);
+            }
+            modal.style.display='block';
+        }
+        function closeMonthlyGradeDetails(){
+            const modal=document.getElementById('monthlyGradeDetailsModal');
+            if(modal) modal.style.display='none';
+        }
+
         // ================= EXCEL EXPORT (SHEETJS) =================
         function autoFitWorksheet(ws) {
             const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
