@@ -227,8 +227,9 @@
 <style id="v43-grade-fix">
 /* V43: Employee Monthly Grade card - only requested visual changes. */
 .employee-monthly-grade-card{background:#e9f7f5!important;border:1px solid #3e6a6e!important;}
-.employee-monthly-grade-card .monthly-grade-title{color:#7db0b1!important;text-transform:none!important;}
+.employee-monthly-grade-card .monthly-grade-title{color:#000000!important;text-transform:none!important;font-size:14px!important;}
 .employee-monthly-grade-card .grade-percent{color:#000000!important;}
+.employee-monthly-grade-card .mt-2{color:#000000!important;}
 </style>
 </head>
 <body class="h-screen w-full text-gray-800 overflow-hidden">
@@ -292,29 +293,39 @@
                     
                     <div id="breakReasonBox" class="mb-3">
                         <label class="text-xs font-semibold text-[#a5cacc]">Break Type:</label>
-                        <select id="actionReasonSelect" class="w-full bg-[#2a4d53] border border-[#5a8789] text-white px-2 py-2 rounded-lg mb-2 text-xs focus:outline-none focus:border-[#5fd3cc]" onchange="toggleOtherReason()">
+                        <select id="actionReasonSelect" class="hidden" aria-hidden="true">
                             <option value="">-- Select Break Type --</option>
                             <option value="Lunch">Lunch</option>
                             <option value="Namaz">Namaz</option>
                             <option value="Other">Other</option>
                         </select>
+
+                        <div class="space-y-2 mt-2">
+                            <div class="bg-[#2a4d53] border border-[#5a8789] rounded-lg p-3">
+                                <p class="text-sm font-bold text-white mb-2">Break For Namaz</p>
+                                <select id="namazTypeSelect" class="w-full bg-[#1e3e43] border border-[#5a8789] text-white px-2 py-2 rounded-lg text-xs focus:outline-none focus:border-[#5fd3cc]" onchange="selectNamazBreakType()">
+                                    <option value="">-- Select Namaz --</option>
+                                </select>
+                                <input type="time" id="namazBreakTime" class="w-full bg-[#1e3e43] border border-[#5a8789] text-white px-2 py-2 rounded-lg text-xs mt-2 focus:outline-none focus:border-[#5fd3cc]" onchange="selectBreakTiming('Namaz')">
+                                <p id="namazDayHint" class="text-[10px] text-[#f59e0b] mt-1"></p>
+                            </div>
+
+                            <div class="bg-[#2a4d53] border border-[#5a8789] rounded-lg p-3">
+                                <p class="text-sm font-bold text-white mb-2">Break For Lunch</p>
+                                <input type="time" id="lunchBreakTime" class="w-full bg-[#1e3e43] border border-[#5a8789] text-white px-2 py-2 rounded-lg text-xs focus:outline-none focus:border-[#5fd3cc]" onchange="selectBreakTiming('Lunch')">
+                                <p id="lunchFreezeHint" class="text-[10px] text-[#f59e0b] mt-1 hidden">Ramadan mein Lunch Admin ke freeze setting ke mutabiq available nahi hai.</p>
+                            </div>
+
+                            <div class="bg-[#2a4d53] border border-[#5a8789] rounded-lg p-3">
+                                <p class="text-sm font-bold text-white mb-2">Break For Other</p>
+                                <input type="time" id="otherBreakTime" class="w-full bg-[#1e3e43] border border-[#5a8789] text-white px-2 py-2 rounded-lg text-xs focus:outline-none focus:border-[#5fd3cc]" onchange="selectBreakTiming('Other')">
+                                <textarea id="actionReasonOther" class="w-full bg-[#1e3e43] border border-[#5a8789] text-white px-2 py-2 rounded-lg mt-2 text-xs focus:outline-none" rows="2" placeholder="Break reason likhein..."></textarea>
+                            </div>
+                        </div>
+
+                        <div id="namazReasonBox" class="hidden"></div>
+                        <div id="jumaReasonBox" class="hidden"><select id="jumaReasonSelect"><option value="">Juma</option></select><p id="jumaDayHint" class="hidden"></p></div>
                     </div>
-                    <div id="namazReasonBox" class="mb-3 hidden">
-                        <label class="text-xs font-semibold text-[#a5cacc]">Zohar:</label>
-                        <select id="namazZoharSelect" class="w-full bg-[#2a4d53] border border-[#5a8789] text-white px-2 py-2 rounded-lg text-xs focus:outline-none focus:border-[#5fd3cc]" onchange="selectNamazType('Zohar')">
-                            <option value="">-- Select Zohar --</option>
-                            <option value="Zohar">Zohar</option>
-                        </select>
-                    </div>
-                    <div id="jumaReasonBox" class="mb-3 hidden">
-                        <label class="text-xs font-semibold text-[#a5cacc]">Juma (Friday):</label>
-                        <select id="jumaReasonSelect" class="w-full bg-[#2a4d53] border border-[#5a8789] text-white px-2 py-2 rounded-lg text-xs focus:outline-none focus:border-[#5fd3cc]" onchange="selectNamazType('Juma')">
-                            <option value="">-- Select Juma (Friday) --</option>
-                            <option value="Juma">Juma (Friday)</option>
-                        </select>
-                        <p id="jumaDayHint" class="text-[10px] text-[#f59e0b] mt-1 hidden">Juma (Friday) sirf Friday ko select ki ja sakti hai.</p>
-                    </div>
-                    <textarea id="actionReasonOther" class="w-full bg-[#2a4d53] border border-[#5a8789] text-white px-2 py-2 rounded-lg mb-3 text-xs hidden focus:outline-none focus:border-[#5fd3cc]" rows="2" placeholder="Write your reason here..."></textarea>
                     <div id="attendanceTimingReasonBox" class="mb-3 hidden">
                         <label class="text-xs font-semibold text-[#f59e0b]">Attendance Reason:</label>
                         <select id="attendanceTimingReasonSelect" class="w-full bg-[#2a4d53] border border-[#f59e0b] text-white px-2 py-2 rounded-lg mb-2 text-xs" disabled>
@@ -748,42 +759,34 @@
             <span onclick="closeQuickTemplateModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-800 cursor-pointer text-2xl transition">&times;</span>
             <h3 class="text-2xl font-bold text-[#112a2e] mb-1"><i class="fas fa-layer-group text-[#7c3aed]"></i> Add Task Template</h3>
             <p class="text-sm text-gray-500 mb-5">Template ek baar save karein; baad mein Assign New Task mein select karke employees ko assign karein.</p>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 gap-4">
                 <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Task Name</label>
-                    <input id="qtName" class="w-full border border-gray-300 p-3 rounded-lg" placeholder="e.g. Follow-up">
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Category</label>
-                    <input id="qtCategory" class="w-full border border-gray-300 p-3 rounded-lg" placeholder="e.g. Follow-up / File Work">
-                </div>
-                <div class="md:col-span-2">
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Task Details</label>
-                    <textarea id="qtDescription" class="w-full border border-gray-300 p-3 rounded-lg" rows="3" placeholder="Task details..."></textarea>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Task Category</label>
+                    <select id="qtCategory" class="w-full border border-gray-300 p-3 rounded-lg" onchange="updateQuickTemplateTaskTypes()">
+                        <option value="">-- Select Task Category --</option>
+                        <option value="Follow-up">Follow-up</option>
+                        <option value="File-Work">File-Work</option>
+                        <option value="Meeting">Meeting</option>
+                        <option value="Outdoor">Outdoor</option>
+                    </select>
                 </div>
                 <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Priority</label>
-                    <select id="qtPriority" class="w-full border border-gray-300 p-3 rounded-lg"><option>Normal</option><option>High</option><option>Urgent</option></select>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Task Type</label>
+                    <select id="qtName" class="w-full border border-gray-300 p-3 rounded-lg" onchange="handleQuickTemplateOtherType()" disabled>
+                        <option value="">-- Select Task Type --</option>
+                    </select>
+                    <input id="qtOtherType" class="hidden w-full border border-gray-300 p-3 rounded-lg mt-2" placeholder="Write your task type here..." maxlength="150">
                 </div>
                 <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Weightage (%)</label>
-                    <input id="qtWeight" type="number" min="0" max="85" value="10" class="w-full border border-gray-300 p-3 rounded-lg">
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Task Frequency</label>
+                    <select id="qtFrequency" class="w-full border border-gray-300 p-3 rounded-lg">
+                        <option value="">-- Select Task Frequency --</option>
+                        <option value="Daily">Daily</option>
+                        <option value="Weekly">Weekly</option>
+                        <option value="Monthly">Monthly</option>
+                        <option value="One-time">One-time</option>
+                    </select>
                 </div>
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Default Start Day</label>
-                    <input id="qtStartDay" type="number" min="1" max="31" value="1" class="w-full border border-gray-300 p-3 rounded-lg">
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Default End Day</label>
-                    <input id="qtEndDay" type="number" min="1" max="31" value="5" class="w-full border border-gray-300 p-3 rounded-lg">
-                </div>
-            </div>
-            <div class="mt-4 border border-[#b2d8d8] rounded-lg bg-[#f7fbfb] p-4">
-                <div class="flex items-center justify-between mb-3">
-                    <div><b class="text-sm text-[#2a4d53]">Task Works</b><p class="text-xs text-gray-500">Daily / Weekly / Monthly work define karein.</p></div>
-                    <button type="button" onclick="addQuickTemplateWorkRow()" class="bg-[#2a4d53] text-white px-3 py-2 rounded-md text-xs font-bold"><i class="fas fa-plus"></i> Add Work</button>
-                </div>
-                <div id="quickTemplateWorks" class="space-y-2"></div>
             </div>
             <div class="flex gap-3 mt-5">
                 <button type="button" onclick="closeQuickTemplateModal()" class="flex-1 bg-gray-200 text-gray-700 font-bold py-3 rounded-lg">Cancel</button>
