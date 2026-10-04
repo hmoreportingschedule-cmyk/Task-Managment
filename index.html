@@ -176,7 +176,34 @@
             #dashboard-section{overflow-y:auto!important}
             .login-card .w-20{width:64px!important;height:64px!important}
         }
-''</style>
+''
+        /* V36: mobile-first UX + fast visual feedback */
+        .v36-sync-status{position:fixed;right:18px;bottom:18px;z-index:40;display:flex;align-items:center;gap:7px;background:rgba(17,42,46,.94);color:#fff;border-radius:999px;padding:7px 11px;font-size:10px;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.14);opacity:.92;pointer-events:none;transition:opacity .2s,transform .2s}
+        .v36-sync-dot{width:7px;height:7px;border-radius:50%;background:#5fd3cc;box-shadow:0 0 0 3px rgba(95,211,204,.16)}
+        .v36-sync-status.syncing .v36-sync-dot{background:#f59e0b;animation:v36Pulse 1s infinite}
+        .v36-sync-status.offline .v36-sync-dot{background:#ef4444}
+        .v36-sync-status.cached .v36-sync-dot{background:#60a5fa}
+        @keyframes v36Pulse{50%{opacity:.35;transform:scale(.7)}}
+        .v36-mobile-nav{display:none}
+        @media(max-width:767px){
+            body{padding-bottom:68px}
+            #dashboard-section{padding-bottom:70px}
+            .v36-sync-status{right:10px;bottom:74px;font-size:9px;padding:6px 9px}
+            .v36-mobile-nav{position:fixed;left:8px;right:8px;bottom:8px;height:58px;z-index:60;display:grid;grid-template-columns:repeat(5,1fr);gap:3px;padding:5px;background:rgba(17,42,46,.97);border:1px solid rgba(95,211,204,.28);border-radius:18px;box-shadow:0 12px 34px rgba(0,0,0,.28);backdrop-filter:blur(12px)}
+            .v36-mobile-nav button{position:relative;border:0;background:transparent;color:#b9d3d3;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:10px;font-weight:800;min-width:44px;min-height:44px;touch-action:manipulation}
+            .v36-mobile-nav button i{font-size:16px}
+            .v36-mobile-nav button.active{background:#259b94;color:#fff}
+            .v36-mobile-badge{position:absolute;right:8px;top:3px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:#ef4444;color:#fff;font-size:8px;display:flex;align-items:center;justify-content:center}
+            #mobileTaskQuickSearchWrap{display:block!important}
+            #mobileTaskSection .p-6{padding:14px!important}
+            #mobileTaskSection table{font-size:11px}
+            #mobileTaskSection th,#mobileTaskSection td{padding:9px 10px!important}
+            .modal-content{border-radius:18px!important}
+            .modal-content button,.modal-content select,.modal-content input,.modal-content textarea{min-height:44px}
+            #assignTaskModal .assign-task-content,#userManagementModal .user-management-content{min-height:94vh}
+        }
+        @media(min-width:768px){#mobileTaskQuickSearchWrap{display:none!important}}
+</style>
 <style id="v4-manager-polish">
 #hodActionBar.manager-controls{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:14px;padding:18px 20px;background:linear-gradient(110deg,#f2fffc,#e9f5f6);border:1px solid #b7dedb;border-radius:18px}
 #hodActionBar.manager-controls>div:first-child{margin:0!important}#hodActionBar.manager-controls>div:first-child h3{font-size:18px;margin:0}#hodActionBar.manager-controls>div:first-child p{font-size:12px}
@@ -318,6 +345,7 @@
 
         <!-- Main Content -->
         <div class="flex-1 p-4 md:p-8 overflow-y-auto w-full relative">
+            <div id="v36SyncStatus" class="v36-sync-status" role="status" aria-live="polite"><span class="v36-sync-dot"></span><span id="v36SyncText">Ready</span></div>
             
             <!-- Dashboard Header -->
             <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-8 gap-4">
@@ -489,9 +517,9 @@
             </div>
 
             <!-- Task Table Section -->
-            <div class="modern-card overflow-hidden mb-8 border-t-4 border-[#259b94]">
+            <div id="mobileTaskSection" class="modern-card overflow-hidden mb-8 border-t-4 border-[#259b94]">
                 <div class="p-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-center bg-white gap-4">
-                    <h3 class="text-lg font-bold text-[#112a2e]" id="taskTableTitle">Assigned Tasks</h3>
+                    <div class="flex items-center gap-3 w-full md:w-auto"><h3 class="text-lg font-bold text-[#112a2e]" id="taskTableTitle">Assigned Tasks</h3><div id="mobileTaskQuickSearchWrap" class="hidden md:hidden w-full"><div class="relative"><i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i><input id="mobileTaskQuickSearch" type="search" inputmode="search" autocomplete="off" class="w-full border border-gray-200 rounded-lg pl-8 pr-3 py-2 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#259b94]" placeholder="Search tasks..."></div></div></div>
                     <div class="flex gap-3 items-center">
                         <span class="text-sm font-semibold text-[#4b6d70] hod-only admin-only">Filter by Employee:</span>
                         <button type="button" onclick="clearAllTestingTasks()" class="admin-only bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 px-3 py-2 rounded-lg text-xs font-extrabold shadow-sm" title="Testing ke current tasks remove karein"><i class="fas fa-broom mr-1"></i> Clear Testing Tasks</button>
@@ -523,6 +551,13 @@
                 </div>
             </div>
         </div>
+        <nav id="v36MobileNav" class="v36-mobile-nav" aria-label="Mobile quick navigation">
+            <button type="button" onclick="v36GoHome()" data-nav="home"><i class="fas fa-house"></i><span>Home</span></button>
+            <button type="button" onclick="v36GoTasks()" data-nav="tasks"><i class="fas fa-list-check"></i><span>Tasks</span></button>
+            <button type="button" onclick="v36OpenProgress()" data-nav="progress"><i class="fas fa-chart-line"></i><span>Progress</span></button>
+            <button type="button" onclick="toggleNotifications();v36SetNav('notifications')" data-nav="notifications"><i class="fas fa-bell"></i><span>Alerts</span><b id="v36MobileBadge" class="v36-mobile-badge hidden">0</b></button>
+            <button type="button" onclick="v36GoMore()" data-nav="more"><i class="fas fa-bars"></i><span>More</span></button>
+        </nav>
     </div>
 
     <!-- LOG WORK MODAL -->
@@ -1342,6 +1377,57 @@
     </div>
 
     <script src="./index_scripts.js"></script>
+<script>
+(function(){
+  function el(id){return document.getElementById(id)}
+  window.v36SetSyncStatus=function(mode,text){
+    const box=el('v36SyncStatus'), label=el('v36SyncText'); if(!box||!label)return;
+    box.classList.remove('syncing','offline','cached'); if(mode)box.classList.add(mode); label.textContent=text||'Ready';
+  };
+  window.v36SetNav=function(key){document.querySelectorAll('#v36MobileNav button').forEach(b=>b.classList.toggle('active',b.dataset.nav===key));};
+  window.v36GoHome=function(){
+    const main=document.querySelector('#dashboard-section > .flex-1'); if(main)main.scrollTo({top:0,behavior:'smooth'}); v36SetNav('home');
+  };
+  window.v36GoTasks=function(){
+    const main=document.querySelector('#dashboard-section > .flex-1'), target=el('mobileTaskSection');
+    if(main&&target){main.scrollTo({top:Math.max(0,target.offsetTop-12),behavior:'smooth'});}
+    v36SetNav('tasks');
+    setTimeout(()=>el('mobileTaskQuickSearch')?.focus({preventScroll:true}),450);
+  };
+  window.v36OpenProgress=function(){v36SetNav('progress'); if(typeof openProgressReportModal==='function')openProgressReportModal();};
+  window.v36GoMore=function(){
+    const sidebar=document.querySelector('#dashboard-section > div:first-child');
+    if(sidebar){sidebar.scrollTo({top:0,behavior:'smooth'});}
+    v36SetNav('more');
+  };
+  function applyTaskSearch(){
+    const q=(el('mobileTaskQuickSearch')?.value||'').trim().toLowerCase();
+    const rows=document.querySelectorAll('#taskTableBody tr');
+    rows.forEach(r=>{r.style.display=(!q||r.innerText.toLowerCase().includes(q))?'':'none';});
+  }
+  document.addEventListener('DOMContentLoaded',()=>{
+    el('mobileTaskQuickSearch')?.addEventListener('input',applyTaskSearch);
+    window.addEventListener('online',()=>v36SetSyncStatus('','Online'));
+    window.addEventListener('offline',()=>v36SetSyncStatus('offline','Offline — cached data'));
+    if(navigator.onLine===false)v36SetSyncStatus('offline','Offline — cached data');
+    const count=el('notificationCount'), badge=el('v36MobileBadge');
+    if(count&&badge){new MutationObserver(()=>{badge.textContent=count.textContent||'0';badge.classList.toggle('hidden',count.classList.contains('hidden'));}).observe(count,{attributes:true,childList:true,subtree:true});}
+  });
+  const originalFetch=window.fetch;
+  if(originalFetch){
+    window.fetch=function(){
+      try{ if(arguments[0]===window.GOOGLE_SCRIPT_URL || (typeof arguments[0]==='string' && arguments[0].indexOf('script.google.com')>-1)) v36SetSyncStatus('syncing','Syncing…'); }catch(e){}
+      return originalFetch.apply(this,arguments).then(r=>{
+        try{ if(r.ok) v36SetSyncStatus('','Synced'); }catch(e){}
+        return r;
+      }).catch(err=>{
+        try{ v36SetSyncStatus(navigator.onLine===false?'offline':'offline',navigator.onLine===false?'Offline — cached data':'Sync retry available'); }catch(e){}
+        throw err;
+      });
+    };
+  }
+})();
+</script>
 
 </body>
 </html>
