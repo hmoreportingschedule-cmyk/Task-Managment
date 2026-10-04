@@ -2377,14 +2377,17 @@ function parseBreakTimeClient(v){
             (globalAdvanceScheduleRequests||[]).forEach(r=>{
                 if(String(r.status||'').toLowerCase()!=='pending')return;
                 const rt=String(r.requestType||'');
+                if(rt==='Emergency Task'){
+                    out.push({key:'urgent|'+r.rowIndex,type:'task',typeLabel:'Task',employee:r.employee||'',task:r.taskName||'Today Urgent Task',date:r.requestDate||'',details:(r.category?r.category+' • ':'')+(r.assignBy?'Assign By: '+r.assignBy+' • ':'')+(r.details||'-'),status:r.status||'Pending',rowIndex:r.rowIndex,action:'scheduleEmergency',requestId:r.requestId||'',assignBy:r.assignBy||'',approvalOwner:r.approvalOwner||''});
+                    return;
+                }
                 const kind=rt.toLowerCase().includes('leave')?'leave':rt.toLowerCase().includes('weekoff')||rt.toLowerCase().includes('adjust')?'adjustment':'adjustment';
                 out.push({key:'schedule|'+r.rowIndex,type:kind,typeLabel:kind==='leave'?'Leave':'Adjustment',employee:r.employee||'',task:rt||'Schedule Request',date:r.requestDate||'',details:r.details||r.location||'-',status:r.status||'Pending',rowIndex:r.rowIndex,action:'schedule'});
             });
             (globalAllTasks||[]).forEach(t=>{
                 const empStatus=String(t.empStatus||'').toLowerCase(), hodStatus=String(t.hodStatus||'').toLowerCase();
-                // Completion/Before-completion requests are the task approvals that close the task after approval.
-                if(empStatus==='completion requested') out.push({key:'task-completion|'+(t.taskId||t.rowIndex),type:'task',typeLabel:'Task',employee:t.assignedTo||t.employee||'',task:t.taskName||'Task',date:t.endDate||t.startDate||'',details:'Before/Completion approval required',status:t.empStatus||'Completion Requested',rowIndex:t.rowIndex,taskId:t.taskId||'',action:'taskCompletion',targetUser:t.assignedTo||t.employee||''});
-                else if(hodStatus==='pending' && String(t.assignedBy||'').trim()) out.push({key:'task-approval|'+(t.taskId||t.rowIndex),type:'task',typeLabel:'Task',employee:t.assignedTo||t.employee||'',task:t.taskName||'Task',date:t.startDate||'',details:'Task approval pending',status:t.hodStatus||'Pending',rowIndex:t.rowIndex,taskId:t.taskId||'',action:'taskApproval',targetUser:t.assignedTo||t.employee||''});
+                if(empStatus==='completion requested') out.push({key:'task-completion|'+(t.taskId||t.rowIndex),type:'task',typeLabel:'Task',employee:t.assignedTo||t.employee||'',task:t.taskName||'Task',date:t.endDate||t.startDate||'',details:'Before/Completion approval required',status:t.empStatus||'Completion Requested',rowIndex:t.rowIndex,taskId:t.taskId||'',action:'taskCompletion',targetUser:t.assignedTo||t.employee||'',approvalOwner:t.approvalOwner||''});
+                else if(hodStatus==='pending' && String(t.assignedBy||'').trim()) out.push({key:'task-approval|'+(t.taskId||t.rowIndex),type:'task',typeLabel:'Task',employee:t.assignedTo||t.employee||'',task:t.taskName||'Task',date:t.startDate||'',details:'Task approval pending',status:t.hodStatus||'Pending',rowIndex:t.rowIndex,taskId:t.taskId||'',action:'taskApproval',targetUser:t.assignedTo||t.employee||'',approvalOwner:t.approvalOwner||''});
             });
             return out;
         }
@@ -2424,10 +2427,10 @@ function parseBreakTimeClient(v){
         }
         function closeApprovalRejectModal(){const m=document.getElementById('approvalRejectModal');if(m)m.style.display='none';approvalRejectContext=null;}
         function toggleTaskRejectOther(){const v=document.getElementById('taskRejectReason')?.value;const b=document.getElementById('taskRejectOtherBox');if(b)b.style.display=v==='Other'?'block':'none';}
-        function approvalCenterPost(item,status,rejectionReason='',rejectionReasonOther=''){
+        function approvalCenterPost(item,status,rejectionReason='',rejectionReasonOther='',extra={}){
             const fd=new FormData();fd.append('sessionToken',sessionToken);
             if(item.action==='attendance'){fd.append('action','reviewAttendanceRequest');fd.append('rowIndex',item.rowIndex);fd.append('status',status);if(rejectionReason)fd.append('rejectionReason',rejectionReason);}
-            else if(item.action==='schedule'){fd.append('action','updateAdvanceScheduleRequest');fd.append('rowIndex',item.rowIndex);fd.append('status',status);}
+            else if(item.action==='schedule' || item.action==='scheduleEmergency'){fd.append('action','updateAdvanceScheduleRequest');fd.append('rowIndex',item.rowIndex);fd.append('status',status);if(item.action==='scheduleEmergency' && extra.durationDays)fd.append('durationDays',String(extra.durationDays));}
             else {fd.append('action','updateTaskStatus');fd.append('targetUser',item.targetUser||'');fd.append('rowIndex',item.rowIndex);fd.append('type','hod');fd.append('status',status);if(rejectionReason)fd.append('rejectionReason',rejectionReason);if(rejectionReasonOther)fd.append('rejectionReasonOther',rejectionReasonOther);}
             return fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json());
         }
@@ -2439,21 +2442,25 @@ function parseBreakTimeClient(v){
             const btn=document.getElementById('approvalRejectSubmit');if(btn)btn.disabled=true;
             Promise.all(ctx.items.map(x=>approvalCenterPost(x,'Rejected',reason,other))).then(ds=>{const bad=ds.filter(d=>d.status!=='success');if(bad.length)alert('Kuch rejection process nahi ho sake.');else alert('Rejected successfully.');closeApprovalRejectModal();fetchDashboardDataSilently();setTimeout(loadApprovalAttendanceTaskCenter,300);}).catch(()=>alert('Rejection update failed.')).finally(()=>{if(btn)btn.disabled=false;});
         }
+        let urgentTaskApprovalContext=null;
+        function openUrgentTaskApprovalModal(key){
+            const item=approvalCenterFind(key); if(!item)return;
+            urgentTaskApprovalContext=item;
+            const info=document.getElementById('urgentTaskApprovalInfo');if(info)info.innerHTML=`<b>${escapeHtml(item.employee||'Employee')}</b> • ${escapeHtml(item.task||'Today Urgent Task')}<br><span class="text-xs">Assign By: ${escapeHtml(item.assignBy||'-')}</span>`;
+            const days=document.getElementById('urgentTaskApprovalDays');if(days)days.value='1';
+            const m=document.getElementById('urgentTaskApprovalModal');if(m)m.style.display='block';
+        }
+        function closeUrgentTaskApprovalModal(){const m=document.getElementById('urgentTaskApprovalModal');if(m)m.style.display='none';urgentTaskApprovalContext=null;}
         function approvalCenterSingleAction(key,status){
             const item=approvalCenterFind(key);if(!item)return;
             if(status==='Rejected'){openApprovalRejectModal(key);return;}
+            if(item.action==='scheduleEmergency'){openUrgentTaskApprovalModal(key);return;}
             const row=document.querySelector(`#approvalCenterBody .approval-center-check[data-key=\"${CSS.escape(String(key))}\"]`)?.closest('tr');
             const btn=row?.querySelector('button'); if(btn){btn.disabled=true;btn.textContent='Saving...';}
-            // Optimistic UI: remove the item immediately; backend continues the save in the background.
             if(row)row.remove();
             approvalCenterPost(item,status).then(d=>{
-                if(d.status==='success'){
-                    fetchDashboardDataSilently();
-                    setTimeout(loadApprovalAttendanceTaskCenter,200);
-                }else{
-                    alert(d.message||'Approval update failed.');
-                    loadApprovalAttendanceTaskCenter();
-                }
+                if(d.status==='success'){fetchDashboardDataSilently();setTimeout(loadApprovalAttendanceTaskCenter,200);}
+                else{alert(d.message||'Approval update failed.');loadApprovalAttendanceTaskCenter();}
             }).catch(()=>{alert('Approval update failed.');loadApprovalAttendanceTaskCenter();});
         }
         async function bulkApprovalCenterAction(status){
@@ -2463,6 +2470,7 @@ function parseBreakTimeClient(v){
                 const types=new Set(items.map(x=>x.type)); if(types.size>1){alert('Bulk Reject mein ek hi type (Task ya Attendance) select karein.');return;}
                 approvalRejectContext={mode:'bulk',items:items}; const first=items[0]; document.getElementById('approvalRejectTitle').textContent=first.type==='attendance'?'Attendance Reject Reason':'Task Reject Reason'; document.getElementById('taskRejectReasonBox').style.display=first.type==='task'?'block':'none'; document.getElementById('attendanceRejectReasonBox').style.display=first.type==='attendance'?'block':'none'; document.getElementById('taskRejectOtherBox').style.display='none'; document.getElementById('taskRejectReason').value=''; document.getElementById('attendanceRejectReason').value=''; document.getElementById('taskRejectReasonOther').value=''; document.getElementById('approvalRejectModal').style.display='block'; return;
             }
+            if(items.some(x=>x.action==='scheduleEmergency')){alert('Today Urgent Task ko individual Approve karein, kyunki approval ke waqt Working Days select karne honge.');return;}
             if(!confirm(`${items.length} item(s) ko Approve karna hai?`))return;
             const buttons=document.querySelectorAll('#approvalCenterBody .approval-center-check:checked'); buttons.forEach(c=>{const b=c.closest('tr')?.querySelector('button');if(b){b.disabled=true;b.textContent='Saving...';} c.closest('tr')?.remove();});
             const results=await Promise.all(items.map(item=>approvalCenterPost(item,status).catch(()=>({status:'error'}))));
@@ -3359,9 +3367,28 @@ function parseBreakTimeClient(v){
             const show=document.getElementById('advanceScheduleType').value==='Meeting' && document.getElementById('meetingMode').value==='Online';
             document.getElementById('onlineDurationBox').classList.toggle('hidden',!show);
         }
-        function openEmergencyTaskModal(){const today=new Date().toISOString().split('T')[0],d=document.getElementById('emergencyTaskDate'),e=document.getElementById('emergencyTaskEndDate');if(d)d.value=today;if(e){e.value=today;e.min=today;}document.getElementById('emergencyTaskModal').style.display='block';}
+        let emergencyTaskTemplateCache=[];
+        function openEmergencyTaskModal(){
+            const today=new Date(); const key=today.toISOString().split('T')[0];
+            const label=document.getElementById('emergencyTaskToday');if(label)label.textContent=today.toLocaleDateString('en-IN',{day:'2-digit',month:'2-digit',year:'numeric'});
+            const sel=document.getElementById('emergencyTaskTemplate');if(sel)sel.innerHTML='<option value="">Loading templates...</option>';
+            const cat=document.getElementById('emergencyTaskCategory');if(cat)cat.value='';
+            const ab=document.getElementById('emergencyTaskAssignBy');if(ab)ab.value='';
+            document.getElementById('emergencyTaskDetails').value='';
+            document.getElementById('emergencyTaskModal').style.display='block';
+            const fd=new FormData();fd.append('action','getTodayUrgentTaskTemplates');fd.append('sessionToken',sessionToken);
+            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(d=>{if(d.status!=='success')throw new Error(d.message||'Templates load failed');emergencyTaskTemplateCache=Array.isArray(d.templates)?d.templates:[];if(sel){sel.innerHTML='<option value="">-- Select Task Template --</option>'+emergencyTaskTemplateCache.map(t=>`<option value="${escapeHtml(t.templateId)}">${escapeHtml(t.taskName)} — ${escapeHtml(t.category||'-')}</option>`).join('');}}).catch(e=>{if(sel)sel.innerHTML='<option value="">Templates load nahi hue</option>';alert(e.message||'Templates load failed.');});
+        }
+        function applyEmergencyTaskTemplate(){const id=document.getElementById('emergencyTaskTemplate')?.value||'',t=emergencyTaskTemplateCache.find(x=>String(x.templateId)===String(id));const cat=document.getElementById('emergencyTaskCategory');if(cat)cat.value=t?.category||'';}
         function closeEmergencyTaskModal(){document.getElementById('emergencyTaskModal').style.display='none';}
-        function submitEmergencyTaskRequest(){const name=document.getElementById('emergencyTaskName').value.trim(),date=document.getElementById('emergencyTaskDate').value,endDate=document.getElementById('emergencyTaskEndDate').value,details=document.getElementById('emergencyTaskDetails').value.trim(),location=document.getElementById('emergencyTaskLocation').value.trim();if(!name){alert('Emergency Task name required hai.');return;}if(!date||!endDate||endDate<date){alert('From Date aur To Date sahi select karein.');return;}const fd=new FormData();fd.append('action','emergencyTaskRequest');fd.append('taskName',name);fd.append('requestDate',date);fd.append('endDate',endDate);fd.append('details',details);fd.append('location',location);fd.append('sessionToken',sessionToken);const b=document.getElementById('emergencyTaskBtn');b.disabled=true;b.innerText='Sending...';fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(d=>{alert(d.message||'Request sent');if(d.status==='success'){closeEmergencyTaskModal();fetchDashboardDataSilently();}}).catch(()=>alert('Emergency request failed.')).finally(()=>{b.disabled=false;b.innerText='Send Request';});}
+        function submitEmergencyTaskRequest(){
+            const templateId=document.getElementById('emergencyTaskTemplate')?.value||'',assignBy=document.getElementById('emergencyTaskAssignBy')?.value||'',details=document.getElementById('emergencyTaskDetails')?.value.trim()||'',today=new Date().toISOString().split('T')[0];
+            if(!templateId){alert('Task Template select karein.');return;} if(!assignBy){alert('Assign By select karein.');return;}
+            const t=emergencyTaskTemplateCache.find(x=>String(x.templateId)===String(templateId));if(!t){alert('Selected template nahi mila.');return;}
+            const fd=new FormData();fd.append('action','emergencyTaskRequest');fd.append('templateId',templateId);fd.append('requestDate',today);fd.append('assignBy',assignBy);fd.append('details',details);fd.append('sessionToken',sessionToken);
+            const b=document.getElementById('emergencyTaskBtn');b.disabled=true;b.innerText='Sending...';
+            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(d=>{alert(d.message||'Request sent');if(d.status==='success'){closeEmergencyTaskModal();fetchDashboardDataSilently();}}).catch(()=>alert('Today Urgent Task request failed.')).finally(()=>{b.disabled=false;b.innerText='Send Request';});
+        }
         function submitAdvanceScheduleRequest(){
             const date=document.getElementById('advanceScheduleDate').value;
             const endDate=['3 Days Qafila','Tarbiyati Ijtima'].includes(document.getElementById('advanceScheduleType').value)?document.getElementById('advanceScheduleEndDate').value:'';
@@ -3397,7 +3424,7 @@ function parseBreakTimeClient(v){
                 else box.innerHTML=reqs.map(r=>`<div class="border border-[#b2d8d8] rounded-xl p-4 bg-[#f7fbfb]">
                     <div class="flex flex-col md:flex-row md:justify-between gap-2"><div><b class="text-[#112a2e]">${r.employee}</b><span class="text-xs text-gray-500 ml-2">${r.employeeId||''}</span><span class="text-xs text-gray-500 ml-2">${r.department||''}</span><span class="text-xs text-gray-500 ml-2">${r.requestDate}</span></div><span class="bg-[#e6fcf5] text-[#1f827c] px-3 py-1 rounded-full text-xs font-bold">${r.requestType}</span></div>
                     <div class="text-sm text-gray-600 mt-2"><b>Location:</b> ${r.location||'-'}<br>${r.details||'-'}</div>
-                    <div class="mt-3 flex gap-2"><button onclick="editAdvanceSchedule(${r.rowIndex},${JSON.stringify(r.requestDate)},${JSON.stringify(r.details||'')})" class="bg-[#2a4d53] hover:bg-[#1e3e43] text-white px-4 py-2 rounded-lg text-sm font-bold">Edit</button><button onclick="approveAdvanceSchedule(${r.rowIndex})" class="bg-[#259b94] hover:bg-[#1f827c] text-white px-4 py-2 rounded-lg text-sm font-bold">${r.requestType==='Emergency Task'?'Approve Emergency Task':'Approve & Assign'}</button><button onclick="rejectAdvanceSchedule(${r.rowIndex})" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold">Reject</button></div>
+                    <div class="mt-3 flex gap-2"><button onclick="editAdvanceSchedule(${r.rowIndex},${JSON.stringify(r.requestDate)},${JSON.stringify(r.details||'')})" class="bg-[#2a4d53] hover:bg-[#1e3e43] text-white px-4 py-2 rounded-lg text-sm font-bold">Edit</button><button onclick="${r.requestType==='Emergency Task'?`openUrgentTaskApprovalByRow(${r.rowIndex})`:`approveAdvanceSchedule(${r.rowIndex})`}" class="bg-[#259b94] hover:bg-[#1f827c] text-white px-4 py-2 rounded-lg text-sm font-bold">${r.requestType==='Emergency Task'?'Approve Emergency Task':'Approve & Assign'}</button><button onclick="rejectAdvanceSchedule(${r.rowIndex})" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold">Reject</button></div>
                 </div>`).join('');
                 document.getElementById('advanceScheduleApprovalModal').style.display='block';
             }).catch(err=>{box.innerHTML='<div class="p-6 text-center text-red-500">Requests load nahi ho sakin. '+(err.message||'Please try again.')+'</div>';});
@@ -3412,6 +3439,20 @@ function parseBreakTimeClient(v){
         function updateAdvanceScheduleRequest(rowIndex,status){
             const fd=new FormData();fd.append('action','updateAdvanceScheduleRequest');fd.append('rowIndex',rowIndex);fd.append('status',status);fd.append('sessionToken',sessionToken);
             return fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json());
+        }
+        function openUrgentTaskApprovalByRow(rowIndex){
+            const r=(globalAdvanceScheduleRequests||[]).find(x=>Number(x.rowIndex)===Number(rowIndex));
+            if(!r)return;
+            urgentTaskApprovalContext={key:'schedule-row|'+rowIndex,rowIndex:Number(rowIndex),action:'scheduleEmergency',employee:r.employee||'',task:r.taskName||'Today Urgent Task',assignBy:r.assignBy||'',approvalOwner:r.approvalOwner||''};
+            const info=document.getElementById('urgentTaskApprovalInfo');if(info)info.innerHTML=`<b>${escapeHtml(r.employee||'Employee')}</b> • ${escapeHtml(r.taskName||'Today Urgent Task')}<br><span class="text-xs">Assign By: ${escapeHtml(r.assignBy||'-')}</span>`;
+            const days=document.getElementById('urgentTaskApprovalDays');if(days)days.value='1';
+            const m=document.getElementById('urgentTaskApprovalModal');if(m)m.style.display='block';
+        }
+        function confirmUrgentTaskApproval(){
+            const item=urgentTaskApprovalContext;if(!item)return;
+            const days=Number(document.getElementById('urgentTaskApprovalDays')?.value||0);if(!Number.isInteger(days)||days<1||days>31){alert('Working Days 1 se 31 ke beech dein.');return;}
+            const btn=document.getElementById('urgentTaskApprovalBtn');if(btn){btn.disabled=true;btn.textContent='Saving...';}
+            approvalCenterPost(item,'Approved','','',{durationDays:days}).then(d=>{if(d.status!=='success')throw new Error(d.message||'Approval update failed.');closeUrgentTaskApprovalModal();closeAdvanceScheduleApprovalModal();fetchDashboardDataSilently();setTimeout(loadApprovalAttendanceTaskCenter,200);alert(d.message||'Today Urgent Task approved.');}).catch(e=>alert(e.message||'Approval update failed.')).finally(()=>{if(btn){btn.disabled=false;btn.textContent='Approve & Add Task';}});
         }
         function approveAdvanceSchedule(rowIndex){updateAdvanceScheduleRequest(rowIndex,'Approved').then(d=>{alert(d.message||'Approved');if(d.status==='success'){closeAdvanceScheduleApprovalModal();setTimeout(fetchDashboardDataSilently,250);}}).catch(()=>alert('Update failed.'));}
         function rejectAdvanceSchedule(rowIndex){updateAdvanceScheduleRequest(rowIndex,'Rejected').then(d=>{alert(d.message||'Rejected');if(d.status==='success'){closeAdvanceScheduleApprovalModal();setTimeout(fetchDashboardDataSilently,250);}}).catch(()=>alert('Update failed.'));}
