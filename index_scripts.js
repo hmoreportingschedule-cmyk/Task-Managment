@@ -70,7 +70,7 @@
             if(document.getElementById('dashboard-section').style.display === 'flex') {
                 fetchDashboardDataSilently();
             }
-        }, 120000);
+        }, 60000);
 
         function v4UpdateAttendanceAvailability(){
             const el=document.getElementById('attendanceDate'), notice=document.getElementById('attendanceClosedNotice'), btn=document.getElementById('attendanceBtn');
@@ -309,7 +309,7 @@ function parseBreakTimeClient(v){
             note.textContent=reason;note.classList.toggle('hidden',!reason);form.classList.toggle('is-closed',!!reason);
             return !!reason;
         }
-        document.addEventListener('change',function(e){if(e.target&&e.target.id==='attendanceDate')updateAttendanceNonWorkingDay();});
+        document.addEventListener('change',function(e){if(e.target&&e.target.id==='attendanceDate'){updateAttendanceNonWorkingDay();renderSelectedAttendanceState();}});
 
         function getShiftStartMinsClient(){ const s=document.getElementById('displayOfficeTime')?.innerText||''; const parts=s.toLowerCase().split('to'); return parts.length>1?timeToMins(parts[0].trim()):-1; }
         function getShiftEndMinsClient(){ const s=document.getElementById('displayOfficeTime')?.innerText||''; const parts=s.toLowerCase().split('to'); return parts.length>1?timeToMins(parts[1].trim()):-1; }
@@ -327,6 +327,46 @@ function parseBreakTimeClient(v){
             } else { wrap.classList.add('hidden'); sel.innerHTML='<option value="">-- Select Reason --</option>'; sel.value=''; sel.disabled=false; ta.value=''; ta.classList.add('hidden'); }
         }
 
+        function renderSelectedAttendanceState(){
+            const box=document.getElementById('attendanceSavedStatus');
+            if(!box)return;
+            const date=document.getElementById('attendanceDate')?.value||'';
+            const user=(document.getElementById('displayUser')?.innerText||'').trim().toLowerCase();
+            if(!date||!user){box.textContent='Attendance: Not Saved';return;}
+            let rec=(globalMonthlyFullAttendance||[]).find(a=>String(a.Date||'')===date && String(a.Employee||'').trim().toLowerCase()===user);
+            if(!rec){box.textContent='Attendance: Not Saved';return;}
+            const inT=rec.InTime||''; const outT=rec.OutTime||'';
+            const parts=[];
+            if(inT)parts.push('In: '+inT);
+            if(outT)parts.push('Out: '+outT);
+            box.textContent=parts.length?'Attendance Saved • '+parts.join(' | '):'Attendance: Not Saved';
+        }
+        function renderTodayLocation(){
+            const statusEl=document.getElementById('todayLocationStatus'), cityEl=document.getElementById('todayLocationCity');
+            if(!statusEl||!cityEl)return;
+            const officeCity=(window.currentUserOfficeLocation||document.getElementById('displayOfficeLocation')?.innerText||'').split(':')[0].trim()||'--';
+            const today=new Date(); const key=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
+            const schedules=Array.isArray(globalAdvanceScheduleRequests)?globalAdvanceScheduleRequests:[];
+            const outdoorTypes=['3 Days Qafila','Tarbiyati Ijtima','Journey','Meeting Journey'];
+            const outdoorSchedule=schedules.find(r=>String(r.status||'').toLowerCase()==='approved' && outdoorTypes.includes(String(r.requestType||'').trim()) && key>=String(r.requestDate||'') && key<=String(r.endDate||r.requestDate||''));
+            let outdoorTask=false;
+            try{ outdoorTask=(globalAllTasks||[]).some(t=>{
+                const active=key>=String(t.startDate||'')&&key<=String(t.endDate||'');
+                const works=Array.isArray(t.works)?t.works:[];
+                return active&&works.some(w=>String(w.category||'').trim().toLowerCase()==='outdoor');
+            }); }catch(_e){}
+            if(outdoorSchedule||outdoorTask){
+                statusEl.textContent='Outdoor';
+                cityEl.textContent=(outdoorSchedule&&String(outdoorSchedule.location||'').trim())||'Outdoor Location';
+                statusEl.classList.remove('text-[#e6fcf5]'); statusEl.classList.add('text-[#f59e0b]');
+            }else{
+                statusEl.textContent='In Office';
+                cityEl.textContent=officeCity;
+                statusEl.classList.remove('text-[#f59e0b]'); statusEl.classList.add('text-[#e6fcf5]');
+            }
+        }
+        function refreshDailyActionWidgets(){ renderSelectedAttendanceState(); renderTodayLocation(); }
+
         function markAttendance(){
             if(updateAttendanceNonWorkingDay())return;
             const selectedDate=document.getElementById('attendanceDate')?.value||'', action=document.getElementById('attendanceAction')?.value||'Punch In', manual=document.getElementById('manualTime')?.value||'';
@@ -343,7 +383,7 @@ function parseBreakTimeClient(v){
             // Client-side punch-out restriction for today's shift.
             if(action==='Punch Out'&&selectedDate===(()=>{const d=new Date(),tz=d.getTimezoneOffset()*60000;return new Date(d-tz).toISOString().split('T')[0]})()){const shift=document.getElementById('displayOfficeTime')?.innerText||'',parts=shift.toLowerCase().split('to');if(parts.length>1){const endM=timeToMins(parts[1].trim()),now=new Date(),cur=now.getHours()*60+now.getMinutes();if(endM>=0&&cur<endM){alert(`Closing time is ${parts[1].trim().toUpperCase()}. Punch Out is not allowed before closing time.`);return;}}}
             btn.innerText='Saving...';btn.disabled=true;
-            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(d=>{if(d.status==='error')throw new Error(d.message||'Daily Actions save failed.');alert(d.message||'Daily Actions saved.');['namazTypeSelect','namazBreakStartTime','namazBreakEndTime','lunchBreakStartTime','lunchBreakEndTime','manualTime','extraBreakReason'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});const _tr=document.getElementById('attendanceTimingReason');if(_tr)_tr.value='';document.getElementById('attendanceTimingReasonBox')?.classList.add('hidden');clearPendingBreakAction();fetchDashboardDataSilently();}).catch(e=>alert(e.message||'Daily Actions save failed.')).finally(()=>{btn.innerText='Submit Record';btn.disabled=false;updateBreakTypeOptions();});
+            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(d=>{if(d.status==='error')throw new Error(d.message||'Daily Actions save failed.');alert(d.message||'Daily Actions saved.');['namazTypeSelect','namazBreakStartTime','namazBreakEndTime','lunchBreakStartTime','lunchBreakEndTime','manualTime','extraBreakReason'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});const _tr=document.getElementById('attendanceTimingReason');if(_tr)_tr.value='';document.getElementById('attendanceTimingReasonBox')?.classList.add('hidden');clearPendingBreakAction();refreshDailyActionWidgets();fetchDashboardDataSilently();}).catch(e=>alert(e.message||'Daily Actions save failed.')).finally(()=>{btn.innerText='Submit Record';btn.disabled=false;updateBreakTypeOptions();});
         }
 
         // ================= TODAY SHIFT TRACKER =================
@@ -449,6 +489,7 @@ function parseBreakTimeClient(v){
                 const roleNow=String(document.getElementById('displayRole')?.innerText||role||'').toLowerCase();
                 if(roleNow.indexOf('hod')>-1 || roleNow.indexOf('admin')>-1){ populateTeamDropdowns(globalTeamMembers); renderTeamAttendance(globalTeamAttendance); }
                 else { calculateTimeTracker(data.todayAttendance); populateLogTaskDropdown(globalAllTasks); }
+                refreshDailyActionWidgets();
                 filterTasksByEmp();
                 return true;
             }catch(e){ return false; }
@@ -537,6 +578,7 @@ function parseBreakTimeClient(v){
                     calculateTimeTracker(data.todayAttendance);
                     populateLogTaskDropdown(globalAllTasks);
                 }
+                refreshDailyActionWidgets();
 
                 filterTasksByEmp();
             })
@@ -3052,7 +3094,7 @@ function parseBreakTimeClient(v){
         function toggleAdvanceScheduleFields(){
             const type=document.getElementById('advanceScheduleType').value;
             const rangeBox=document.getElementById('advanceScheduleEndDateBox');
-            const isRange=['3 Din Qafila','Tarbiyati Ijtima'].includes(type);
+            const isRange=['3 Days Qafila','Tarbiyati Ijtima'].includes(type);
             if(rangeBox) rangeBox.classList.toggle('hidden',!isRange);
             const start=document.getElementById('advanceScheduleDate'), end=document.getElementById('advanceScheduleEndDate');
             if(start&&end){ end.min=start.value||start.min||''; end.max=start.max||''; if(!isRange) end.value=''; }
@@ -3089,7 +3131,7 @@ function parseBreakTimeClient(v){
         function submitEmergencyTaskRequest(){const name=document.getElementById('emergencyTaskName').value.trim(),date=document.getElementById('emergencyTaskDate').value,endDate=document.getElementById('emergencyTaskEndDate').value,details=document.getElementById('emergencyTaskDetails').value.trim(),location=document.getElementById('emergencyTaskLocation').value.trim();if(!name){alert('Emergency Task name required hai.');return;}if(!date||!endDate||endDate<date){alert('From Date aur To Date sahi select karein.');return;}const fd=new FormData();fd.append('action','emergencyTaskRequest');fd.append('taskName',name);fd.append('requestDate',date);fd.append('endDate',endDate);fd.append('details',details);fd.append('location',location);fd.append('sessionToken',sessionToken);const b=document.getElementById('emergencyTaskBtn');b.disabled=true;b.innerText='Sending...';fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(d=>{alert(d.message||'Request sent');if(d.status==='success'){closeEmergencyTaskModal();fetchDashboardDataSilently();}}).catch(()=>alert('Emergency request failed.')).finally(()=>{b.disabled=false;b.innerText='Send Request';});}
         function submitAdvanceScheduleRequest(){
             const date=document.getElementById('advanceScheduleDate').value;
-            const endDate=['3 Din Qafila','Tarbiyati Ijtima'].includes(document.getElementById('advanceScheduleType').value)?document.getElementById('advanceScheduleEndDate').value:'';
+            const endDate=['3 Days Qafila','Tarbiyati Ijtima'].includes(document.getElementById('advanceScheduleType').value)?document.getElementById('advanceScheduleEndDate').value:'';
             const type=document.getElementById('advanceScheduleType').value;
             const reason=document.getElementById('advanceScheduleReason').value.trim(); const scheduleLocation=document.getElementById('advanceScheduleLocation').value.trim();
             const weekoffDate=type==='Weekoff Adjustment'?date:'';
@@ -3102,7 +3144,7 @@ function parseBreakTimeClient(v){
             const journeyStart=type==='Meeting Journey'?document.getElementById('journeyStart').value:'';
             const journeyComplete=type==='Meeting Journey'?document.getElementById('journeyComplete').value:'';
             if(!date){alert('Please select future date.');return;}
-            if(['3 Din Qafila','Tarbiyati Ijtima'].includes(type) && (!endDate||endDate<date)){alert('From Date aur To Date sahi select karein.');return;}
+            if(['3 Days Qafila','Tarbiyati Ijtima'].includes(type) && (!endDate||endDate<date)){alert('From Date aur To Date sahi select karein.');return;}
             if(type==='Meeting'&&mode==='Online'&&(!meetingFrom||!meetingTo)){alert('Online Meeting ke liye From aur To time select karein.');return;}
             if(type==='Meeting Journey'&&(!journeyStart||!journeyComplete)){alert('Journey Start aur Journey Complete time select karein.');return;}
             const btn=document.getElementById('advanceScheduleBtn'); btn.disabled=true; btn.innerText='Submitting...';
