@@ -1126,7 +1126,7 @@
             const fd=new FormData(); fd.append('action','adminCreateUser'); fd.append('sessionToken',sessionToken); fd.append('username',login); fd.append('displayName',name); fd.append('password',pass); fd.append('role',role); fd.append('department',dept); fd.append('hod',hod); fd.append('accessPermissions',access); fd.append('emailAddress',document.getElementById('adminNewEmailAddress').value.trim()); fd.append('contactNumber',document.getElementById('adminNewContactNumber').value.trim()); fd.append('whatsappNumber',document.getElementById('adminNewWhatsappNumber').value.trim()); fd.append('officeTime',office); fd.append('weekoff',weekoff); fd.append('officeLocation',document.getElementById('adminNewOfficeLocation').value.trim()); fd.append('officeAddress',document.getElementById('adminNewOfficeAddress').value.trim()); fd.append('profilePhotoUrl',photoUrl);
             const btn=document.getElementById('createUserBtn'); btn.disabled=true; btn.innerText='Creating...';
             fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(data=>{
-                if(data.status==='success'){alert('User created successfully.'); document.getElementById('adminNewUsername').value=''; document.getElementById('adminNewLogin').value=''; document.getElementById('adminNewPassword').value=''; document.getElementById('adminNewDepartment').value=''; document.getElementById('adminNewHod').value=''; document.getElementById('adminNewPhotoUrl').value=''; document.getElementById('adminNewPhotoFile').value=''; loadAdminUsers();} else alert(data.message||'User creation failed.');
+                if(data.status==='success'){alert((data.message||'User created successfully.')+(data.masterSpreadsheetUrl?'\n\nMaster Users Sheet: '+data.masterSpreadsheetUrl:'')); document.getElementById('adminNewUsername').value=''; document.getElementById('adminNewLogin').value=''; document.getElementById('adminNewPassword').value=''; document.getElementById('adminNewDepartment').value=''; document.getElementById('adminNewHod').value=''; document.getElementById('adminNewPhotoUrl').value=''; document.getElementById('adminNewPhotoFile').value=''; loadAdminUsers();} else alert(data.message||'User creation failed.');
             }).catch(()=>alert('User creation failed.')).finally(()=>{btn.disabled=false;btn.innerHTML='<i class="fas fa-user-plus"></i> Create User';});
         }
 
@@ -1637,7 +1637,7 @@
             const mg = document.getElementById('monthlyGrade');
             if (mg) {
                 mg.innerText = `${grade} (${grade === 'A' ? 'Mumtaz' : grade === 'B' ? 'Behtar' : grade === 'C' ? 'Munasib' : 'Kamzor'})`;
-                mg.className = `text-3xl font-extrabold leading-tight break-words whitespace-normal overflow-hidden max-w-full px-1 ${color}`; mg.style.background='transparent';
+                mg.className = `text-3xl font-extrabold leading-tight break-words whitespace-normal overflow-hidden max-w-full px-1 ${color}`;
             }
             const monthlyPercEl = document.getElementById('monthlyPerc');
             if (monthlyPercEl) monthlyPercEl.innerText = `${finalScore}% Overall`;
@@ -1674,6 +1674,64 @@
         function closeMonthlyGradeDetails(){
             const modal=document.getElementById('monthlyGradeDetailsModal');
             if(modal) modal.style.display='none';
+        }
+
+        // ================= V43 MANAGEMENT ANALYTICS =================
+        let lastManagementAnalyticsData=null;
+        async function openManagementAnalyticsModal(){
+            const role=String(document.getElementById('displayRole')?.innerText||window.currentUserRole||'').toLowerCase();
+            if(!(role.includes('admin')||role.includes('hod'))) return;
+            const modal=document.getElementById('managementAnalyticsModal'); if(!modal)return;
+            modal.style.display='block'; await loadManagementAnalytics();
+        }
+        function closeManagementAnalyticsModal(){const m=document.getElementById('managementAnalyticsModal');if(m)m.style.display='none';}
+        async function loadManagementAnalytics(){
+            const errEl=document.getElementById('managementAnalyticsError'); if(errEl){errEl.classList.add('hidden');errEl.innerText='';}
+            const fd=new FormData(); fd.append('action','getManagementAnalytics'); fd.append('sessionToken',sessionToken);
+            try{
+                const r=await fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}); const d=await r.json();
+                if(d.status!=='success') throw new Error(d.message||'Management Analytics load failed.');
+                lastManagementAnalyticsData=d;
+                const s=d.summary||{};
+                const cards=[['Employees',s.employees||0],['Tasks',s.tasks||0],['Completed',s.completed||0],['Pending',s.pending||0],['Overdue',s.overdue||0],['Avg Task %',(s.avgTask||0)+'%'],['Avg Attendance %',(s.avgAttendance||0)+'%']];
+                const box=document.getElementById('managementAnalyticsSummary'); if(box)box.innerHTML=cards.map(c=>`<div class="bg-white border rounded-xl p-3 shadow-sm"><div class="text-[10px] uppercase font-bold text-gray-500">${c[0]}</div><div class="text-xl font-extrabold text-[#112a2e] mt-1">${c[1]}</div></div>`).join('');
+                const employees=Array.isArray(d.employees)?d.employees:[], top=document.getElementById('managementTopEmployees'), attention=document.getElementById('managementAttentionEmployees'), body=document.getElementById('managementEmployeeBody');
+                const row=(x,i)=>`<tr class="border-t"><td class="p-3">${i+1}</td><td class="p-3 font-bold">${escapeHtml(x.name||x.username)}<div class="text-[10px] text-gray-500">${escapeHtml(x.employeeId||x.username)}</div></td><td class="p-3 text-center">${x.taskPercent}%</td><td class="p-3 text-center">${x.attendancePercent}%</td><td class="p-3 text-center font-extrabold">${x.overall}%</td><td class="p-3 text-center font-extrabold">${escapeHtml(x.grade)}</td></tr>`;
+                if(top)top.innerHTML=employees.slice(0,10).map(row).join('')||'<tr><td colspan="6" class="p-5 text-center text-gray-500">No employee data.</td></tr>';
+                if(attention)attention.innerHTML=(Array.isArray(d.attention)?d.attention:[]).map(x=>`<tr class="border-t"><td class="p-3 font-bold">${escapeHtml(x.name||x.username)}</td><td class="p-3 text-center text-red-600 font-bold">${x.overdue}</td><td class="p-3 text-center">${x.taskPercent}%</td><td class="p-3 text-center font-bold">${x.overall}%</td><td class="p-3 text-center font-bold">${escapeHtml(x.grade)}</td></tr>`).join('')||'<tr><td colspan="5" class="p-5 text-center text-gray-500">No immediate attention required.</td></tr>';
+                if(body)body.innerHTML=employees.map(x=>`<tr class="border-t hover:bg-gray-50"><td class="p-3 font-bold">${escapeHtml(x.name||x.username)}<div class="text-[10px] text-gray-500">${escapeHtml(x.employeeId||x.username)}</div></td><td class="p-3">${escapeHtml(x.department||'-')}</td><td class="p-3 text-center">${x.tasks}</td><td class="p-3 text-center">${x.completed}</td><td class="p-3 text-center">${x.pending}</td><td class="p-3 text-center ${x.overdue?'text-red-600 font-bold':''}">${x.overdue}</td><td class="p-3 text-center">${x.taskPercent}%</td><td class="p-3 text-center">${x.onTimePercent}%</td><td class="p-3 text-center">${x.attendancePercent}%</td><td class="p-3 text-center font-extrabold">${x.overall}%</td><td class="p-3 text-center font-extrabold">${escapeHtml(x.grade)}</td></tr>`).join('')||'<tr><td colspan="11" class="p-5 text-center text-gray-500">No employee data.</td></tr>';
+            }catch(err){if(errEl){errEl.classList.remove('hidden');errEl.innerText=err.message||'Management Analytics load failed.';}}
+        }
+
+        function exportManagementAnalyticsExcel(){
+            const d=lastManagementAnalyticsData; if(!d||!Array.isArray(d.employees)){alert('Pehle Management Analytics load karein.');return;}
+            if(typeof XLSX==='undefined'){alert('Excel module load nahi hua.');return;}
+            const wb=XLSX.utils.book_new();
+            const summary=[['Metric','Value'],['Employees',d.summary.employees],['Tasks',d.summary.tasks],['Completed',d.summary.completed],['Pending',d.summary.pending],['Overdue',d.summary.overdue],['Average Task %',d.summary.avgTask+'%'],['Average Attendance %',d.summary.avgAttendance+'%']];
+            XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(summary),'Summary');
+            const rows=d.employees.map((x,i)=>({Rank:i+1,Employee:x.name||x.username,'Employee ID':x.employeeId||'',Department:x.department||'',Tasks:x.tasks,Completed:x.completed,Pending:x.pending,Overdue:x.overdue,'Task %':x.taskPercent+'%','On-Time %':x.onTimePercent+'%','Attendance %':x.attendancePercent+'%','Overall %':x.overall+'%',Grade:x.grade}));
+            XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'Employee Analysis');
+            const att=(d.attention||[]).map(x=>({Employee:x.name||x.username,'Employee ID':x.employeeId||'',Department:x.department||'',Overdue:x.overdue,'Task %':x.taskPercent+'%','Overall %':x.overall+'%',Grade:x.grade}));
+            XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(att),'Attention Required');
+            XLSX.writeFile(wb,'Management_Analytics_Report_'+new Date().toISOString().slice(0,10)+'.xlsx');
+        }
+        async function generateManagementAnalyticsPDF(){
+            const d=lastManagementAnalyticsData; if(!d||!Array.isArray(d.employees)){alert('Pehle Management Analytics load karein.');return;}
+            try{
+                if(!window.jspdf?.jsPDF){await new Promise((resolve,reject)=>{const sc=document.createElement('script');sc.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';sc.onload=resolve;sc.onerror=reject;document.head.appendChild(sc);});}
+                const {jsPDF}=window.jspdf, doc=new jsPDF('l','mm','a4');
+                doc.setFont('helvetica','bold');doc.setFontSize(18);doc.text('Office Task Reporting - Management Performance Report',14,15);
+                doc.setFontSize(9);doc.setFont('helvetica','normal');doc.text('Generated: '+new Date().toLocaleString(),14,21);
+                const s=d.summary||{};const summary=`Employees: ${s.employees||0} | Tasks: ${s.tasks||0} | Completed: ${s.completed||0} | Pending: ${s.pending||0} | Overdue: ${s.overdue||0} | Avg Task: ${s.avgTask||0}% | Avg Attendance: ${s.avgAttendance||0}%`;
+                doc.text(summary,14,28);
+                let y=37;doc.setFont('helvetica','bold');doc.text('Top Employees',14,y);y+=7;doc.setFont('helvetica','normal');
+                d.employees.slice(0,12).forEach((x,i)=>{doc.text(`${i+1}. ${String(x.name||x.username).slice(0,28)} | Task ${x.taskPercent}% | Att ${x.attendancePercent}% | Overall ${x.overall}% | ${x.grade}`,16,y);y+=6;});
+                y+=4;doc.setFont('helvetica','bold');doc.text('Attention Required',14,y);y+=7;doc.setFont('helvetica','normal');
+                (d.attention||[]).slice(0,10).forEach(x=>{doc.text(`- ${String(x.name||x.username).slice(0,30)} | Overdue ${x.overdue} | Task ${x.taskPercent}% | Overall ${x.overall}% | ${x.grade}`,16,y);y+=6;});
+                doc.addPage();doc.setFont('helvetica','bold');doc.setFontSize(15);doc.text('Employee Analysis',14,15);doc.setFontSize(8);let yy=23;doc.text('Employee',14,yy);doc.text('Dept',72,yy);doc.text('Tasks',130,yy);doc.text('Comp',146,yy);doc.text('Pending',162,yy);doc.text('Overdue',180,yy);doc.text('Task%',198,yy);doc.text('Att%',214,yy);doc.text('Overall',230,yy);doc.text('Grade',250,yy);yy+=5;doc.setFont('helvetica','normal');
+                d.employees.slice(0,28).forEach(x=>{doc.text(String(x.name||x.username).slice(0,28),14,yy);doc.text(String(x.department||'').slice(0,24),72,yy);doc.text(String(x.tasks),130,yy);doc.text(String(x.completed),146,yy);doc.text(String(x.pending),162,yy);doc.text(String(x.overdue),180,yy);doc.text(String(x.taskPercent)+'%',198,yy);doc.text(String(x.attendancePercent)+'%',214,yy);doc.text(String(x.overall)+'%',230,yy);doc.text(String(x.grade),250,yy);yy+=5;if(yy>190){doc.addPage();yy=15;}});
+                doc.save('Management_Performance_Report_'+new Date().toISOString().slice(0,10)+'.pdf');
+            }catch(e){alert('PDF report generate nahi hua: '+(e.message||e));}
         }
 
         // ================= EXCEL EXPORT (SHEETJS) =================

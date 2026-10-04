@@ -1,23 +1,40 @@
-OFFICE TASK REPORTING DASHBOARD — V42
+OFFICE TASK REPORTING - V43
 
-GitHub / Vercel project root:
-1. index.html
-2. index_scripts.js
+VERSION: V43 Management Analytics + User Sheet Write Verification + Monthly Grade UI Fix
 
-Google Apps Script project:
-3. backend_code.js
+GITHUB / VERCEL PROJECT ROOT
+1. index.html -> replace existing index.html
+2. index_scripts.js -> replace existing index_scripts.js
 
-Important V42 behavior:
-- Assign New Task > Select Employees shows ONLY active Employee accounts.
-- Assign To (Employee) shows ONLY active Employee accounts.
-- OFF/inactive users are excluded immediately after cache refresh.
-- Deleted users cannot appear because they no longer exist in Users.
-- Backend also blocks assigning a task/template to an inactive employee, so UI filtering cannot be bypassed.
-- Newly created Admin Employee users are written immediately to the master Users sheet with Account Status=ON.
-- After user creation, the Users cache is invalidated and the UI refreshes its user/employee lists.
-- Task assignment/template assignment bumps dashboard cache via audit and triggers notification; employee dashboard can receive the new task on its next fast sync.
+GOOGLE APPS SCRIPT
+3. backend_code.js -> replace the current backend_code.js in the Apps Script project
 
-Deployment:
-- Replace both frontend files in GitHub/Vercel.
-- Replace backend_code.js in Apps Script.
-- Deploy Apps Script as a NEW VERSION.
+IMPORTANT
+- V43 changes the Google Apps Script backend. After replacing backend_code.js, create a NEW VERSION deployment:
+  Deploy -> Manage deployments -> Edit -> Version -> New version -> Deploy
+- Keep the same Web App /exec URL if possible. If the deployment URL changes, update GOOGLE_SCRIPT_URL in index_scripts.js.
+- Do NOT put index_scripts.js inside Apps Script.
+
+V43 FIXES
+- Admin/MasterAdmin-created users are written directly to the Users sheet with a write lock, one-row setValues write, flush, and row verification.
+- The success response includes Users row number and Master Users Sheet URL.
+- Account Status is now part of the fresh Users header set and protected from cleanup removal.
+- Monthly Grade card is forced to white background; title is exactly "Monthly Grade"; only Task/Att percentage digits are black; other requested colors are preserved.
+- Management Analytics is available to Admin/HOD only.
+- Management Analytics includes active employees, KPI summary, top employees, attention-required employees, employee analysis, Excel export and A4 landscape PDF export.
+- Analytics score recommendation: Task 60% + On-Time 25% + Attendance 15%.
+- Deleted/inactive employees are excluded from Management Analytics.
+
+LIVE TEST CHECKLIST
+1. Login as MasterAdmin.
+2. Create a test Employee.
+3. Confirm success message shows Users row and Master Users Sheet URL.
+4. Open the Users sheet and confirm the new row exists with Account Status = ON.
+5. Refresh User Management and confirm the user appears.
+6. Open Assign New Task and confirm the active employee appears.
+7. Set the employee OFF and confirm they disappear from assignment lists.
+8. Turn the employee ON and confirm they return after refresh.
+9. Login as Employee and confirm Monthly Grade card is white and title is "Monthly Grade".
+10. Confirm only 0%/100% percentage digits are black.
+11. Login as Admin/HOD and confirm Monthly Grade card is not shown.
+12. Open Management Analytics and test Refresh, Excel and PDF.

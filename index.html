@@ -224,6 +224,12 @@
 #attendanceFormBox.is-closed #attendanceAction,#attendanceFormBox.is-closed #manualTimeBox,#attendanceFormBox.is-closed #actionReasonSelect,#attendanceFormBox.is-closed #attendanceBtn{display:none!important}
 @media(max-width:768px){#hodActionBar.manager-controls{flex-direction:column!important;align-items:stretch!important}#hodActionBar>div:first-child{flex:auto}#hodActionBar>div:nth-child(2){overflow-x:auto}#hodActionBar>div:nth-child(2)>button{flex:0 0 112px}}
 </style>
+<style id="v43-grade-fix">
+/* V43: Employee Monthly Grade card - only requested visual changes. */
+.employee-monthly-grade-card{background:#ffffff!important;border:1px solid #3e6a6e!important;}
+.employee-monthly-grade-card .monthly-grade-title{color:#7db0b1!important;text-transform:none!important;}
+.employee-monthly-grade-card .grade-percent{color:#000000!important;}
+</style>
 </head>
 <body class="h-screen w-full text-gray-800 overflow-hidden">
     <!-- LOGIN PAGE -->
@@ -344,12 +350,12 @@
             </div>
 
             <!-- Comprehensive Report Card Sidebar -->
-            <div class="emp-only p-4 rounded-xl mb-4 text-center" style="background:#ffffff !important; border:1px solid #3e6a6e;">
-                <h3 class="text-[#7db0b1] text-xs font-bold mb-2" style="color:#7db0b1 !important; text-transform:none !important;">Monthly Grade</h3>
+            <div class="emp-only employee-monthly-grade-card p-4 rounded-xl mb-4 text-center">
+                <h3 class="monthly-grade-title text-xs font-bold mb-2">Monthly Grade</h3>
                 <div id="monthlyGrade" class="text-3xl font-extrabold leading-tight break-words whitespace-normal overflow-hidden max-w-full px-1 text-[#f59e0b]">-</div>
-                <div class="mt-2 text-xs text-[#a5cacc] flex justify-between px-2" style="color:#a5cacc !important;">
-                    <span>Task: <b id="taskPercText" style="color:#000000 !important;">0%</b></span>
-                    <span>Att: <b id="attPercText" style="color:#000000 !important;">0%</b></span>
+                <div class="mt-2 text-xs text-[#a5cacc] flex justify-between px-2">
+                    <span>Task: <b id="taskPercText" class="grade-percent">0%</b></span>
+                    <span>Att: <b id="attPercText" class="grade-percent">100%</b></span>
                 </div>
                 <button type="button" onclick="openMonthlyGradeDetails()" class="mt-3 w-full bg-[#1e3e43] hover:bg-[#259b94] text-white text-xs font-bold py-2 rounded-lg transition">
                     <i class="fas fa-chart-pie mr-1"></i> View Details
@@ -407,6 +413,9 @@
                         </button>
                         <button onclick="openProgressReportModal()" class="bg-white border border-[#b2d8d8] hover:bg-[#e6fcf5] text-[#2a4d53] px-4 py-2 rounded-lg shadow-sm font-semibold flex items-center gap-2 text-sm transition">
                             <i class="fas fa-chart-line text-orange-500"></i> Progress Report
+                        </button>
+                        <button onclick="openManagementAnalyticsModal()" class="hod-only admin-only bg-[#112a2e] hover:bg-[#1e3e43] text-white px-4 py-2 rounded-lg shadow-sm font-semibold flex items-center gap-2 text-sm transition">
+                            <i class="fas fa-chart-pie"></i> Management Analytics
                         </button>
                         <button onclick="exportToExcel()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow-sm font-semibold flex items-center gap-2 text-sm transition">
                             <i class="fas fa-file-excel"></i> Export Excel
@@ -488,6 +497,9 @@
                     </button>
                     <button onclick="openDelayAnalyticsModal()" class="admin-only bg-[#9a3412] hover:bg-[#7c2d12] text-white px-5 py-3 rounded-xl shadow-md font-bold items-center gap-2 transition">
                         <i class="fas fa-chart-column"></i> Delay Analytics
+                    </button>
+                    <button onclick="openManagementAnalyticsModal()" class="hod-only admin-only bg-[#0f766e] hover:bg-[#115e59] text-white px-5 py-3 rounded-xl shadow-md font-bold items-center gap-2 transition">
+                        <i class="fas fa-chart-pie"></i> Management Analytics
                     </button>
                     <button onclick="runManualBackup()" class="admin-only bg-[#475569] hover:bg-[#334155] text-white px-5 py-3 rounded-xl shadow-md font-bold items-center gap-2 transition">
                         <i class="fas fa-database"></i> Backup Now
@@ -1174,6 +1186,28 @@
                 <table class="progress-report-table"><thead><tr><th class="p-3 text-left">Employee</th><th class="p-3">Attendance %</th><th class="p-3">Present</th><th class="p-3">Absent</th><th class="p-3">Leave</th><th class="p-3">Weekoff</th><th class="p-3">Tasks</th><th class="p-3">Completed</th><th class="p-3">Task Progress</th><th class="p-3">Overall</th></tr></thead><tbody id="progressReportEmployeeBody"></tbody></table>
             </div>
             <div id="progressReportDetails"></div>
+        </div>
+    </div>
+
+    <!-- V43 MANAGEMENT ANALYTICS -->
+    <div id="managementAnalyticsModal" class="modal">
+        <div class="modal-content max-w-7xl mx-auto my-4 bg-white rounded-2xl shadow-2xl p-5 md:p-7 max-h-[94vh] overflow-y-auto">
+            <span onclick="closeManagementAnalyticsModal()" class="absolute top-2 right-4 text-gray-500 hover:text-red-500 cursor-pointer text-3xl font-bold">&times;</span>
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-5">
+                <div><h2 class="text-2xl md:text-3xl font-extrabold text-[#112a2e]"><i class="fas fa-chart-pie text-[#259b94]"></i> Management Analytics</h2><p class="text-sm text-gray-500 mt-1">Employee performance, task completion, attendance aur attention-required analysis.</p></div>
+                <div class="flex flex-wrap gap-2">
+                    <button onclick="loadManagementAnalytics()" class="bg-[#259b94] hover:bg-[#1f827c] text-white px-4 py-2 rounded-lg font-bold text-sm"><i class="fas fa-sync-alt mr-1"></i> Refresh</button>
+                    <button onclick="exportManagementAnalyticsExcel()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-bold text-sm"><i class="fas fa-file-excel mr-1"></i> Excel</button>
+                    <button onclick="generateManagementAnalyticsPDF()" class="bg-[#112a2e] hover:bg-[#1e3e43] text-white px-4 py-2 rounded-lg font-bold text-sm"><i class="fas fa-file-pdf mr-1"></i> PDF</button>
+                </div>
+            </div>
+            <div id="managementAnalyticsError" class="hidden bg-red-50 text-red-700 border border-red-200 rounded-lg p-3 text-sm font-bold mb-4"></div>
+            <div id="managementAnalyticsSummary" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-6"></div>
+            <div class="grid lg:grid-cols-2 gap-5 mb-6">
+                <div class="border rounded-xl overflow-hidden"><div class="p-4 bg-[#f3fbfa] font-extrabold text-[#112a2e]">Top Employees</div><div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-gray-50"><tr><th class="p-3 text-left">#</th><th class="p-3 text-left">Employee</th><th class="p-3">Task</th><th class="p-3">Att.</th><th class="p-3">Overall</th><th class="p-3">Grade</th></tr></thead><tbody id="managementTopEmployees"></tbody></table></div></div>
+                <div class="border rounded-xl overflow-hidden"><div class="p-4 bg-[#fff7ed] font-extrabold text-[#9a3412]">Attention Required</div><div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-gray-50"><tr><th class="p-3 text-left">Employee</th><th class="p-3">Overdue</th><th class="p-3">Task</th><th class="p-3">Overall</th><th class="p-3">Grade</th></tr></thead><tbody id="managementAttentionEmployees"></tbody></table></div></div>
+            </div>
+            <div class="border rounded-xl overflow-hidden"><div class="p-4 bg-[#f8fafc] font-extrabold text-[#112a2e]">Employee Analysis</div><div class="overflow-x-auto"><table class="w-full text-xs md:text-sm"><thead class="bg-[#2a4d53] text-white"><tr><th class="p-3 text-left">Employee</th><th class="p-3 text-left">Department</th><th class="p-3">Tasks</th><th class="p-3">Completed</th><th class="p-3">Pending</th><th class="p-3">Overdue</th><th class="p-3">Task %</th><th class="p-3">On-Time %</th><th class="p-3">Attendance %</th><th class="p-3">Overall</th><th class="p-3">Grade</th></tr></thead><tbody id="managementEmployeeBody"></tbody></table></div></div>
         </div>
     </div>
 
