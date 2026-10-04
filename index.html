@@ -325,15 +325,18 @@
             <div id="hodNoticeBox" class="hod-only admin-only bg-[#1e3e43] p-4 rounded-xl mb-4 border border-[#3e6a6e]">
                 <p class="text-sm font-bold text-[#5fd3cc]"><i class="fas fa-shield-alt"></i> Manager / Admin Mode</p>
                 <p class="text-xs text-[#a5cacc] mt-1">Attendance tracking disabled. Manage team and approve requests.</p>
+                <button type="button" onclick="openAdvanceScheduleApprovalModal()" class="mt-3 bg-[#259b94] hover:bg-[#1f827c] text-white font-bold text-sm px-4 py-2 rounded-lg shadow-md transition">
+                    <i class="fas fa-calendar-check mr-1"></i> Advance Schedule Requests
+                </button>
             </div>
 
             <!-- Comprehensive Report Card Sidebar -->
-            <div class="emp-only bg-white border border-[#3e6a6e] p-4 rounded-xl mb-4 text-center">
-                <h3 class="text-[#7db0b1] text-xs font-bold mb-2">Monthly Grade</h3>
+            <div class="emp-only p-4 rounded-xl mb-4 text-center" style="background:#ffffff !important; border:1px solid #3e6a6e;">
+                <h3 class="text-[#7db0b1] text-xs font-bold mb-2" style="color:#7db0b1 !important;">Monthly Grade</h3>
                 <div id="monthlyGrade" class="text-3xl font-extrabold leading-tight break-words whitespace-normal overflow-hidden max-w-full px-1 text-[#f59e0b]">-</div>
-                <div class="mt-2 text-xs text-[#a5cacc] flex justify-between px-2">
-                    <span>Task: <b id="taskPercText" class="text-black">0%</b></span>
-                    <span>Att: <b id="attPercText" class="text-black">0%</b></span>
+                <div class="mt-2 text-xs text-[#a5cacc] flex justify-between px-2" style="color:#a5cacc !important;">
+                    <span>Task: <b id="taskPercText" style="color:#000000 !important;">0%</b></span>
+                    <span>Att: <b id="attPercText" style="color:#000000 !important;">0%</b></span>
                 </div>
                 <button type="button" onclick="openMonthlyGradeDetails()" class="mt-3 w-full bg-[#1e3e43] hover:bg-[#259b94] text-white text-xs font-bold py-2 rounded-lg transition">
                     <i class="fas fa-chart-pie mr-1"></i> View Details

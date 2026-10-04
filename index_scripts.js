@@ -1582,6 +1582,27 @@
             if (metricEfficiencyEl) metricEfficiencyEl.innerText = `${taskPerc}%`;
         }
 
+        // ================= MONTHLY GRADE DETAILS =================
+        function openMonthlyGradeDetails(){
+            const role=String(document.getElementById('displayRole')?.innerText||window.currentUserRole||'').toLowerCase();
+            if(role && !role.includes('employee') && !role.includes('emp')) return;
+            const modal=document.getElementById('monthlyGradeDetailsModal');
+            if(!modal) return;
+            // Refresh the same calculation before showing details so the modal never shows stale values.
+            try{ calculateReportCard(Array.isArray(globalAllTasks)?globalAllTasks:[]); }catch(e){}
+            const task=(document.getElementById('taskPercText')?.innerText||'0%').trim();
+            const att=(document.getElementById('attPercText')?.innerText||'0%').trim();
+            const overall=(document.getElementById('indivScore')?.innerText||'0').trim();
+            const grade=(document.getElementById('monthlyGrade')?.innerText||'-').trim();
+            const set=(id,val)=>{const el=document.getElementById(id);if(el)el.innerText=val;};
+            set('gradeDetailTask',task); set('gradeDetailAtt',att); set('gradeDetailOverall',overall==='-'?'-':overall+'%'); set('gradeDetailGrade',grade);
+            modal.style.display='block';
+        }
+        function closeMonthlyGradeDetails(){
+            const modal=document.getElementById('monthlyGradeDetailsModal');
+            if(modal) modal.style.display='none';
+        }
+
         // ================= EXCEL EXPORT (SHEETJS) =================
         function autoFitWorksheet(ws) {
             const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
@@ -2989,7 +3010,7 @@
             fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(data=>{
                 if(data.status!=='success') throw new Error(data.message||'Unable to load requests');
                 globalAdvanceScheduleRequests=Array.isArray(data.requests)?data.requests:[];
-                const reqs=globalAdvanceScheduleRequests.filter(r=>String(r.status||'').trim().toLowerCase()==='pending');
+                const reqs=globalAdvanceScheduleRequests.filter(r=>{const st=String(r.status??'').trim().toLowerCase();return !st||st==='pending';});
                 if(!reqs.length){box.innerHTML='<div class="p-6 text-center text-gray-500 italic">No pending advance schedule requests.</div>';}
                 else box.innerHTML=reqs.map(r=>`<div class="border border-[#b2d8d8] rounded-xl p-4 bg-[#f7fbfb]">
                     <div class="flex flex-col md:flex-row md:justify-between gap-2"><div><b class="text-[#112a2e]">${r.employee}</b><span class="text-xs text-gray-500 ml-2">${r.employeeId||''}</span><span class="text-xs text-gray-500 ml-2">${r.department||''}</span><span class="text-xs text-gray-500 ml-2">${r.requestDate}</span></div><span class="bg-[#e6fcf5] text-[#1f827c] px-3 py-1 rounded-full text-xs font-bold">${r.requestType}</span></div>
