@@ -1964,6 +1964,10 @@ function parseBreakTimeClient(v){
                 "Task": w.Task,
                 "Time Spent (Mins)": w.TimeSpentMins,
                 "Description": w.Description,
+                "Approval Status": w.ApprovalStatus || 'Approved',
+                "Reviewed By": w.ReviewedBy || '',
+                "Reviewed At": w.ReviewedAt || '',
+                "Rejection Reason": w.RejectionReason || '',
                 "Task Row": w.TaskRowIndex
             })));
             autoFitWorksheet(wsLogs);
@@ -1974,7 +1978,7 @@ function parseBreakTimeClient(v){
             let grade = document.getElementById('monthlyGrade').innerText;
             const overallEl = document.getElementById('indivScore');
             let overall = overallEl ? overallEl.innerText : '-';
-            let totalTime = (globalWorkLogs || []).reduce((sum,w) => sum + (Number(w.TimeSpentMins) || 0), 0);
+            let totalTime = (globalWorkLogs || []).filter(w => String(w.ApprovalStatus || 'Approved').toLowerCase() === 'approved').reduce((sum,w) => sum + (Number(w.TimeSpentMins) || 0), 0);
             let summaryData = [
                 {"Metric": "Employee", "Value": username},
                 {"Metric": "Overall Score", "Value": overall + "%"},
@@ -2188,7 +2192,8 @@ function parseBreakTimeClient(v){
                 // Selected-date work logs only.
                 const logs = (globalWorkLogs || []).filter(w =>
                     String(w.WorkDate || '') === dateKey &&
-                    String(w.Employee || '').trim().toLowerCase() === String(user).trim().toLowerCase()
+                    String(w.Employee || '').trim().toLowerCase() === String(user).trim().toLowerCase() &&
+                    String(w.ApprovalStatus || 'Approved').toLowerCase() === 'approved'
                 );
 
                 // Tasks active on the selected date.
@@ -2318,7 +2323,8 @@ function parseBreakTimeClient(v){
                     const d = String(w.WorkDate || '').split('-');
                     return d.length === 3 &&
                         `${d[1]}-${d[2]}` === key &&
-                        String(w.Employee || '').trim().toLowerCase() === String(user).trim().toLowerCase();
+                        String(w.Employee || '').trim().toLowerCase() === String(user).trim().toLowerCase() &&
+                        String(w.ApprovalStatus || 'Approved').toLowerCase() === 'approved';
                 });
 
                 let total = 0;
@@ -2392,6 +2398,7 @@ function parseBreakTimeClient(v){
         function downloadAttendanceExcelTemplate(){const rows=[['Date','Employee ID','In Time','Out Time','Break Start','Break End','Leave/Weekoff','Reason','Approval Status'],['2026-09-21','EMP001','09:30:00 AM','06:30:00 PM','','','','Manual Entry','Approved']];const wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(rows);XLSX.utils.book_append_sheet(wb,ws,'Attendance');XLSX.writeFile(wb,'Attendance_One_Time_Upload_Format.xlsx');}
         // ================= APPROVAL ATTENDENCE & TASK CENTER =================
         let approvalCenterItems = [];
+        let globalPendingWorkLogs = [];
         function approvalCenterDateKey(v){ const s=String(v||'').trim(); if(!s)return ''; const m=s.match(/(20\d{2})-(\d{2})-(\d{2})/); return m?m[0]:s.slice(0,10); }
         function approvalCenterInRange(date, month, from, to){
             const d=approvalCenterDateKey(date); if(!d)return !month&&!from&&!to;
@@ -2426,6 +2433,10 @@ function parseBreakTimeClient(v){
                 const kind=rt.toLowerCase().includes('leave')?'leave':rt.toLowerCase().includes('weekoff')||rt.toLowerCase().includes('adjust')?'adjustment':'adjustment';
                 out.push({key:'schedule|'+r.rowIndex,type:kind,typeLabel:kind==='leave'?'Leave':'Adjustment',employee:r.employee||'',employeeId:r.employeeId||'',task:rt||'Schedule Request',date:r.requestDate||'',details:r.details||r.location||'-',status:status,rowIndex:r.rowIndex,action:'schedule'});
             });
+            (globalPendingWorkLogs||[]).forEach(w=>{
+                const meta=attendanceMetaForUser(w.employee||'')||{};
+                out.push({key:w.key||('worklog|'+(w.employee||'')+'|'+(w.rowIndex||'')),type:'worklog',typeLabel:'Daily Work',employee:w.employee||'',employeeId:w.employeeId||meta.employeeId||'',task:w.task||'Daily Work',date:w.date||'',details:`${Number(w.minutes)||0} minute(s) • ${w.description||'No description'}${w.submittedAt?' • Submitted: '+w.submittedAt:''}`,status:w.status||'Pending',rowIndex:w.rowIndex,action:'workLogApproval',targetUser:w.employee||'',taskRowIndex:w.taskRowIndex||''});
+            });
             (globalAllTasks||[]).forEach(t=>{
                 const empStatus=String(t.empStatus||'').toLowerCase(), hodStatus=String(t.hodStatus||'').toLowerCase();
                 const meta=attendanceMetaForUser(t.assignedTo||t.employee||'')||{};
@@ -2457,6 +2468,7 @@ function parseBreakTimeClient(v){
                 globalAttendanceRequests=Array.isArray(d.attendanceRequests)?d.attendanceRequests:globalAttendanceRequests;
                 globalTeamMembers=Array.isArray(d.teamMembers)?d.teamMembers:globalTeamMembers;
                 globalTeamMemberMeta=Array.isArray(d.teamMemberMeta)?d.teamMemberMeta:globalTeamMemberMeta;
+                globalPendingWorkLogs=Array.isArray(d.pendingWorkLogs)?d.pendingWorkLogs:[];
                 approvalCenterItems=buildApprovalCenterItems();
                 if(forceRender)renderApprovalAttendanceTaskCenter();
             }).catch(()=>{}).finally(()=>{approvalCenterSyncInProgress=false;});
@@ -2478,7 +2490,7 @@ function parseBreakTimeClient(v){
                 const checkbox=pending?`<input type="checkbox" class="approval-center-check" data-key="${escapeHtml(x.key)}">`:'<span class="text-gray-300">—</span>';
                 const action=pending?`<div class="flex gap-1"><button onclick="approvalCenterSingleAction('${escapeHtml(x.key)}','Approved')" class="bg-[#259b94] text-white px-3 py-1.5 rounded text-xs font-bold">Approve</button><button onclick="approvalCenterSingleAction('${escapeHtml(x.key)}','Rejected')" class="bg-red-500 text-white px-3 py-1.5 rounded text-xs font-bold">Reject</button></div>`:`<span class="text-xs font-bold ${String(x.status).toLowerCase()==='approved'?'text-green-600':'text-red-500'}">${escapeHtml(x.status)}</span>`;
                 const statusClass=String(x.status).toLowerCase()==='approved'?'text-green-600':String(x.status).toLowerCase()==='rejected'?'text-red-500':'text-orange-600';
-                return `<tr class="border-t hover:bg-gray-50"><td class="p-3">${checkbox}</td><td class="p-3"><span class="px-2 py-1 rounded-full text-[10px] font-bold ${x.type==='task'?'bg-blue-50 text-blue-700':x.type==='leave'?'bg-amber-50 text-amber-700':'bg-purple-50 text-purple-700'}">${escapeHtml(x.typeLabel)}</span></td><td class="p-3 font-bold text-[#112a2e]">${escapeHtml(x.employee)}${x.employeeId?`<div class="text-[10px] text-gray-500 font-semibold">ID: ${escapeHtml(x.employeeId)}</div>`:''}</td><td class="p-3 font-semibold">${escapeHtml(x.task)}</td><td class="p-3">${escapeHtml(x.date||'-')}</td><td class="p-3 text-xs text-gray-600 max-w-[320px] whitespace-normal">${escapeHtml(x.details||'-')}</td><td class="p-3 text-xs font-bold ${statusClass}">${escapeHtml(x.status)}</td><td class="p-3">${action}</td></tr>`;
+                return `<tr class="border-t hover:bg-gray-50"><td class="p-3">${checkbox}</td><td class="p-3"><span class="px-2 py-1 rounded-full text-[10px] font-bold ${x.type==='task'?'bg-blue-50 text-blue-700':x.type==='worklog'?'bg-orange-50 text-orange-700':x.type==='leave'?'bg-amber-50 text-amber-700':'bg-purple-50 text-purple-700'}">${escapeHtml(x.typeLabel)}</span></td><td class="p-3 font-bold text-[#112a2e]">${escapeHtml(x.employee)}${x.employeeId?`<div class="text-[10px] text-gray-500 font-semibold">ID: ${escapeHtml(x.employeeId)}</div>`:''}</td><td class="p-3 font-semibold">${escapeHtml(x.task)}</td><td class="p-3">${escapeHtml(x.date||'-')}</td><td class="p-3 text-xs text-gray-600 max-w-[320px] whitespace-normal">${escapeHtml(x.details||'-')}</td><td class="p-3 text-xs font-bold ${statusClass}">${escapeHtml(x.status)}</td><td class="p-3">${action}</td></tr>`;
             }).join('');
         }
         function toggleApprovalCenterSelectAll(checked){document.querySelectorAll('#approvalCenterBody .approval-center-check').forEach(c=>c.checked=!!checked);const h=document.getElementById('approvalCenterSelectAll');if(h)h.checked=!!checked;}
@@ -2488,8 +2500,8 @@ function parseBreakTimeClient(v){
             const item=approvalCenterFind(key); if(!item)return;
             approvalRejectContext={mode:'single',items:[item]};
             const title=document.getElementById('approvalRejectTitle'), taskBox=document.getElementById('taskRejectReasonBox'), attBox=document.getElementById('attendanceRejectReasonBox'), otherBox=document.getElementById('taskRejectOtherBox');
-            if(title)title.textContent=item.type==='attendance'?'Attendance Reject Reason':'Task Reject Reason';
-            if(taskBox)taskBox.style.display=item.type==='task'?'block':'none'; if(attBox)attBox.style.display=item.type==='attendance'?'block':'none'; if(otherBox)otherBox.style.display='none';
+            if(title)title.textContent=item.type==='attendance'?'Attendance Reject Reason':(item.type==='worklog'?'Daily Work Reject Reason':'Task Reject Reason');
+            if(taskBox)taskBox.style.display=(item.type==='task'||item.type==='worklog')?'block':'none'; if(attBox)attBox.style.display=item.type==='attendance'?'block':'none'; if(otherBox)otherBox.style.display='none';
             const tr=document.getElementById('taskRejectReason');if(tr)tr.value=''; const ar=document.getElementById('attendanceRejectReason');if(ar)ar.value=''; const ot=document.getElementById('taskRejectReasonOther');if(ot)ot.value='';
             document.getElementById('approvalRejectModal').style.display='block';
         }
@@ -2497,7 +2509,8 @@ function parseBreakTimeClient(v){
         function toggleTaskRejectOther(){const v=document.getElementById('taskRejectReason')?.value;const b=document.getElementById('taskRejectOtherBox');if(b)b.style.display=v==='Other'?'block':'none';}
         function approvalCenterPost(item,status,rejectionReason='',rejectionReasonOther='',extra={}){
             const fd=new FormData();fd.append('sessionToken',sessionToken);
-            if(item.action==='attendance'){fd.append('action','reviewAttendanceRequest');fd.append('rowIndex',item.rowIndex);fd.append('status',status);if(rejectionReason)fd.append('rejectionReason',rejectionReason);}
+            if(item.action==='workLogApproval'){fd.append('action','reviewWorkLog');fd.append('targetUser',item.targetUser||item.employee||'');fd.append('rowIndex',item.rowIndex);fd.append('status',status);if(rejectionReason)fd.append('rejectionReason',rejectionReason);}
+            else if(item.action==='attendance'){fd.append('action','reviewAttendanceRequest');fd.append('rowIndex',item.rowIndex);fd.append('status',status);if(rejectionReason)fd.append('rejectionReason',rejectionReason);}
             else if(item.action==='attendanceRecord'){fd.append('action','reviewAttendanceRecord');fd.append('targetUser',item.targetUser||item.employee||'');fd.append('rowIndex',item.rowIndex);fd.append('status',status);if(rejectionReason)fd.append('rejectionReason',rejectionReason);}
             else if(item.action==='schedule' || item.action==='scheduleEmergency'){fd.append('action','updateAdvanceScheduleRequest');fd.append('rowIndex',item.rowIndex);fd.append('status',status);if(item.action==='scheduleEmergency' && extra.durationDays)fd.append('durationDays',String(extra.durationDays));}
             else {fd.append('action','updateTaskStatus');fd.append('targetUser',item.targetUser||'');fd.append('rowIndex',item.rowIndex);fd.append('type','hod');fd.append('status',status);if(rejectionReason)fd.append('rejectionReason',rejectionReason);if(rejectionReasonOther)fd.append('rejectionReasonOther',rejectionReasonOther);}
@@ -2507,7 +2520,7 @@ function parseBreakTimeClient(v){
             const ctx=approvalRejectContext;if(!ctx||!ctx.items.length)return;
             const item=ctx.items[0]; let reason='',other='';
             if(item.type==='attendance'){reason=document.getElementById('attendanceRejectReason')?.value||'';if(!reason){alert('Attendance reject reason select karein.');return;}}
-            else if(item.type==='task'){reason=document.getElementById('taskRejectReason')?.value||'';if(!reason){alert('Task reject reason select karein.');return;}if(reason==='Other'){other=(document.getElementById('taskRejectReasonOther')?.value||'').trim();if(!other){alert('Other reason likhiye.');return;}}}
+            else if(item.type==='task'||item.type==='worklog'){reason=document.getElementById('taskRejectReason')?.value||'';if(!reason){alert('Task reject reason select karein.');return;}if(reason==='Other'){other=(document.getElementById('taskRejectReasonOther')?.value||'').trim();if(!other){alert('Other reason likhiye.');return;}}}
             const btn=document.getElementById('approvalRejectSubmit');if(btn)btn.disabled=true;
             Promise.all(ctx.items.map(x=>approvalCenterPost(x,'Rejected',reason,other))).then(ds=>{const bad=ds.filter(d=>d.status!=='success');if(bad.length)alert('Kuch rejection process nahi ho sake.');else alert('Rejected successfully.');closeApprovalRejectModal();fetchDashboardDataSilently();setTimeout(loadApprovalAttendanceTaskCenter,300);}).catch(()=>alert('Rejection update failed.')).finally(()=>{if(btn)btn.disabled=false;});
         }
@@ -2537,7 +2550,7 @@ function parseBreakTimeClient(v){
             const items=keys.map(approvalCenterFind).filter(Boolean);
             if(status==='Rejected'){
                 const types=new Set(items.map(x=>x.type)); if(types.size>1){alert('Bulk Reject mein ek hi type (Task ya Attendance) select karein.');return;}
-                approvalRejectContext={mode:'bulk',items:items}; const first=items[0]; document.getElementById('approvalRejectTitle').textContent=first.type==='attendance'?'Attendance Reject Reason':'Task Reject Reason'; document.getElementById('taskRejectReasonBox').style.display=first.type==='task'?'block':'none'; document.getElementById('attendanceRejectReasonBox').style.display=first.type==='attendance'?'block':'none'; document.getElementById('taskRejectOtherBox').style.display='none'; document.getElementById('taskRejectReason').value=''; document.getElementById('attendanceRejectReason').value=''; document.getElementById('taskRejectReasonOther').value=''; document.getElementById('approvalRejectModal').style.display='block'; return;
+                approvalRejectContext={mode:'bulk',items:items}; const first=items[0]; document.getElementById('approvalRejectTitle').textContent=first.type==='attendance'?'Attendance Reject Reason':(first.type==='worklog'?'Daily Work Reject Reason':'Task Reject Reason'); document.getElementById('taskRejectReasonBox').style.display=first.type==='task'?'block':'none'; document.getElementById('attendanceRejectReasonBox').style.display=first.type==='attendance'?'block':'none'; document.getElementById('taskRejectOtherBox').style.display='none'; document.getElementById('taskRejectReason').value=''; document.getElementById('attendanceRejectReason').value=''; document.getElementById('taskRejectReasonOther').value=''; document.getElementById('approvalRejectModal').style.display='block'; return;
             }
             if(items.some(x=>x.action==='scheduleEmergency')){alert('Today Urgent Task ko individual Approve karein, kyunki approval ke waqt Working Days select karne honge.');return;}
             if(!confirm(`${items.length} item(s) ko Approve karna hai?`))return;
@@ -2613,7 +2626,7 @@ function parseBreakTimeClient(v){
             if(role.includes('hod')||role.includes('admin')){
                 tasks.forEach(t=>{if(String(t.hodStatus||'').toLowerCase()==='pending'&&['completed','completion requested'].includes(String(t.empStatus||'').toLowerCase()))items.push({type:'task',key:t.taskId||t.rowIndex,title:'Task approval required',text:`${t.taskName||'Task'} — ${t.assignedTo||''}`,action:'approval-center',date:t.completedAt||t.endDate||t.startDate});});
                 atts.forEach(a=>{if(String(a.status||'').toLowerCase()==='pending')items.push({type:'attendance',key:a.rowIndex||a.date,title:'Attendance approval required',text:`${a.user||''} — ${a.date||''}`,action:'approval-center',date:a.date});});
-                (globalWorkLogs||[]).slice(-20).forEach(w=>items.push({type:'work',key:w.rowIndex||w.Task||w.WorkDate,title:'Employee work updated',text:`${w.Employee||''} — ${w.Task||''} — ${w.TimeSpentMins||0} min`,action:'task',date:w.WorkDate||w.Timestamp||''})); delayReports.slice(-20).forEach((r,i)=>items.push({type:'delay',key:(r.employee||'')+'|'+(r.task||'')+'|'+(r.date||'')+'|'+i,title:'Task Delay Report',text:`${r.employee||''} — ${r.task||''}: ${r.reason||''}`,action:'task',date:r.date||''}));
+                delayReports.slice(-20).forEach((r,i)=>items.push({type:'delay',key:(r.employee||'')+'|'+(r.task||'')+'|'+(r.date||'')+'|'+i,title:'Task Delay Report',text:`${r.employee||''} — ${r.task||''}: ${r.reason||''}`,action:'task',date:r.date||''}));
                 sched.forEach(r=>{if(String(r.status||'').toLowerCase()==='pending')items.push({type:'schedule',key:r.requestId||r.rowIndex,title:'Advance Schedule Request',text:`${r.employee||''} — ${r.requestType||''} — ${r.requestDate||''}`,action:'approval-center',date:r.submittedAt||r.requestDate});});
                 attReqs.forEach(r=>{if(String(r.status||'').toLowerCase()==='pending')items.push({type:'attendance-request',key:r.requestId||r.rowIndex,title:'Attendance Entry Request',text:`${r.employee||''} — ${r.date||''} — ${r.reason||''}`,action:'approval-center',date:r.submittedAt||r.date});});
             }else{
