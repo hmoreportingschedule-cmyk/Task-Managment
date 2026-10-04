@@ -2542,14 +2542,46 @@ function parseBreakTimeClient(v){
         function notificationStorageKey(){const u=(window.currentUser&&window.currentUser.username)||(document.getElementById('displayName')?.innerText||'user');return 'office_task_reporting_notifications_read_'+String(u).trim().toLowerCase();}
         function getReadNotificationIds(){try{return JSON.parse(localStorage.getItem(notificationStorageKey())||'[]');}catch(e){return [];}}
         function setReadNotificationIds(ids){try{localStorage.setItem(notificationStorageKey(),JSON.stringify(Array.from(new Set(ids)).slice(-300)));}catch(e){}}
+        function getReadNotificationMeta(){try{return JSON.parse(localStorage.getItem(notificationStorageKey()+'_meta')||'{}');}catch(e){return {};}}
+        function setReadNotificationMeta(meta){try{const keys=Object.keys(meta),keep=keys.slice(-300),out={};keep.forEach(k=>out[k]=meta[k]);localStorage.setItem(notificationStorageKey()+'_meta',JSON.stringify(out));}catch(e){}}
         function notificationId(n){return String(n.type||'')+'|'+String(n.key||n.title||'')+'|'+String(n.date||'')+'|'+String(n.text||'');}
-        function notificationTime(n){
-            const raw=n.timestamp||n.date||''; if(!raw)return '';
-            const d=new Date(raw); if(isNaN(d.getTime()))return String(raw);
+        function parseNotificationDate(raw){
+            if(raw===null||raw===undefined||raw==='')return null;
+            if(raw instanceof Date)return isNaN(raw.getTime())?null:raw;
+            const v=String(raw).trim();
+            // Google Sheet/date-only values in this app are commonly DD-MM-YYYY.
+            let m=v.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+            if(m){
+                const day=Number(m[1]),month=Number(m[2])-1,year=Number(m[3]),hh=Number(m[4]||0),mm=Number(m[5]||0),ss=Number(m[6]||0);
+                const d=new Date(year,month,day,hh,mm,ss);
+                if(d.getFullYear()===year&&d.getMonth()===month&&d.getDate()===day)return d;
+            }
+            // ISO timestamps are safe to parse normally.
+            const d=new Date(v);
+            return isNaN(d.getTime())?null:d;
+        }
+        function formatNotificationDate(raw){
+            const d=parseNotificationDate(raw);
+            if(!d)return raw?String(raw):'';
             return d.toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true});
         }
-        function markNotificationRead(id){const ids=getReadNotificationIds();if(!ids.includes(id)){ids.push(id);setReadNotificationIds(ids);}renderNotifications();}
-        function markAllNotificationsRead(){const items=notificationItems();setReadNotificationIds(items.map(notificationId));renderNotifications();}
+        function notificationTime(n){return formatNotificationDate(n.timestamp||n.date||'');}
+        function markNotificationRead(id){
+            const ids=getReadNotificationIds();
+            const meta=getReadNotificationMeta();
+            if(!ids.includes(id))ids.push(id);
+            meta[id]=new Date().toISOString();
+            setReadNotificationIds(ids);
+            setReadNotificationMeta(meta);
+            renderNotifications();
+        }
+        function markAllNotificationsRead(){
+            const items=notificationItems(),now=new Date().toISOString(),meta=getReadNotificationMeta();
+            items.forEach(n=>{meta[notificationId(n)]=now;});
+            setReadNotificationIds(items.map(notificationId));
+            setReadNotificationMeta(meta);
+            renderNotifications();
+        }
         function toggleNotifications(){const p=document.getElementById('notificationPanel');if(!p)return;p.classList.toggle('hidden');if(!p.classList.contains('hidden')){fetchServerNotifications();renderNotifications();}}
         function fetchServerNotifications(){if(!sessionToken)return;const fd=new FormData();fd.append('action','getServerNotifications');fd.append('sessionToken',sessionToken);fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd,cache:'no-store'}).then(r=>r.json()).then(d=>{if(d.status==='success'){window.serverNotifications=Array.isArray(d.notifications)?d.notifications:[];renderNotifications();}}).catch(()=>{});}
         function notificationItems(){
@@ -2575,12 +2607,12 @@ function parseBreakTimeClient(v){
         }
         function renderNotifications(){
             const list=document.getElementById('notificationList'),count=document.getElementById('notificationCount'),label=document.getElementById('notificationUnreadLabel');if(!list||!count)return;
-            const items=notificationItems(),readIds=getReadNotificationIds();
+            const items=notificationItems(),readIds=getReadNotificationIds(),readMeta=getReadNotificationMeta();
             const unread=items.filter(n=>!readIds.includes(notificationId(n)));
             count.innerText=unread.length;count.classList.toggle('hidden',unread.length===0);count.classList.toggle('flex',unread.length>0);if(label)label.innerText=unread.length?`${unread.length} unread`:'All read';
             list.innerHTML='';
             if(!items.length){list.innerHTML='<div class="p-5 text-center text-sm text-gray-500">No notifications.</div>';return;}
-            items.forEach(n=>{const id=notificationId(n),isRead=readIds.includes(id),row=document.createElement('button');row.type='button';row.className=`w-full text-left px-4 py-3 border-b transition ${isRead?'bg-white opacity-70 hover:bg-gray-50':'bg-[#f0fbf9] hover:bg-[#e7f7f4]'}`;row.innerHTML=`<div class="flex items-start gap-2"><i class="fas fa-bell mt-1 ${isRead?'text-gray-400':'text-[#259b94]'}"></i><div class="min-w-0 flex-1"><div class="font-bold text-sm text-[#112a2e]">${n.title}${isRead?'':' <span class="ml-1 inline-block w-2 h-2 rounded-full bg-red-500 align-middle"></span>'}</div><div class="text-xs text-gray-600 mt-1">${n.text}</div><div class="text-[10px] text-gray-400 mt-1">${notificationTime(n)} ${isRead?'• Read':''}</div></div></div>`;row.onclick=()=>{markNotificationRead(id);closeNotifications();if(n.action==='task')openTaskReportModal();else if(n.action==='schedule')openAdvanceScheduleApprovalModal();else if(n.action==='attendance-request')openAttendanceRequestsModal();else openOneViewModal();};list.appendChild(row);});
+            items.forEach(n=>{const id=notificationId(n),isRead=readIds.includes(id),row=document.createElement('button');row.type='button';row.className=`w-full text-left px-4 py-3 border-b transition ${isRead?'bg-white opacity-70 hover:bg-gray-50':'bg-[#f0fbf9] hover:bg-[#e7f7f4]'}`;const displayTime=isRead&&readMeta[id]?`Read ${formatNotificationDate(readMeta[id])}`:notificationTime(n);row.innerHTML=`<div class="flex items-start gap-2"><i class="fas fa-bell mt-1 ${isRead?'text-gray-400':'text-[#259b94]'}"></i><div class="min-w-0 flex-1"><div class="font-bold text-sm text-[#112a2e]">${n.title}${isRead?'':' <span class="ml-1 inline-block w-2 h-2 rounded-full bg-red-500 align-middle"></span>'}</div><div class="text-xs text-gray-600 mt-1">${n.text}</div><div class="text-[10px] text-gray-400 mt-1">${displayTime}</div></div></div>`;row.onclick=()=>{markNotificationRead(id);closeNotifications();if(n.action==='task')openTaskReportModal();else if(n.action==='schedule')openAdvanceScheduleApprovalModal();else if(n.action==='attendance-request')openAttendanceRequestsModal();else openOneViewModal();};list.appendChild(row);});
         }
         document.addEventListener('click',function(e){const b=document.getElementById('notificationBtn'),p=document.getElementById('notificationPanel');if(p&&!p.classList.contains('hidden')&&b&&!b.contains(e.target)&&!p.contains(e.target))closeNotifications();});
         setInterval(()=>{try{if(typeof renderNotifications==='function')renderNotifications();if(typeof fetchServerNotifications==='function'&&typeof approvalCenterRoleAllowed==='function'&&approvalCenterRoleAllowed())fetchServerNotifications();}catch(e){}},10000);
