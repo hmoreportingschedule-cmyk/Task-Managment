@@ -365,7 +365,7 @@ function parseBreakTimeClient(v){
                 statusEl.classList.remove('text-[#f59e0b]'); statusEl.classList.add('text-[#e6fcf5]');
             }
         }
-        function refreshDailyActionWidgets(){ renderSelectedAttendanceState(); renderTodayLocation(); }
+        function refreshDailyActionWidgets(){ renderSelectedAttendanceState(); renderTodayLocation(); if(typeof updateLogDailyWorkButtonState==='function')updateLogDailyWorkButtonState(); }
 
         function markAttendance(){
             if(updateAttendanceNonWorkingDay())return;
@@ -628,22 +628,52 @@ function parseBreakTimeClient(v){
             if(filterSelect && members.includes(currentFilter)) filterSelect.value = currentFilter;
         }
 
-        function populateLogTaskDropdown(tasks) {
-            const select = document.getElementById('logTaskSelect');
-            select.innerHTML = '<option value="">-- Select Active Task --</option>';
-            const todayKey = new Date().toLocaleDateString('en-GB').split('/').join('-');
-            const loggedToday = new Set(
-                (globalWorkLogs || []).filter(w => (w.WorkDate || '').toString() === todayKey)
-                    .map(w => String(w.TaskRowIndex || ''))
-            );
-            tasks.forEach(t => {
-                if(t.empStatus.toLowerCase() !== 'completed' && !loggedToday.has(String(t.rowIndex))) {
-                    select.innerHTML += `<option value="${t.rowIndex}">${t.taskName}</option>`;
-                }
-            });
-            if(select.options.length === 1) {
-                select.innerHTML = '<option value="">-- No task available for today --</option>';
+        function localDateKey(d=new Date()){ const x=new Date(d); x.setHours(12,0,0,0); return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`; }
+        function parseLocalDateKey(v){ const p=String(v||'').split('-').map(Number); return p.length===3&&!p.some(Number.isNaN)?new Date(p[0],p[1]-1,p[2],12):null; }
+        function isLogWorkNonWorkingDate(dateKey){
+            const d=parseLocalDateKey(dateKey); if(!d)return 'Invalid date';
+            const event=typeof officeEventForDate==='function'?officeEventForDate(d):null;
+            if(event)return String(event.name||'Office Closed/Holiday');
+            const names=['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+            const configured=String(window.currentUserWeekoff||v4CurrentWeekoff||'Sunday').split(/[,;/]/).map(x=>x.trim().toLowerCase()).filter(Boolean);
+            const key=String(dateKey);
+            const movedToWeekoff=(globalAdvanceScheduleRequests||[]).some(r=>String(r.status||'').toLowerCase()==='approved'&&String(r.requestType||'')==='Weekoff Adjustment'&&String(r.employee||'').trim().toLowerCase()==String(document.getElementById('displayUser')?.innerText||'').trim().toLowerCase()&&String(r.requestDate||'')===key);
+            if(movedToWeekoff)return 'Weekoff Adjustment';
+            if(configured.includes(names[d.getDay()])){
+                const hasAdjustment=(globalAdvanceScheduleRequests||[]).some(r=>String(r.status||'').toLowerCase()==='approved'&&String(r.requestType||'')==='Weekoff Adjustment'&&String(r.employee||'').trim().toLowerCase()==String(document.getElementById('displayUser')?.innerText||'').trim().toLowerCase());
+                if(!hasAdjustment)return 'Weekoff';
             }
+            const att=(globalMonthlyFullAttendance||[]).find(a=>String(a.Date||'')===String(dateKey).split('-').reverse().join('-')||String(a.Date||'')===String(dateKey));
+            if(att && String(att.Leave||'').toLowerCase().includes('leave'))return 'Leave';
+            return '';
+        }
+        function isLogWorkDateAllowed(dateKey){
+            const d=parseLocalDateKey(dateKey), today=parseLocalDateKey(localDateKey()); if(!d||!today)return false;
+            if(d>today)return false;
+            const start=attendanceEntryStart?parseLocalDateKey(String(attendanceEntryStart).slice(0,10)):null;
+            const end=attendanceEntryEnd?parseLocalDateKey(String(attendanceEntryEnd).slice(0,10)):null;
+            if(start&&end)return d>=start&&d<=end;
+            const min=new Date(today);min.setDate(min.getDate()-2);return d>=min;
+        }
+        function setLogWorkDateConstraints(){
+            const el=document.getElementById('logWorkDate'); if(!el)return;
+            const today=localDateKey(), t=parseLocalDateKey(today), start=attendanceEntryStart?String(attendanceEntryStart).slice(0,10):'';
+            const min=start||(()=>{const x=new Date(t);x.setDate(x.getDate()-2);return localDateKey(x)})();
+            el.min=min;el.max=today;if(!el.value)el.value=today;
+        }
+        function populateLogTaskDropdown(tasks, dateKey){
+            const select=document.getElementById('logTaskSelect'); if(!select)return;
+            const workDate=dateKey||document.getElementById('logWorkDate')?.value||localDateKey();
+            select.innerHTML='<option value="">-- Select Active Task --</option>';
+            const loggedForDate=new Set((globalWorkLogs||[]).filter(w=>String(w.WorkDate||'')===workDate).map(w=>String(w.TaskRowIndex||'')));
+            const d=parseLocalDateKey(workDate);
+            (tasks||[]).forEach(t=>{
+                const st=String(t.empStatus||'').toLowerCase();
+                const sd=parseReportDate(t.startDate), ed=parseReportDate(t.endDate);
+                const active=!!d&&(!sd||d>=sd)&&(!ed||d<=ed);
+                if(st!=='completed'&&active&&!loggedForDate.has(String(t.rowIndex)))select.innerHTML+=`<option value="${t.rowIndex}">${escapeHtml(t.taskName||'Task')}</option>`;
+            });
+            if(select.options.length===1)select.innerHTML='<option value="">-- No task available for selected date --</option>';
             updateCompletionCheckboxState();
         }
 
@@ -760,13 +790,15 @@ function parseBreakTimeClient(v){
                         const eBadge = task.empStatus === 'Completed'
                             ? 'text-green-600 font-bold bg-green-50 px-2 py-1 rounded'
                             : 'text-yellow-600 font-semibold bg-yellow-50 px-2 py-1 rounded';
-                        empStatusHTML = `<span class="${eBadge}">${task.empStatus === 'Completed' ? 'Completed & Locked' : 'Pending — complete via Log Daily Work'}</span>`;
+                        const employeeStatusLabel = task.empStatus === 'Completed' && String(task.completionType||'').toLowerCase()==='before' ? 'Before • Completed & Locked' : (task.empStatus === 'Completed' ? 'Completed & Locked' : 'Pending — complete via Log Daily Work');
+                        empStatusHTML = `<span class="${eBadge}">${employeeStatusLabel}</span>`;
                         let hBadge = task.hodStatus === 'Approved' ? 'bg-green-100 text-green-700' : (task.hodStatus === 'Rejected' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600');
                         hodStatusHTML = `<span class="px-3 py-1 rounded-full text-xs font-bold shadow-sm ${hBadge}">${task.hodStatus}</span>`;
                     } 
                     else if (isHOD && !isAdmin) { 
                         let eBadge = task.empStatus === 'Completed' ? 'text-green-600 font-bold bg-green-50 px-2 py-1 rounded' : 'text-yellow-600 font-semibold bg-yellow-50 px-2 py-1 rounded';
-                        empStatusHTML = `<span class="${eBadge}">${task.empStatus}</span>`;
+                        const managerStatusLabel = task.empStatus === 'Completed' && String(task.completionType||'').toLowerCase()==='before' ? 'Before • Completed' : task.empStatus;
+                        empStatusHTML = `<span class="${eBadge}">${managerStatusLabel}</span>`;
                         hodStatusHTML = `
                             <select onchange="updateTaskDB(${task.rowIndex}, 'hod', this.value, ${JSON.stringify(task.assignedTo)})" class="border border-[#7db0b1] rounded-md px-2 py-1 bg-white text-xs font-semibold text-[#2a4d53] cursor-pointer focus:ring-1 focus:ring-[#259b94]" ${hodLocked}>
                                 <option value="Pending" ${task.hodStatus === 'Pending' ? 'selected' : ''}>Pending</option>
@@ -1493,10 +1525,10 @@ function parseBreakTimeClient(v){
             const category=document.getElementById('qtCategory')?.value||'',name=getQuickTemplateTaskType(),frequency=document.getElementById('qtFrequency')?.value||'';const startDay=Number(document.getElementById('qtStartDay')?.value),endDay=Number(document.getElementById('qtEndDay')?.value),weightage=Number(document.getElementById('qtWeightage')?.value);
             if(!category){alert('Task Category select karein.');return;}if(!name){alert('Task Type select karein ya Others mein task type likhein.');return;}if(!frequency){alert('Task Frequency select karein.');return;}if(!Number.isInteger(startDay)||startDay<1||startDay>31){alert('From Date mein 1 se 31 tak day digit dein.');return;}if(!Number.isInteger(endDay)||endDay<1||endDay>31||endDay<startDay){alert('To Date mein valid day digit dein.');return;}if(!Number.isFinite(weightage)||weightage<0||weightage>100){alert('Task Weightage 0 se 100% ke beech hona chahiye.');return;}
             const btn=document.getElementById('qtSaveBtn');btn.disabled=true;btn.innerText='Saving...';const fd=new FormData();fd.append('action','saveCommonTaskTemplate');fd.append('templateId',document.getElementById('qtTemplateId')?.value||'');fd.append('taskName',name);fd.append('category',category);fd.append('description','');fd.append('priority','Normal');fd.append('weightage',String(weightage));fd.append('startDay',String(startDay));fd.append('endDay',String(endDay));fd.append('frequency',frequency);fd.append('active','true');fd.append('worksJson',JSON.stringify([{frequency,category,workName:name,weightage:100}]));fd.append('sessionToken',sessionToken);
-            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(d=>{if(d.status!=='success')throw new Error(d.message||'Template save failed');alert(d.message||'Template saved.');refreshAssignTemplateData();resetQuickTemplateForm();}).catch(e=>alert(e.message||'Template save failed.')).finally(()=>{btn.disabled=false;btn.innerText='Save Template';});
+            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(d=>{if(d.status!=='success')throw new Error(d.message||'Template save failed');alert(d.message||'Template saved.');resetQuickTemplateForm();refreshAssignTemplateData(true);}).catch(e=>alert(e.message||'Template save failed.')).finally(()=>{btn.disabled=false;btn.innerText='Save Template';});
         }
 
-        function refreshAssignTemplateData(){
+        function refreshAssignTemplateData(templatesOnly){
             const tSel=document.getElementById('assignTemplateSelect');
             const eList=document.getElementById('assignEmployeeList');
             if(tSel) tSel.innerHTML='<option value="">Loading templates...</option>';
@@ -1504,14 +1536,14 @@ function parseBreakTimeClient(v){
             const fd1=new FormData(); fd1.append('action','getCommonTaskTemplates'); fd1.append('sessionToken',sessionToken);
             const now=new Date(), ym=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0'); fd1.append('yearMonth',ym);
             const fd2=new FormData(); fd2.append('action','getCommonTaskEmployees'); fd2.append('sessionToken',sessionToken);
-            Promise.all([
-                fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd1}).then(r=>r.json()),
-                fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd2}).then(r=>r.json())
-            ]).then(([td,ed])=>{
+            const reqs=[fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd1}).then(r=>r.json())];
+            if(!templatesOnly) reqs.push(fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd2}).then(r=>r.json()));
+            Promise.all(reqs).then((results)=>{
+                const td=results[0], ed=results[1]||null;
                 if(td.status!=='success') throw new Error(td.message||'Template load failed');
-                if(ed.status!=='success') throw new Error(ed.message||'Employee load failed');
+                if(ed && ed.status!=='success') throw new Error(ed.message||'Employee load failed');
                 assignTemplateCache=td.templates||[];
-                assignEmployeeCache=(ed.employees||[]).filter(x=>x && x.active!==false && x.accountEnabled!==false);
+                if(ed) assignEmployeeCache=(ed.employees||[]).filter(x=>x && x.active!==false && x.accountEnabled!==false);
                 if(tSel){
                     tSel.innerHTML='<option value="">-- Select Task Template --</option>';
                     assignTemplateCache.filter(x=>x.active!==false).forEach(t=>{
@@ -1576,69 +1608,74 @@ function parseBreakTimeClient(v){
         }
 
         // ================= EMP LOG DAILY WORK =================
-        function openLogWorkModal() { document.getElementById('logWorkModal').style.display = 'block'; if(document.getElementById('delayReason'))document.getElementById('delayReason').value=''; updateCompletionCheckboxState(); }
+        document.addEventListener('change',function(e){
+            if(e.target?.id==='logWorkDate'){updateLogWorkDateUI();}
+            if(e.target?.id==='logTaskSelect'){updateCompletionCheckboxState();}
+            if(e.target?.id==='requestBeforeCompletion' && e.target.checked){const done=document.getElementById('markTaskCompleted');if(done)done.checked=false;}
+            if(e.target?.id==='markTaskCompleted' && e.target.checked){const before=document.getElementById('requestBeforeCompletion');if(before)before.checked=false;}
+        });
+
+        function updateLogDailyWorkButtonState(){
+            const btn=document.getElementById('logDailyWorkBtn'); if(!btn)return;
+            const key=document.getElementById('attendanceDate')?.value||localDateKey();
+            const reason=isLogWorkNonWorkingDate(key);
+            btn.disabled=!!reason; btn.classList.toggle('opacity-50',!!reason); btn.classList.toggle('cursor-not-allowed',!!reason);
+            btn.title=reason?`Log Daily Work frozen: ${reason}`:'Log Daily Work';
+        }
+        function openLogWorkModal() {
+            const modal=document.getElementById('logWorkModal'); if(!modal)return;
+            setLogWorkDateConstraints();
+            const dateEl=document.getElementById('logWorkDate');
+            const dateKey=dateEl?.value||localDateKey();
+            const nonWorking=isLogWorkNonWorkingDate(dateKey);
+            const btn=document.querySelector('button[onclick="openLogWorkModal()"]');
+            if(nonWorking){ alert(`Log Daily Work frozen: ${nonWorking}.`); if(btn)btn.disabled=true; return; }
+            if(btn)btn.disabled=false;
+            modal.style.display='block';
+            ensureWorkLogsLoaded(true).catch(()=>{}).finally(()=>{populateLogTaskDropdown(globalAllTasks,dateKey);updateCompletionCheckboxState();});
+            if(document.getElementById('delayReason'))document.getElementById('delayReason').value='';
+            const before=document.getElementById('requestBeforeCompletion'); if(before)before.checked=false;
+            const done=document.getElementById('markTaskCompleted'); if(done)done.checked=false;
+            updateBeforeCompletionUI();
+        }
+        function updateLogWorkDateUI(){
+            const el=document.getElementById('logWorkDate'); if(!el)return;
+            const key=el.value, nonWorking=isLogWorkNonWorkingDate(key), hint=document.getElementById('logWorkDateHint');
+            const modal=document.getElementById('logWorkModal');
+            if(hint)hint.textContent=nonWorking?`Log Daily Work frozen: ${nonWorking}.`:'Sirf aaj ya Attendance Entry allowed previous date select karein.';
+            if(modal&&modal.style.display!=='none'&&nonWorking){document.getElementById('logTaskSelect').innerHTML='<option value="">-- Log Daily Work Frozen --</option>';}
+            else if(!nonWorking)populateLogTaskDropdown(globalAllTasks,key);
+            updateCompletionCheckboxState(); updateLogDailyWorkButtonState();
+        }
+        function updateBeforeCompletionUI(){
+            const sel=document.getElementById('logTaskSelect'),wrap=document.getElementById('beforeCompletionWrap'),hint=document.getElementById('beforeCompletionHint'),cb=document.getElementById('requestBeforeCompletion');
+            if(!sel||!wrap)return;
+            const task=(globalAllTasks||[]).find(t=>String(t.rowIndex)===String(sel.value));
+            const d=document.getElementById('logWorkDate')?.value||localDateKey(), due=task?parseReportDate(task.endDate):null, cur=parseLocalDateKey(d);
+            const canBefore=!!task&&!!due&&!!cur&&cur<due&&String(task.empStatus||'').toLowerCase()!=='completed';
+            wrap.classList.toggle('hidden',!canBefore); if(!canBefore&&cb)cb.checked=false; if(hint)hint.classList.toggle('hidden',!canBefore);
+        }
         function updateCompletionCheckboxState(){
             const sel=document.getElementById('logTaskSelect'),cb=document.getElementById('markTaskCompleted'),wrap=document.getElementById('delayReasonWrap'),reason=document.getElementById('delayReason'); if(!sel||!cb)return;
-            const task=(globalAllTasks||[]).find(t=>String(t.rowIndex)===String(sel.value)); if(!task){cb.disabled=true;cb.checked=false;if(wrap)wrap.classList.add('hidden');if(reason)reason.value='';return;}
-            const due=parseReportDate(task.endDate),today=new Date();today.setHours(0,0,0,0);const can=!!due&&today.getTime()>=due.getTime();cb.disabled=!can;cb.title=can?'Completion can be marked today.':'Completion can be marked only on its closing date. Add request/details in the description for early completion.';if(!can)cb.checked=false;
-            const isDelayed=!!due&&today.getTime()>due.getTime()&&String(task.empStatus||'').toLowerCase()!=='completed';
-            if(wrap)wrap.classList.toggle('hidden',!isDelayed); if(!isDelayed&&reason)reason.value='';
+            const task=(globalAllTasks||[]).find(t=>String(t.rowIndex)===String(sel.value)); if(!task){cb.disabled=true;cb.checked=false;if(wrap)wrap.classList.add('hidden');if(reason)reason.value='';updateBeforeCompletionUI();return;}
+            const selectedDate=parseLocalDateKey(document.getElementById('logWorkDate')?.value||localDateKey()),due=parseReportDate(task.endDate),can=!!due&&!!selectedDate&&selectedDate.getTime()>=due.getTime();
+            cb.disabled=!can;cb.title=can?'Completion can be marked on or after the closing date.':'Before closing date use Before Completed request.';if(!can)cb.checked=false;
+            const isDelayed=!!due&&!!selectedDate&&selectedDate.getTime()>due.getTime()&&String(task.empStatus||'').toLowerCase()!=='completed';
+            if(wrap)wrap.classList.toggle('hidden',!isDelayed);if(!isDelayed&&reason)reason.value='';updateBeforeCompletionUI();
         }
         function closeLogWorkModal() { document.getElementById('logWorkModal').style.display = 'none'; }
-        
         function submitWorkLog() {
-            const taskSel = document.getElementById('logTaskSelect');
-            const tIdx = taskSel.value;
-            const tName = taskSel.options[taskSel.selectedIndex].text;
-            const mins = document.getElementById('logTimeMins').value;
-            const desc = document.getElementById('logDesc').value;
-            const username = document.getElementById('displayUser').innerText;
-
-            if(!tIdx || !mins) { alert("Please select task and enter time!"); return; }
-
-            document.getElementById('saveLogBtn').innerText = "Saving...";
-            document.getElementById('saveLogBtn').disabled = true;
-
-            const formData = new FormData();
-            formData.append('action', 'logWork');
-            formData.append('username', username);
-            formData.append('rowIndex', tIdx); 
-            formData.append('taskName', tName);
-            formData.append('timeSpent', mins);
-            formData.append('description', desc);
-            formData.append('delayReason', document.getElementById('delayReason')?.value.trim() || '');
-            formData.append('markCompleted', document.getElementById('markTaskCompleted').checked ? 'true' : 'false');
-            formData.append('sessionToken', sessionToken);
-
-            fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: formData })
-            .then(res => res.json())
-            .then(data => {
-                alert(data.message || 'Work log processed.');
-                if(data.status === 'success') {
-                    document.getElementById('saveLogBtn').innerText = "Save Log";
-                    document.getElementById('saveLogBtn').disabled = false;
-                    document.getElementById('logTimeMins').value = '';
-                    document.getElementById('logDesc').value = '';
-                    if(document.getElementById('delayReason')) document.getElementById('delayReason').value = '';
-                    if(document.getElementById('delayReasonWrap')) document.getElementById('delayReasonWrap').classList.add('hidden');
-                    document.getElementById('markTaskCompleted').checked = false;
-                    closeLogWorkModal();
-                    fetchDashboardDataSilently();
-                } else {
-                    document.getElementById('saveLogBtn').innerText = "Save Log";
-                    document.getElementById('saveLogBtn').disabled = false;
-                }
-            }).catch(e => {
-                alert("Unable to save work log. Please try again.");
-                document.getElementById('saveLogBtn').innerText = "Save Log";
-                document.getElementById('saveLogBtn').disabled = false;
-            });
-        }
-
-        function saveRamadanLunchControl(){
-            const cb=document.getElementById('ramadanLunchFreeze'); if(!cb||!isFullAdminRole(String(document.getElementById('displayRole')?.innerText||'').toLowerCase())) return;
-            const fd=new FormData(); fd.append('action','setRamadanLunchControl'); fd.append('frozen',cb.checked?'ON':'OFF'); fd.append('sessionToken',sessionToken);
-            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(d=>{if(d.status!=='success'){alert(d.message||'Ramadan Lunch setting save nahi hui.');cb.checked=ramadanLunchFrozen;return;}ramadanLunchFrozen=!!d.ramadanLunchFrozen;updateAttendanceReasonUI();alert(d.message||'Ramadan Lunch setting saved.');}).catch(()=>{cb.checked=ramadanLunchFrozen;alert('Ramadan Lunch setting save nahi hui.');});
+            const taskSel=document.getElementById('logTaskSelect'), tIdx=taskSel.value, tName=taskSel.options[taskSel.selectedIndex]?.text||'', mins=document.getElementById('logTimeMins').value, desc=document.getElementById('logDesc').value, workDate=document.getElementById('logWorkDate')?.value||localDateKey(), username=document.getElementById('displayUser').innerText;
+            const nonWorking=isLogWorkNonWorkingDate(workDate);
+            if(!isLogWorkDateAllowed(workDate)){alert('Is date par Log Daily Work allowed nahi hai.');return;}
+            if(nonWorking){alert(`Log Daily Work frozen: ${nonWorking}.`);return;}
+            if(!tIdx||!mins){alert('Please select task and enter time!');return;}
+            const before=!!document.getElementById('requestBeforeCompletion')?.checked;
+            const done=!!document.getElementById('markTaskCompleted')?.checked;
+            if(before&&done){alert('Before Completed aur Mark Completed ek saath select nahi kar sakte.');return;}
+            const btn=document.getElementById('saveLogBtn');btn.innerText='Saving...';btn.disabled=true;
+            const formData=new FormData();formData.append('action','logWork');formData.append('username',username);formData.append('rowIndex',tIdx);formData.append('taskName',tName);formData.append('timeSpent',mins);formData.append('description',desc);formData.append('workDate',workDate);formData.append('delayReason',document.getElementById('delayReason')?.value.trim()||'');formData.append('markCompleted',done?'true':'false');formData.append('beforeCompletion',before?'true':'false');formData.append('sessionToken',sessionToken);
+            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:formData}).then(res=>res.json()).then(data=>{alert(data.message||'Work log processed.');if(data.status==='success'){btn.innerText='Save Log';btn.disabled=false;document.getElementById('logTimeMins').value='';document.getElementById('logDesc').value='';if(document.getElementById('delayReason'))document.getElementById('delayReason').value='';if(document.getElementById('delayReasonWrap'))document.getElementById('delayReasonWrap').classList.add('hidden');document.getElementById('markTaskCompleted').checked=false;if(document.getElementById('requestBeforeCompletion'))document.getElementById('requestBeforeCompletion').checked=false;closeLogWorkModal();fetchDashboardDataSilently();}else{btn.innerText='Save Log';btn.disabled=false;}}).catch(e=>{alert('Unable to save work log. Please try again.');btn.innerText='Save Log';btn.disabled=false;});
         }
 
         // ================= COMPREHENSIVE MONTHLY GRADE =================

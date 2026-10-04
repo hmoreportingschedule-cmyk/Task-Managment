@@ -405,7 +405,7 @@
                     </div>
                     <button id="attendanceBtn" onclick="markAttendance()" class="w-full bg-[#259b94] hover:bg-[#1f827c] text-white font-bold text-sm py-2 rounded-lg shadow-md transition mt-3">Submit Record</button>
                 </div>
-                <button onclick="openLogWorkModal()" class="w-full bg-[#f59e0b] hover:bg-[#d97706] text-white font-bold text-sm py-3 rounded-lg shadow-md transition mb-4">
+                <button id="logDailyWorkBtn" onclick="openLogWorkModal()" class="w-full bg-[#f59e0b] hover:bg-[#d97706] text-white font-bold text-sm py-3 rounded-lg shadow-md transition mb-4">
                     <i class="fas fa-edit"></i> Log Daily Work
                 </button>
                 <button onclick="openAdvanceScheduleModal()" class="w-full bg-[#2a4d53] hover:bg-[#112a2e] text-white font-bold text-sm py-3 rounded-lg shadow-md transition mb-4">
@@ -672,6 +672,11 @@
             <p class="text-sm text-gray-500 mb-6">Enter how much time you spent on a task today.</p>
             <div class="space-y-4">
                 <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Select Date:</label>
+                    <input type="date" id="logWorkDate" class="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-[#259b94] focus:outline-none transition" required>
+                    <p id="logWorkDateHint" class="text-xs text-gray-500 mt-1">Sirf aaj ya woh previous dates select karein jahan Attendance Entry allowed hai.</p>
+                </div>
+                <div>
                     <label class="block text-sm font-semibold text-gray-700 mb-1">Select Task:</label>
                     <select id="logTaskSelect" class="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-[#259b94] focus:outline-none transition" required></select>
                 </div>
@@ -692,6 +697,11 @@
                     <input type="checkbox" id="markTaskCompleted" class="w-4 h-4 accent-orange-500">
                     <span class="text-sm font-semibold text-gray-700">Mark this task as Completed</span>
                 </label>
+                <label id="beforeCompletionWrap" class="flex items-center gap-3 p-3 rounded-lg bg-amber-50 border border-amber-200 cursor-pointer shadow-sm">
+                    <input type="checkbox" id="requestBeforeCompletion" class="w-4 h-4 accent-amber-500">
+                    <span class="text-sm font-semibold text-amber-800">Before Completed — Approval Required</span>
+                </label>
+                <p id="beforeCompletionHint" class="text-xs text-amber-700 hidden">Approval ke baad task close hoga aur status mein <b>Before</b> show hoga. Reject hone par task Pending rahega.</p>
                 <button id="saveLogBtn" onclick="submitWorkLog()" class="w-full bg-[#f59e0b] hover:bg-[#d97706] text-white font-bold py-3 rounded-lg mt-2 transition shadow-lg">Save Log</button>
             </div>
         </div>
