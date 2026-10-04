@@ -411,7 +411,7 @@ function parseBreakTimeClient(v){
                 if(document.getElementById('lunchBreakStartTime')) document.getElementById('lunchBreakStartTime').value = '';
                 if(document.getElementById('lunchBreakEndTime')) document.getElementById('lunchBreakEndTime').value = '';
                 clearPendingBreakAction();
-                document.getElementById('namazReasonBox').classList.add('hidden');
+                document.getElementById('namazReasonBox')?.classList.add('hidden');
                 if(document.getElementById('extraBreakReason')) document.getElementById('extraBreakReason').value='';
                 document.getElementById('extraBreakReasonBox')?.classList.add('hidden');
                 

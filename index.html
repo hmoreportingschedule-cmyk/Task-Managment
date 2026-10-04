@@ -244,6 +244,23 @@
 .employee-monthly-grade-card .grade-percent{color:#000000!important;}
 .employee-monthly-grade-card .mt-2{color:#000000!important;}
 </style>
+
+<style id="v48-9-daily-actions-polish">
+/* V48.9: Employee sidebar 1.5-inch wider on desktop without changing mobile width. */
+@media (min-width:768px){
+  #dashboard-section > div:first-child{width:25rem!important;flex:0 0 25rem!important;}
+  #dashboard-section > .flex-1{min-width:0;}
+}
+/* V48.9: Native calendar/time picker icons must remain white. */
+#attendanceFormBox input[type="date"]::-webkit-calendar-picker-indicator,
+#attendanceFormBox input[type="time"]::-webkit-calendar-picker-indicator{
+  filter:brightness(0) invert(1)!important;
+  opacity:1!important;
+  cursor:pointer;
+}
+#attendanceFormBox input[type="date"],
+#attendanceFormBox input[type="time"]{color-scheme:dark!important;}
+</style>
 </head>
 <body class="h-screen w-full text-gray-800 overflow-hidden">
     <!-- LOGIN PAGE -->
