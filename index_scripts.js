@@ -327,96 +327,23 @@ function parseBreakTimeClient(v){
             } else { wrap.classList.add('hidden'); sel.innerHTML='<option value="">-- Select Reason --</option>'; sel.value=''; sel.disabled=false; ta.value=''; ta.classList.add('hidden'); }
         }
 
-        function markAttendance() {
+        function markAttendance(){
             if(updateAttendanceNonWorkingDay())return;
-            const action = pendingBreakAction || document.getElementById('attendanceAction').value;
-            const reasonType = pendingBreakReason || document.getElementById('actionReasonSelect').value;
-            let reason = reasonType;
-            if(action==='Break Start' || action==='Break End') {
-                if(reasonType==='Lunch' && ramadanLunchFrozen){ alert('Ramadan mein Lunch option Admin ne freeze kiya hua hai.'); return; }
-                if(reasonType === 'Namaz') {
-                    const namaz = getSelectedNamazType();
-                    if(!namaz){ alert(isFridaySelected() ? 'Please select Juma.' : 'Please select Zohar.'); return; }
-                    reason = 'Namaz - ' + namaz;
-                }
-                if(!reason){ alert('Break Type select karein.'); return; }
-            }
-            
-            let rawManualTime = document.getElementById('manualTime').value;
-            if(action==='Break Start' || action==='Break End'){
-                const source=reasonType==='Namaz' ? (action==='Break Start'?'namazBreakStartTime':'namazBreakEndTime') : reasonType==='Lunch' ? (action==='Break Start'?'lunchBreakStartTime':'lunchBreakEndTime') : '';
-                const selectedBreakTime=source ? (document.getElementById(source)?.value||'') : '';
-                if(selectedBreakTime){ rawManualTime=selectedBreakTime; document.getElementById('manualTime').value=selectedBreakTime; }
-            }
-            const selectedDate = document.getElementById('attendanceDate').value;
-            const username = document.getElementById('displayUser').innerText;
-            const btn = document.getElementById('attendanceBtn');
-            
-            if(!selectedDate) { alert("Select a date!"); return; }
-            v4UpdateAttendanceAvailability();if(btn.disabled)return;
-            if(['Punch In', 'Punch Out', 'Break Start', 'Break End'].includes(action) && !rawManualTime) {
-                alert("Select Time manually!"); return;
-            }
-
-            if (action === 'Punch Out' && selectedDate === (()=>{const d=new Date();const tz=d.getTimezoneOffset()*60000;return new Date(d-tz).toISOString().split('T')[0]})()) {
-                const shiftStr = document.getElementById('displayOfficeTime').innerText;
-                const parts = shiftStr.toLowerCase().split('to');
-                if (parts.length > 1) {
-                    const endTimeStr = parts[1].trim();
-                    const endMins = timeToMins(endTimeStr);
-                    const now = new Date();
-                    const currentMins = now.getHours() * 60 + now.getMinutes();
-
-                    // Compare actual current time, never the manually entered time.
-                    if (endMins >= 0 && currentMins < endMins) {
-                        const now12 = formatTime12h(String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0'));
-                        alert(`Closing time is ${endTimeStr.toUpperCase()}. Punch Out is not allowed before closing time. Current time is ${now12}.`);
-                        return;
-                    }
-                }
-            }
-
-            const manualTime12h = formatTime12h(rawManualTime);
-
-            btn.innerText = "Saving..."; btn.disabled = true;
-            const formData = new FormData();
-            formData.append('action', 'attendance');
-            formData.append('username', username);
-            formData.append('attAction', action);
-            formData.append('reason', reason);
-            formData.append('manualTime', manualTime12h);
-            formData.append('selectedDate', selectedDate);
-            formData.append('timingReasonType', document.getElementById('attendanceTimingReasonSelect')?.value || '');
-            formData.append('timingReason', document.getElementById('attendanceTimingReason')?.value.trim() || '');
-            formData.append('extraBreakReason', document.getElementById('extraBreakReason')?.value.trim() || '');
-            formData.append('sessionToken', sessionToken);
-
-            fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: formData })
-            .then(res => res.json())
-            .then(data => {
-                if(data.status === 'error') {
-                    alert(data.message);
-                    btn.innerText = "Submit Record"; btn.disabled = false;
-                    return;
-                }
-                alert(data.message);
-                btn.innerText = "Submit Record"; btn.disabled = false;
-                
-                document.getElementById('actionReasonSelect').value = '';
-                if(document.getElementById('namazZoharSelect')) document.getElementById('namazZoharSelect').value = '';
-                if(document.getElementById('jumaReasonSelect')) document.getElementById('jumaReasonSelect').value = '';
-                if(document.getElementById('namazTypeSelect')) document.getElementById('namazTypeSelect').value = '';
-                if(document.getElementById('namazBreakStartTime')) document.getElementById('namazBreakStartTime').value = '';
-                if(document.getElementById('namazBreakEndTime')) document.getElementById('namazBreakEndTime').value = '';
-                if(document.getElementById('lunchBreakStartTime')) document.getElementById('lunchBreakStartTime').value = '';
-                if(document.getElementById('lunchBreakEndTime')) document.getElementById('lunchBreakEndTime').value = '';
-                clearPendingBreakAction();
-                document.getElementById('namazReasonBox')?.classList.add('hidden');
-                if(document.getElementById('extraBreakReason')) document.getElementById('extraBreakReason').value='';
-                document.getElementById('extraBreakReasonBox')?.classList.add('hidden');
-                
-                fetchDashboardDataSilently();
-            }).catch(err => { alert("Saved!"); btn.innerText = "Submit Record"; btn.disabled = false; });
+            const selectedDate=document.getElementById('attendanceDate')?.value||'', action=document.getElementById('attendanceAction')?.value||'Punch In', manual=document.getElementById('manualTime')?.value||'';
+            const btn=document.getElementById('attendanceBtn'); if(!selectedDate){alert('Select a date!');return;} v4UpdateAttendanceAvailability();if(btn.disabled)return;
+            const inTime=action==='Punch In'?manual:'',outTime=action==='Punch Out'?manual:'';
+            const namazType=getSelectedNamazType(),namazStart=document.getElementById('namazBreakStartTime')?.value||'',namazEnd=document.getElementById('namazBreakEndTime')?.value||'',lunchStart=document.getElementById('lunchBreakStartTime')?.value||'',lunchEnd=document.getElementById('lunchBreakEndTime')?.value||'';
+            if(namazStart||namazEnd){if(!namazType){alert('Pehle Namaz select karein.');return;}}
+            if(!inTime&&!outTime&&!namazStart&&!namazEnd&&!lunchStart&&!lunchEnd){alert('Attendance ya Break ka time enter karein.');return;}
+            if((inTime||outTime)&&!manual){alert('Select Time manually!');return;}
+            const timingReason=document.getElementById('attendanceTimingReason')?.value.trim()||'';
+            const timingReasonType=document.getElementById('attendanceTimingReasonSelect')?.value||'';
+            if(inTime)updateAttendanceTimingReasonUI(); if(outTime)updateAttendanceTimingReasonUI();
+            const fd=new FormData();fd.append('action','saveDailyActions');fd.append('selectedDate',selectedDate);fd.append('inTime',inTime?formatTime12h(inTime):'');fd.append('outTime',outTime?formatTime12h(outTime):'');fd.append('inDelayReason',inTime?timingReason:'');fd.append('outBeforeReason',outTime?timingReason:'');fd.append('namazType',namazType);fd.append('namazStart',namazStart?formatTime12h(namazStart):'');fd.append('namazEnd',namazEnd?formatTime12h(namazEnd):'');fd.append('lunchStart',lunchStart?formatTime12h(lunchStart):'');fd.append('lunchEnd',lunchEnd?formatTime12h(lunchEnd):'');fd.append('extraBreakReason',document.getElementById('extraBreakReason')?.value.trim()||'');fd.append('sessionToken',sessionToken);
+            // Client-side punch-out restriction for today's shift.
+            if(action==='Punch Out'&&selectedDate===(()=>{const d=new Date(),tz=d.getTimezoneOffset()*60000;return new Date(d-tz).toISOString().split('T')[0]})()){const shift=document.getElementById('displayOfficeTime')?.innerText||'',parts=shift.toLowerCase().split('to');if(parts.length>1){const endM=timeToMins(parts[1].trim()),now=new Date(),cur=now.getHours()*60+now.getMinutes();if(endM>=0&&cur<endM){alert(`Closing time is ${parts[1].trim().toUpperCase()}. Punch Out is not allowed before closing time.`);return;}}}
+            btn.innerText='Saving...';btn.disabled=true;
+            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(d=>{if(d.status==='error')throw new Error(d.message||'Daily Actions save failed.');alert(d.message||'Daily Actions saved.');['namazTypeSelect','namazBreakStartTime','namazBreakEndTime','lunchBreakStartTime','lunchBreakEndTime','manualTime','extraBreakReason'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});const _tr=document.getElementById('attendanceTimingReason');if(_tr)_tr.value='';document.getElementById('attendanceTimingReasonBox')?.classList.add('hidden');clearPendingBreakAction();fetchDashboardDataSilently();}).catch(e=>alert(e.message||'Daily Actions save failed.')).finally(()=>{btn.innerText='Submit Record';btn.disabled=false;updateBreakTypeOptions();});
         }
 
         // ================= TODAY SHIFT TRACKER =================
@@ -641,22 +568,22 @@ function parseBreakTimeClient(v){
             const emailEmpSelect = document.getElementById('emailEmpSelect');
             const whatsappEmpSelect = document.getElementById('whatsappEmpSelect');
             
-            let currentFilter = filterSelect.value;
+            let currentFilter = filterSelect ? filterSelect.value : 'All';
 
-            assignSelect.innerHTML = '';
-            filterSelect.innerHTML = '<option value="All">All Employees</option>';
-            emailEmpSelect.innerHTML = '';
+            if(assignSelect) assignSelect.innerHTML = '';
+            if(filterSelect) filterSelect.innerHTML = '<option value="All">All Employees</option>';
+            if(emailEmpSelect) emailEmpSelect.innerHTML = '';
             if(whatsappEmpSelect) whatsappEmpSelect.innerHTML = '';
             
             members=(members||[]).filter(m=>{const v=(typeof m==='string'?m:(m&&m.username)||''); return !!v;});
             members.forEach(m => { const mv=(typeof m==='string'?m:(m.username||'')); const md=(typeof m==='string'?m:(m.displayName||m.username||''));
-                assignSelect.innerHTML += `<option value="${escapeHtml(mv)}">${escapeHtml(md)}</option>`;
-                filterSelect.innerHTML += `<option value="${m}">${m}</option>`;
-                emailEmpSelect.innerHTML += `<option value="${m}">${m}</option>`;
+                if(assignSelect) assignSelect.innerHTML += `<option value="${escapeHtml(mv)}">${escapeHtml(md)}</option>`;
+                if(filterSelect) filterSelect.innerHTML += `<option value="${m}">${m}</option>`;
+                if(emailEmpSelect) emailEmpSelect.innerHTML += `<option value="${m}">${m}</option>`;
                 if(whatsappEmpSelect) whatsappEmpSelect.innerHTML += `<option value="${m}">${m}</option>`;
             });
 
-            if(members.includes(currentFilter)) filterSelect.value = currentFilter;
+            if(filterSelect && members.includes(currentFilter)) filterSelect.value = currentFilter;
         }
 
         function populateLogTaskDropdown(tasks) {
@@ -1442,88 +1369,47 @@ function parseBreakTimeClient(v){
 
         function openAssignTaskModal() {
             document.getElementById('assignTaskModal').style.display = 'block';
-            document.getElementById('taskWorksBuilder').innerHTML='';
-            addTaskWorkRow();
-            const role=String(document.getElementById('displayRole').innerText||'').toLowerCase();
-            const sel=document.getElementById('newTaskAssignedBy');
-            sel.innerHTML='<option value="">-- Select --</option>';
-            if(isFullAdminRole(role)){
-                const fd=new FormData(); fd.append('action','adminListUsers'); fd.append('sessionToken',sessionToken);
-                fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(data=>{
-                    (data.hods||[]).forEach(n=>sel.innerHTML+=`<option value="${n}">${n}</option>`);
-                    sel.value=document.getElementById('displayUser').innerText||'';
-                }).catch(()=>{});
-            } else {
-                sel.innerHTML=`<option value="${document.getElementById('displayUser').innerText}">${document.getElementById('displayUser').innerText} (Self)</option>`;
-                sel.value=document.getElementById('displayUser').innerText;
-            }
+            clearAssignEmployees();
+            const details=document.getElementById('selectedTemplateDetails'); if(details)details.innerHTML='Template select karein. Date, frequency aur weightage template se automatically aayega.';
             refreshAssignTemplateData();
         }
 
         const QUICK_TEMPLATE_TYPES = {
             'Follow-up': ['HOD-Hind Musahwarat','Telethon/Ramzan Donation','Monthly Report','Weekly Risala Report','Others'],
             'File-Work': ['Monthly Report Errors Check & Solve','HOD-Hind Musahwarat','Telethon/Ramzan Donation','Monthly Report Analise','Weekly Risala Report','Others'],
-            'Meeting': ['Online','Physical'],
-            'Outdoor': ['3 Days Qafila','Tarbiyati Ijtima','Journey']
+            'Meeting': ['Online','Physical'], 'Outdoor': ['3 Days Qafila','Tarbiyati Ijtima','Journey']
         };
+        function resetQuickTemplateForm(){
+            ['qtTemplateId','qtCategory','qtFrequency','qtStartDay','qtEndDay'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+            const w=document.getElementById('qtWeightage');if(w)w.value='10';
+            const type=document.getElementById('qtName'),other=document.getElementById('qtOtherType');
+            if(type){type.innerHTML='<option value="">-- Select Task Type --</option>';type.disabled=true;} if(other){other.value='';other.classList.add('hidden');}
+            const btn=document.getElementById('qtSaveBtn');if(btn){btn.innerText='Save Template';btn.dataset.mode='create';}
+        }
         function openQuickTemplateModal(){
-            const role=String(document.getElementById('displayRole')?.innerText||'').toLowerCase();
-            if(!isFullAdminRole(role)){ alert('Task Template add karne ka access sirf Admin ko hai.'); return; }
-            const cat=document.getElementById('qtCategory'), type=document.getElementById('qtName'), freq=document.getElementById('qtFrequency'), other=document.getElementById('qtOtherType');
-            if(cat)cat.value=''; if(type){type.innerHTML='<option value="">-- Select Task Type --</option>';type.disabled=true;}
-            if(freq)freq.value=''; if(other){other.value='';other.classList.add('hidden');}
-            document.getElementById('quickTemplateModal').style.display='block';
+            const role=String(document.getElementById('displayRole')?.innerText||'').toLowerCase(); if(!isFullAdminRole(role)){alert('Task Template add karne ka access sirf Admin ko hai.');return;}
+            resetQuickTemplateForm();document.getElementById('quickTemplateModal').style.display='block';setTimeout(renderQuickTemplateList,50);
         }
-        function closeQuickTemplateModal(){ const m=document.getElementById('quickTemplateModal'); if(m)m.style.display='none'; }
-        function updateQuickTemplateTaskTypes(){
-            const cat=document.getElementById('qtCategory'), type=document.getElementById('qtName'), other=document.getElementById('qtOtherType');
-            if(!cat||!type)return;
-            const list=QUICK_TEMPLATE_TYPES[cat.value]||[];
-            type.innerHTML='<option value="">-- Select Task Type --</option>'+list.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
-            type.disabled=!list.length;
-            if(other){other.value='';other.classList.add('hidden');}
+        function closeQuickTemplateModal(){const m=document.getElementById('quickTemplateModal');if(m)m.style.display='none';}
+        function updateQuickTemplateTaskTypes(){const cat=document.getElementById('qtCategory'),type=document.getElementById('qtName'),other=document.getElementById('qtOtherType');if(!cat||!type)return;const list=QUICK_TEMPLATE_TYPES[cat.value]||[];type.innerHTML='<option value="">-- Select Task Type --</option>'+list.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');type.disabled=!list.length;if(other){other.value='';other.classList.add('hidden');}}
+        function handleQuickTemplateOtherType(){const type=document.getElementById('qtName'),other=document.getElementById('qtOtherType');if(!type||!other)return;const isOther=type.value==='Others';other.classList.toggle('hidden',!isOther);if(!isOther)other.value='';}
+        function getQuickTemplateTaskType(){const type=document.getElementById('qtName')?.value||'',other=document.getElementById('qtOtherType')?.value.trim()||'';return type==='Others'?other:type;}
+        function editQuickTaskTemplate(t){
+            document.getElementById('qtTemplateId').value=t.templateId||'';const cat=document.getElementById('qtCategory'),type=document.getElementById('qtName');cat.value=t.category||'';updateQuickTemplateTaskTypes();
+            const known=(QUICK_TEMPLATE_TYPES[t.category]||[]).includes(t.taskName||'');if(known){type.value=t.taskName||'';document.getElementById('qtOtherType').value='';}else{type.value='Others';document.getElementById('qtOtherType').value=t.taskName||'';}handleQuickTemplateOtherType();
+            document.getElementById('qtFrequency').value=t.repeat||'Monthly';document.getElementById('qtStartDay').value=Number(t.startDay)||1;document.getElementById('qtEndDay').value=Number(t.endDay)||31;document.getElementById('qtWeightage').value=Number(t.weightage)||10;
+            const btn=document.getElementById('qtSaveBtn');btn.innerText='Update Template';btn.dataset.mode='edit';document.getElementById('quickTemplateModal').style.display='block';
         }
-        function handleQuickTemplateOtherType(){
-            const type=document.getElementById('qtName'), other=document.getElementById('qtOtherType');
-            if(!type||!other)return;
-            const isOther=type.value==='Others';
-            other.classList.toggle('hidden',!isOther);
-            if(!isOther)other.value='';
-        }
-        function getQuickTemplateTaskType(){
-            const type=document.getElementById('qtName')?.value||'', other=document.getElementById('qtOtherType')?.value.trim()||'';
-            return type==='Others'?other:type;
+        function deleteQuickTaskTemplate(id,name){if(!id)return;if(!confirm(`Template "${name||id}" delete karna hai? Existing assigned tasks delete nahi honge.`))return;const fd=new FormData();fd.append('action','deleteCommonTaskTemplate');fd.append('templateId',id);fd.append('sessionToken',sessionToken);fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(d=>{if(d.status!=='success')throw new Error(d.message||'Delete failed');alert(d.message||'Template deleted.');refreshAssignTemplateData();renderQuickTemplateList();}).catch(e=>alert(e.message||'Template delete failed.'));}
+        function renderQuickTemplateList(){const box=document.getElementById('quickTemplateList');if(!box)return;const list=(assignTemplateCache||[]).filter(t=>t.active!==false);if(!list.length){box.innerHTML='<div class="text-sm text-gray-500 p-3 border rounded-lg">No task templates found.</div>';return;}box.innerHTML=list.map(t=>`<div class="border border-gray-200 rounded-lg p-3 bg-gray-50"><div class="flex items-start justify-between gap-3"><div class="min-w-0"><b class="text-sm text-[#112a2e]">${escapeHtml(t.taskName||'Task')}</b><div class="text-xs text-gray-500 mt-1">Category: ${escapeHtml(t.category||'-')} • Frequency: ${escapeHtml(t.repeat||'Monthly')}</div><div class="text-xs text-gray-500">Date: ${Number(t.startDay)||1} to ${Number(t.endDay)||31} • Weightage: ${Number(t.weightage)||0}%</div></div><div class="flex gap-1 shrink-0"><button type="button" data-tpl-edit="${escapeHtml(t.templateId||'')}" class="px-2 py-1 rounded bg-blue-50 text-blue-700 text-xs font-bold">Edit</button><button type="button" data-tpl-delete="${escapeHtml(t.templateId||'')}" class="px-2 py-1 rounded bg-red-50 text-red-700 text-xs font-bold">Delete</button></div></div></div>`).join('');
+            box.querySelectorAll('[data-tpl-edit]').forEach(b=>b.onclick=()=>{const t=(assignTemplateCache||[]).find(x=>String(x.templateId)===String(b.dataset.tplEdit));if(t)editQuickTaskTemplate(t);});
+            box.querySelectorAll('[data-tpl-delete]').forEach(b=>b.onclick=()=>{const t=(assignTemplateCache||[]).find(x=>String(x.templateId)===String(b.dataset.tplDelete));if(t)deleteQuickTaskTemplate(t.templateId,t.taskName);});
         }
         function saveQuickTaskTemplate(){
-            const category=document.getElementById('qtCategory')?.value||'';
-            const name=getQuickTemplateTaskType();
-            const frequency=document.getElementById('qtFrequency')?.value||'';
-            if(!category){alert('Task Category select karein.');return;}
-            if(!name){alert('Task Type select karein ya Others mein task type likhein.');return;}
-            if(!frequency){alert('Task Frequency select karein.');return;}
-            const btn=document.getElementById('qtSaveBtn');btn.disabled=true;btn.innerText='Saving...';
-            const work={frequency:frequency,category:category,workName:name,weightage:100};
-            const fd=new FormData();
-            fd.append('action','saveCommonTaskTemplate');
-            fd.append('taskName',name);
-            fd.append('category',category);
-            fd.append('description','');
-            fd.append('priority','Normal');
-            fd.append('weightage','10');
-            fd.append('startDay','1');
-            fd.append('endDay','31');
-            fd.append('frequency',frequency);
-            fd.append('active','true');
-            fd.append('worksJson',JSON.stringify([work]));
-            fd.append('sessionToken',sessionToken);
-            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(d=>{
-                if(d.status!=='success')throw new Error(d.message||'Template save failed');
-                alert('Task Template save ho gaya.');
-                closeQuickTemplateModal();
-                refreshAssignTemplateData();
-                const sel=document.getElementById('assignTemplateSelect');
-                if(sel&&d.templateId){sel.value=d.templateId;applyAssignTemplate();}
-            }).catch(e=>alert(e.message||'Template save failed.')).finally(()=>{btn.disabled=false;btn.innerText='Save Template';});
+            const category=document.getElementById('qtCategory')?.value||'',name=getQuickTemplateTaskType(),frequency=document.getElementById('qtFrequency')?.value||'';const startDay=Number(document.getElementById('qtStartDay')?.value),endDay=Number(document.getElementById('qtEndDay')?.value),weightage=Number(document.getElementById('qtWeightage')?.value);
+            if(!category){alert('Task Category select karein.');return;}if(!name){alert('Task Type select karein ya Others mein task type likhein.');return;}if(!frequency){alert('Task Frequency select karein.');return;}if(!Number.isInteger(startDay)||startDay<1||startDay>31){alert('From Date mein 1 se 31 tak day digit dein.');return;}if(!Number.isInteger(endDay)||endDay<1||endDay>31||endDay<startDay){alert('To Date mein valid day digit dein.');return;}if(!Number.isFinite(weightage)||weightage<0||weightage>100){alert('Task Weightage 0 se 100% ke beech hona chahiye.');return;}
+            const btn=document.getElementById('qtSaveBtn');btn.disabled=true;btn.innerText='Saving...';const fd=new FormData();fd.append('action','saveCommonTaskTemplate');fd.append('templateId',document.getElementById('qtTemplateId')?.value||'');fd.append('taskName',name);fd.append('category',category);fd.append('description','');fd.append('priority','Normal');fd.append('weightage',String(weightage));fd.append('startDay',String(startDay));fd.append('endDay',String(endDay));fd.append('frequency',frequency);fd.append('active','true');fd.append('worksJson',JSON.stringify([{frequency,category,workName:name,weightage:100}]));fd.append('sessionToken',sessionToken);
+            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(d=>{if(d.status!=='success')throw new Error(d.message||'Template save failed');alert(d.message||'Template saved.');refreshAssignTemplateData();resetQuickTemplateForm();}).catch(e=>alert(e.message||'Template save failed.')).finally(()=>{btn.disabled=false;btn.innerText='Save Template';});
         }
 
         function refreshAssignTemplateData(){
@@ -1549,6 +1435,7 @@ function parseBreakTimeClient(v){
                     });
                 }
                 renderAssignEmployees();
+                renderQuickTemplateList();
             }).catch(err=>{
                 if(tSel)tSel.innerHTML='<option value="">-- Select Task Template --</option>';
                 if(eList)eList.innerHTML='<div class="text-sm text-red-500 p-2">Employee/Template list load nahi ho saki. Refresh karein.</div>';
@@ -1574,19 +1461,10 @@ function parseBreakTimeClient(v){
         function updateAssignEmployeeCount(){ const n=getSelectedAssignEmployees().length; const el=document.getElementById('assignEmployeeCount'); if(el)el.textContent=n+' employee'+(n===1?'':'s')+' selected'; }
 
         function applyAssignTemplate(){
-            const id=document.getElementById('assignTemplateSelect').value;
-            const t=assignTemplateCache.find(x=>String(x.templateId)===String(id));
-            if(!t)return;
-            document.getElementById('newTaskName').value=t.taskName||'';
-            document.getElementById('newTaskWeightage').value=t.weightage||10;
-            document.getElementById('newTaskPriority').value=t.priority||'Normal';
-            document.getElementById('newTaskFreq').value=t.repeat||'Monthly';
-            document.getElementById('newTaskStart').value=t.scheduleStart||'';
-            document.getElementById('newTaskEnd').value=t.scheduleEnd||'';
-            const desc=document.getElementById('newTaskDescription'); if(desc)desc.value=t.description||'';
-            document.getElementById('taskWorksBuilder').innerHTML='';
-            (t.works||[]).forEach(w=>addTaskWorkRow({category:w.category,work:w.work,weightage:w.weightage}));
-            if(!(t.works||[]).length)addTaskWorkRow();
+            const id=document.getElementById('assignTemplateSelect').value,t=(assignTemplateCache||[]).find(x=>String(x.templateId)===String(id)),details=document.getElementById('selectedTemplateDetails');
+            if(!t){if(details)details.innerHTML='Template select karein. Date, frequency aur weightage template se automatically aayega.';return;}
+            const now=new Date(),y=now.getFullYear(),m=now.getMonth(),last=new Date(y,m+1,0).getDate(),sd=Math.min(Number(t.startDay)||1,last),ed=Math.min(Number(t.endDay)||sd,last);const start=`${y}-${String(m+1).padStart(2,'0')}-${String(sd).padStart(2,'0')}`,end=`${y}-${String(m+1).padStart(2,'0')}-${String(ed).padStart(2,'0')}`;
+            if(details)details.innerHTML=`<div class="grid grid-cols-2 md:grid-cols-4 gap-2"><div><b>Task Type</b><br>${escapeHtml(t.taskName||'-')}</div><div><b>Category</b><br>${escapeHtml(t.category||'-')}</div><div><b>Frequency</b><br>${escapeHtml(t.repeat||'-')}</div><div><b>Weightage</b><br>${Number(t.weightage)||0}%</div></div><div class="mt-2 font-semibold">Date: ${start} to ${end}</div>`;
         }
 
         function closeAssignTaskModal() { document.getElementById('assignTaskModal').style.display = 'none'; }
@@ -1604,68 +1482,13 @@ function parseBreakTimeClient(v){
             return [...document.querySelectorAll('#taskWorksBuilder .task-work-row')].map(r=>({category:r.querySelector('.task-work-category').value.trim(),work:r.querySelector('.task-work-name').value.trim(),weightage:Number(r.querySelector('.task-work-weight').value)||0})).filter(x=>x.category&&x.work);
         }
 
-        function submitNewTask() {
-            const templateId = document.getElementById('assignTemplateSelect')?.value || '';
-            const selectedEmployees = getSelectedAssignEmployees();
-            const tUser = document.getElementById('newTaskUser').value;
-            const tName = document.getElementById('newTaskName').value;
-            const tPrio = document.getElementById('newTaskPriority').value;
-            const tFreq = document.getElementById('newTaskFreq').value;
-            const tStart = document.getElementById('newTaskStart').value;
-            const tEnd = document.getElementById('newTaskEnd').value;
-            const dept = document.getElementById('displayDept').innerText;
-
-            const works = collectTaskWorks();
-            if(!tName || !tStart || !tEnd) { alert("Fill all required fields including dates!"); return; }
-            if(works.length===0) { alert('Please add at least one Category / Work.'); return; }
-            const workTotal=works.reduce((a,x)=>a+(Number(x.weightage)||0),0);
-            if(workTotal>100) { alert('Work weightage total cannot exceed 100%.'); return; }
-
-            const useTemplate = !!templateId && selectedEmployees.length>0;
-            document.getElementById('saveTaskBtn').innerText = useTemplate ? "Assigning to Selected Employees..." : "Assigning...";
-
-            const formData = new FormData();
-            if(useTemplate){
-                formData.append('action','assignTemplateToEmployees');
-                formData.append('templateId',templateId);
-                formData.append('usernamesJson',JSON.stringify(selectedEmployees));
-                formData.append('startDate',tStart);
-                formData.append('endDate',tEnd);
-                formData.append('priority',tPrio);
-                formData.append('frequency',tFreq);
-                formData.append('weightage',document.getElementById('newTaskWeightage').value||'10');
-                formData.append('assignedBy',document.getElementById('newTaskAssignedBy').value||document.getElementById('displayUser').innerText);
-                formData.append('sessionToken',sessionToken);
-            }else{
-                if(!tUser) { alert("Select an employee or select a Task Template and employees."); document.getElementById('saveTaskBtn').innerText="Assign Task"; return; }
-                formData.append('action','assignNewTask');
-                formData.append('assignedTo',tUser);
-                formData.append('taskName',tName);
-                formData.append('dept',dept);
-                formData.append('priority',tPrio);
-                formData.append('frequency',tFreq);
-                formData.append('startDate',tStart);
-                formData.append('endDate',tEnd);
-                formData.append('weightage',document.getElementById('newTaskWeightage').value||'10');
-                formData.append('assignedBy',document.getElementById('newTaskAssignedBy').value||document.getElementById('displayUser').innerText);
-                formData.append('worksJson',JSON.stringify(works));
-                formData.append('sessionToken',sessionToken);
-            }
-
-            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:formData})
-            .then(res=>res.json())
-            .then(data=>{
-                alert(data.message || (data.status==='success'?'Task Assigned!':'Task assignment failed.'));
-                document.getElementById('saveTaskBtn').innerText="Assign Task";
-                if(data.status==='success'){
-                    closeAssignTaskModal();
-                    refreshAssignTemplateData();
-                    setTimeout(fetchDashboardDataSilently,120);
-                }
-            }).catch(e=>{
-                alert("Task assignment failed. Please try again.");
-                document.getElementById('saveTaskBtn').innerText="Assign Task";
-            });
+        function submitNewTask(){
+            const templateId=document.getElementById('assignTemplateSelect')?.value||'',selectedEmployees=getSelectedAssignEmployees();if(!templateId){alert('Pehle Task Template select karein.');return;}if(!selectedEmployees.length){alert('Kam az kam ek employee select karein.');return;}
+            const t=(assignTemplateCache||[]).find(x=>String(x.templateId)===String(templateId));if(!t){alert('Selected Task Template nahi mila.');return;}
+            const now=new Date(),y=now.getFullYear(),m=now.getMonth(),last=new Date(y,m+1,0).getDate(),sd=Math.min(Number(t.startDay)||1,last),ed=Math.min(Number(t.endDay)||sd,last),startDate=`${y}-${String(m+1).padStart(2,'0')}-${String(sd).padStart(2,'0')}`,endDate=`${y}-${String(m+1).padStart(2,'0')}-${String(ed).padStart(2,'0')}`;
+            const btn=document.getElementById('saveTaskBtn');btn.disabled=true;btn.innerText=`Assigning to ${selectedEmployees.length} Employee${selectedEmployees.length===1?'':'s'}...`;
+            const fd=new FormData();fd.append('action','assignTemplateToEmployees');fd.append('templateId',templateId);fd.append('usernamesJson',JSON.stringify(selectedEmployees));fd.append('startDate',startDate);fd.append('endDate',endDate);fd.append('priority',t.priority||'Normal');fd.append('frequency',t.repeat||'One-time');fd.append('weightage',String(Number(t.weightage)||10));fd.append('assignedBy',document.getElementById('displayUser').innerText||'');fd.append('sessionToken',sessionToken);
+            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(d=>{if(d.status!=='success')throw new Error(d.message||'Task assignment failed');alert(d.message||'Task assigned.');clearAssignEmployees();fetchDashboardDataSilently();}).catch(e=>alert(e.message||'Task assignment failed.')).finally(()=>{btn.disabled=false;btn.innerText='Assign Task';});
         }
 
         // ================= EMP LOG DAILY WORK =================
