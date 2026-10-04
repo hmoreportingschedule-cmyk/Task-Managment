@@ -704,6 +704,7 @@ function parseBreakTimeClient(v){
         }
 
         function renderTasks(tasksToRender, role) {
+            window.__taskActionCache = {};
             const tbody = document.getElementById('taskTableBody'); 
             tbody.innerHTML = ''; 
             const isHOD = (isManagerRole(role));
@@ -733,9 +734,11 @@ function parseBreakTimeClient(v){
             }
 
             if (tasksToRender.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="${isHOD?(isAdmin?12:11):10}" class="py-8 text-center text-gray-500 italic">No tasks found.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="${isHOD?(isAdmin?12:12):11}" class="py-8 text-center text-gray-500 italic">No tasks found.</td></tr>`;
             } else {
                 tasksToRender.forEach(task => {
+                    const taskActionKey = Object.keys(window.__taskActionCache).length;
+                    window.__taskActionCache[taskActionKey] = task;
                     let prioColor = task.priority.toLowerCase() === 'high' ? 'text-red-600' : 'text-yellow-600';
                     let tr = document.createElement('tr');
                     
@@ -786,9 +789,18 @@ function parseBreakTimeClient(v){
                             </select>`;
                     }
 
+                    const replacementForToday = getApprovedTaskReplacement(task, new Date());
+                    const displayTaskName = replacementForToday || task.taskName;
+                    let taskReplaceHTML = '';
+                    const pendingReplacements = (Array.isArray(task.replaceRequests)?task.replaceRequests:[]).map((r,i)=>({r:r,i:i})).filter(x=>String(x.r.status||'').toLowerCase()==='pending');
+                    if(!isHOD && !isAdmin){
+                        taskReplaceHTML = `<button type="button" onclick="openTaskReplaceModal(window.__taskActionCache[${taskActionKey}])" class="bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 px-3 py-1.5 rounded-lg text-xs font-bold" title="Request Task Replace"><i class="fas fa-repeat"></i> Replace</button>`;
+                    } else if(isHOD || isAdmin){
+                        if(pendingReplacements.length){ taskReplaceHTML = pendingReplacements.map(x=>`<div class="mb-1"><span class="text-xs font-bold text-orange-700">Replace: ${escapeHtml(x.r.replacementTask)}<br><span class="text-gray-500">${escapeHtml(x.r.date||'')}</span></span><div class="mt-1 flex gap-1"><button type="button" onclick="reviewTaskReplace(${JSON.stringify(task.taskId)},${Number(task.rowIndex)||0},${JSON.stringify(task.assignedTo)},'Approved',${x.i})" class="bg-green-50 text-green-700 border border-green-200 px-2 py-1 rounded text-[11px] font-bold">Approve</button><button type="button" onclick="reviewTaskReplace(${JSON.stringify(task.taskId)},${Number(task.rowIndex)||0},${JSON.stringify(task.assignedTo)},'Rejected',${x.i})" class="bg-red-50 text-red-700 border border-red-200 px-2 py-1 rounded text-[11px] font-bold">Reject</button></div></div>`).join(''); }
+                    }
                     tr.innerHTML = `
-                        <td class="py-4 px-6 font-bold text-[#112a2e]">${task.taskName}</td>
-                         <td class="py-4 px-6 text-xs">${(task.works&&task.works.length)?task.works.map(w=>`<div class="mb-1"><span class="font-bold text-[#2a4d53]">${w.category}</span>: ${w.work} <span class="text-[#0f766e] font-bold">(${w.frequency||'Monthly'})</span> <span class="text-[#259b94] font-bold">(${Number(w.weightage)||0}%)</span></div>`).join(''): '<span class="text-gray-400">No works added</span>'}</td>
+                        <td class="py-4 px-6 font-bold text-[#112a2e]">${escapeHtml(displayTaskName)}${replacementForToday ? '<div class="text-[10px] text-[#0f766e] font-semibold mt-1">Replacement approved</div>' : ''}</td>
+                         <td class="py-4 px-6 font-bold text-[#0f766e]">${escapeHtml(task.frequency||'One-time')}</td>
                          ${isHOD ? `<td class="py-4 px-6 text-[#259b94] font-bold">${task.assignedTo}</td>` : ''}
                          <td class="py-4 px-6 text-[#4b6d70] font-semibold">${task.assignedBy || '-'}</td>
                          <td class="py-4 px-6 font-bold text-[#2a4d53]">${isHOD ? `<input type="number" min="0" max="85" value="${Number(task.weightage)||0}" onchange="updateTaskWeightage(${task.rowIndex}, this.value, ${JSON.stringify(task.assignedTo)})" class="w-20 border border-[#b2d8d8] rounded-md px-2 py-1 text-sm font-bold" title="Task weightage (%)">` : `${Number(task.weightage)||0}%`}</td>
@@ -798,11 +810,41 @@ function parseBreakTimeClient(v){
                         <td class="py-4 px-6">${timeSpentHTML}</td>
                         <td class="py-4 px-6">${empStatusHTML}</td>
                         <td class="py-4 px-6">${hodStatusHTML}</td>
-                        ${isAdmin ? `<td class="py-4 px-3 whitespace-nowrap"><button type="button" onclick="openEditTaskModal(${JSON.stringify(task)})" class="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg text-xs font-bold mr-1" title="Edit / Assign Task"><i class="fas fa-pen-to-square"></i> Edit</button><button type="button" onclick="deleteAssignedTask(${JSON.stringify(task.assignedTo)}, ${JSON.stringify(task.taskId)}, ${JSON.stringify(task.taskName)}, ${Number(task.rowIndex)||0})" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-3 py-1.5 rounded-lg text-xs font-bold" title="Delete Task"><i class="fas fa-trash"></i> Delete</button></td>` : ''}
+                        ${(isHOD || isAdmin || (!isHOD && !isAdmin)) ? `<td class="py-4 px-3 whitespace-nowrap">${isAdmin ? `<button type="button" onclick="openEditTaskModalByKey(${taskActionKey})" class="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-2 py-1.5 rounded-lg text-xs font-bold mr-1" title="Edit Task"><i class="fas fa-pen-to-square"></i> Edit</button><button type="button" onclick="deleteAssignedTaskByKey(${taskActionKey})" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-2 py-1.5 rounded-lg text-xs font-bold" title="Delete Task"><i class="fas fa-trash"></i> Delete</button>` : ''}${taskReplaceHTML}</td>` : ''}
                     `;
                     tbody.appendChild(tr);
                 });
             }
+        }
+
+        function getApprovedTaskReplacement(task, dateObj){
+            const ymd = dateObj instanceof Date ? dateObj.toISOString().slice(0,10) : String(dateObj||'').slice(0,10);
+            const list = Array.isArray(task?.replaceRequests) ? task.replaceRequests : [];
+            const hit = list.slice().reverse().find(r => String(r.status||'').toLowerCase()==='approved' && String(r.date||'').slice(0,10)===ymd && String(r.replacementTask||'').trim());
+            return hit ? String(hit.replacementTask).trim() : '';
+        }
+        function openEditTaskModalByKey(key){ const task=window.__taskActionCache?.[key]; if(task) openEditTaskModal(task); }
+        function deleteAssignedTaskByKey(key){ const task=window.__taskActionCache?.[key]; if(task) deleteAssignedTask(task.assignedTo,task.taskId,task.taskName,task.rowIndex); }
+        function openTaskReplaceModal(task){
+            const today=new Date().toISOString().slice(0,10);
+            document.getElementById('replaceTaskId').value=task.taskId||'';
+            document.getElementById('replaceTaskRow').value=task.rowIndex||'';
+            document.getElementById('replaceTaskUser').value=task.assignedTo||'';
+            const d=document.getElementById('replaceTaskDate'); d.value=today; d.min=task.startDate && /^\d{4}-\d{2}-\d{2}$/.test(task.startDate)?task.startDate:today; d.max=task.endDate && /^\d{4}-\d{2}-\d{2}$/.test(task.endDate)?task.endDate:'';
+            document.getElementById('replaceTaskName').value='';
+            document.getElementById('taskReplaceModal').style.display='block';
+        }
+        function closeTaskReplaceModal(){ const m=document.getElementById('taskReplaceModal'); if(m)m.style.display='none'; }
+        function submitTaskReplaceRequest(){
+            const taskId=document.getElementById('replaceTaskId').value, rowIndex=document.getElementById('replaceTaskRow').value, targetUser=document.getElementById('replaceTaskUser').value, date=document.getElementById('replaceTaskDate').value, replacementTask=document.getElementById('replaceTaskName').value.trim();
+            if(!taskId||!targetUser||!date||!replacementTask){alert('Task date aur new task required hain.');return;}
+            const btn=document.getElementById('replaceTaskSubmitBtn'); btn.disabled=true; btn.innerText='Sending...';
+            const fd=new FormData(); fd.append('action','requestTaskReplace'); fd.append('taskId',taskId); fd.append('rowIndex',rowIndex||''); fd.append('targetUser',targetUser); fd.append('requestDate',date); fd.append('replacementTask',replacementTask); fd.append('sessionToken',sessionToken);
+            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd,cache:'no-store'}).then(r=>r.json()).then(d=>{alert(d.message||'Request submitted.');if(d.status==='success'){closeTaskReplaceModal();fetchDashboardDataSilently();}}).catch(()=>alert('Task replace request failed.')).finally(()=>{btn.disabled=false;btn.innerText='Raise Request';});
+        }
+        function reviewTaskReplace(taskId,rowIndex,targetUser,decision,requestIndex){
+            const fd=new FormData(); fd.append('action','reviewTaskReplace'); fd.append('taskId',taskId); fd.append('rowIndex',rowIndex||''); fd.append('targetUser',targetUser); fd.append('decision',decision); fd.append('requestIndex',requestIndex); fd.append('sessionToken',sessionToken);
+            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd,cache:'no-store'}).then(r=>r.json()).then(d=>{alert(d.message||'Updated');if(d.status==='success')fetchDashboardDataSilently();}).catch(()=>alert('Task replace approval failed.'));
         }
 
         function openEditTaskModal(task){
@@ -2900,9 +2942,8 @@ function parseBreakTimeClient(v){
 
         function officeEventForDate(date){ const key=`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`; return (globalOfficeEvents||[]).find(ev=>key>=String(ev.fromDate||"") && key<=String(ev.toDate||ev.fromDate||""))||null; }
 
-        function attendanceIsWorkingDay(date, weekoff) {
-            const dayNames=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-            return dayNames[date.getDay()].toLowerCase() !== String(weekoff||'Sunday').toLowerCase();
+        function attendanceIsWorkingDay(date, weekoff, username) {
+            return effectiveWorkingDay(date, weekoff, username);
         }
 
         function uniqueAttendanceRecords(records) {
@@ -2937,7 +2978,7 @@ function parseBreakTimeClient(v){
                     const isPast=dt<=cutoff;
                     const event=officeEventForDate(dt);
                     if(event) return;
-                    const working=attendanceIsWorkingDay(dt,meta.weekoff);
+                    const working=attendanceIsWorkingDay(dt,meta.weekoff,meta.username||name);
                     if(!working){ totalWeekoff++; return; }
                     totalAvailability++;
                     const key=attendanceDateKey(dt);
@@ -2980,7 +3021,7 @@ function parseBreakTimeClient(v){
                 users.forEach(user=>{
                     const meta=attendanceMetaForUser(user);
                     g.dates.forEach(dt=>{
-                        if(officeEventForDate(dt) || !attendanceIsWorkingDay(dt,meta.weekoff) || dt>cutoff) return;
+                        if(officeEventForDate(dt) || !attendanceIsWorkingDay(dt,meta.weekoff,meta.username||name) || dt>cutoff) return;
                         const rec=attendanceRecordFor(records,user,attendanceDateKey(dt));
                         if(rec&&rec.InTime) gp++; else if(!(rec&&String(rec.Leave||'').toLowerCase().includes('leave'))) ga++;
                     });
@@ -3051,7 +3092,7 @@ function parseBreakTimeClient(v){
                     const ev=officeEventForDate(dt);
                     if(ev) st='E';
                     if(!st){
-                        if(!attendanceIsWorkingDay(dt,meta.weekoff)) st='W';
+                        if(!attendanceIsWorkingDay(dt,meta.weekoff,meta.username||m)) st='W';
                         else if(dt<today) st='A';
                         else st='-';
                     }
@@ -3088,8 +3129,21 @@ function parseBreakTimeClient(v){
             if(!dateStr) return false;
             const d=new Date(dateStr+'T12:00:00');
             const names=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-            const configured=String(window.currentUserWeekoff||'').trim().toLowerCase();
-            return configured && configured.split(',').map(x=>x.trim().toLowerCase()).indexOf(names[d.getDay()].toLowerCase())>-1;
+            const configured=String(window.currentUserWeekoff||'Sunday').trim().toLowerCase();
+            return configured.split(',').map(x=>x.trim().toLowerCase()).indexOf(names[d.getDay()].toLowerCase())>-1;
+        }
+        function isAdjustedWeekoffDate(dateStr, username){
+            if(!dateStr) return false;
+            const user=String(username||document.getElementById('displayUser')?.innerText||'').trim().toLowerCase();
+            return (globalAdvanceScheduleRequests||[]).some(r=>String(r.status||'').toLowerCase()==='approved' && String(r.requestType||'')==='Weekoff Adjustment' && String(r.employee||'').trim().toLowerCase()===user && String(r.requestDate||'')===dateStr);
+        }
+        function effectiveWorkingDay(date, weekoff, username){
+            const dayNames=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+            const key=date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-'+String(date.getDate()).padStart(2,'0');
+            const regular=dayNames[date.getDay()].toLowerCase()===String(weekoff||'Sunday').toLowerCase();
+            if(isAdjustedWeekoffDate(key,username)) return false;
+            if(regular && (globalAdvanceScheduleRequests||[]).some(r=>String(r.status||'').toLowerCase()==='approved' && String(r.requestType||'')==='Weekoff Adjustment' && String(r.employee||'').trim().toLowerCase()===String(username||'').trim().toLowerCase())) return true;
+            return !regular;
         }
         function toggleAdvanceScheduleFields(){
             const type=document.getElementById('advanceScheduleType').value;
@@ -3103,9 +3157,8 @@ function parseBreakTimeClient(v){
             const wob=document.getElementById('weekoffAdjustmentBox');
             if(wob) wob.classList.toggle('hidden',type!=='Weekoff Adjustment');
             if(type==='Weekoff Adjustment'){
-                const d=document.getElementById('advanceScheduleDate').value, nw=document.getElementById('newWeekoffDate');
-                if(nw){nw.min=document.getElementById('advanceScheduleDate').min;nw.max=document.getElementById('advanceScheduleDate').max;}
-                if(d && !isConfiguredWeekoffDate(d)){alert('Weekoff Adjustment ke liye upar selected date aapke configured Weekoff par honi chahiye.');document.getElementById('advanceScheduleDate').value='';}
+                const d=document.getElementById('advanceScheduleDate').value;
+                if(d && isConfiguredWeekoffDate(d)){alert('Weekoff Adjustment ke liye regular Weekoff date nahi, Monday-Saturday ki working date select karein.');document.getElementById('advanceScheduleDate').value='';}
             }
             if(type!=='Meeting') document.getElementById('onlineDurationBox').classList.add('hidden');
             else toggleMeetingMode();
@@ -3114,10 +3167,9 @@ function parseBreakTimeClient(v){
             if(ev.target && ev.target.id==='advanceScheduleDate'){
                 const end=document.getElementById('advanceScheduleEndDate'); if(end){ end.min=ev.target.value||ev.target.min||''; end.max=ev.target.max||''; if(end.value && ev.target.value && end.value<ev.target.value) end.value=ev.target.value; }
                 if(document.getElementById('advanceScheduleType')?.value==='Weekoff Adjustment'){
-                    if(!isConfiguredWeekoffDate(ev.target.value)){
-                        alert('Weekoff Adjustment sirf aapke configured Weekoff date par select kiya ja sakta hai.');
+                    if(isConfiguredWeekoffDate(ev.target.value)){
+                        alert('Weekoff Adjustment ke liye regular Weekoff date nahi, Monday-Saturday ki working date select karein.');
                         ev.target.value='';
-                        
                     }
                 }
             }
@@ -3135,9 +3187,7 @@ function parseBreakTimeClient(v){
             const type=document.getElementById('advanceScheduleType').value;
             const reason=document.getElementById('advanceScheduleReason').value.trim(); const scheduleLocation=document.getElementById('advanceScheduleLocation').value.trim();
             const weekoffDate=type==='Weekoff Adjustment'?date:'';
-            const newWeekoffDate=type==='Weekoff Adjustment'?document.getElementById('newWeekoffDate').value:'';
-            if(type==='Weekoff Adjustment' && (!date||!newWeekoffDate)){alert('Weekoff Date aur New Weekoff Date dono select karein.');return;}
-            if(type==='Weekoff Adjustment' && !isConfiguredWeekoffDate(weekoffDate)){alert('Weekoff Adjustment sirf configured Weekoff date par hi kiya ja sakta hai.');return;}
+            if(type==='Weekoff Adjustment' && (!date||isConfiguredWeekoffDate(weekoffDate))){alert('Weekoff Adjustment ke liye Monday-Saturday ki working date select karein.');return;}
             const mode=type==='Meeting'?document.getElementById('meetingMode').value:'';
             const meetingFrom=type==='Meeting'&&mode==='Online'?document.getElementById('meetingFrom').value:'';
             const meetingTo=type==='Meeting'&&mode==='Online'?document.getElementById('meetingTo').value:'';
@@ -3148,7 +3198,7 @@ function parseBreakTimeClient(v){
             if(type==='Meeting'&&mode==='Online'&&(!meetingFrom||!meetingTo)){alert('Online Meeting ke liye From aur To time select karein.');return;}
             if(type==='Meeting Journey'&&(!journeyStart||!journeyComplete)){alert('Journey Start aur Journey Complete time select karein.');return;}
             const btn=document.getElementById('advanceScheduleBtn'); btn.disabled=true; btn.innerText='Submitting...';
-            const fd=new FormData(); fd.append('action','advanceScheduleRequest'); fd.append('requestDate',date); fd.append('endDate',endDate); fd.append('requestType',type); fd.append('reason',reason); fd.append('location',scheduleLocation); fd.append('weekoffDate',weekoffDate); fd.append('newWeekoffDate',newWeekoffDate); fd.append('meetingMode',mode); fd.append('meetingFrom',meetingFrom); fd.append('meetingTo',meetingTo); fd.append('journeyStart',journeyStart); fd.append('journeyComplete',journeyComplete); fd.append('sessionToken',sessionToken);
+            const fd=new FormData(); fd.append('action','advanceScheduleRequest'); fd.append('requestDate',date); fd.append('endDate',endDate); fd.append('requestType',type); fd.append('reason',reason); fd.append('location',scheduleLocation); fd.append('weekoffDate',weekoffDate); fd.append('meetingMode',mode); fd.append('meetingFrom',meetingFrom); fd.append('meetingTo',meetingTo); fd.append('journeyStart',journeyStart); fd.append('journeyComplete',journeyComplete); fd.append('sessionToken',sessionToken);
             fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(data=>{
                 alert(data.message||'Request submitted.');
                 if(data.status==='success'){closeAdvanceScheduleModal();fetchDashboardDataSilently();}

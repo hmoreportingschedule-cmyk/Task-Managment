@@ -637,7 +637,7 @@
                         <thead>
                             <tr class="bg-[#f0f7f7] text-[#4b6d70] uppercase text-xs font-bold tracking-wider">
                                 <th class="py-4 px-6">Task Name</th>
-                                 <th class="py-4 px-6">Category / Work / Weightage</th>
+                                 <th class="py-4 px-6">Task Frequency</th>
                                  <th class="py-4 px-6 hod-only-col hidden">Employee</th>
                                  <th class="py-4 px-6">Assigned By</th>
                                  <th class="py-4 px-6">Weightage</th>
@@ -756,6 +756,21 @@
                 <div class="md:col-span-2"><div class="flex justify-between items-center mb-2"><div><b class="text-sm text-[#2a4d53]">Task Works / Categories</b><p class="text-xs text-gray-500">Existing works ko edit/add/remove kar sakte hain.</p></div><button type="button" onclick="addEditTaskWorkRow()" class="bg-[#2a4d53] text-white px-3 py-2 rounded-md text-xs font-bold"><i class="fas fa-plus"></i> Add Work</button></div><div id="editTaskWorksBuilder" class="space-y-2"></div></div>
             </div>
             <button id="editTaskSaveBtn" onclick="saveEditedTask()" class="w-full bg-[#259b94] hover:bg-[#1f827c] text-white font-bold py-3 rounded-lg mt-5 transition shadow-lg">Save Task Changes</button>
+        </div>
+    </div>
+
+    <!-- TASK REPLACEMENT REQUEST MODAL -->
+    <div id="taskReplaceModal" class="modal">
+        <div class="modal-content max-w-lg relative shadow-2xl">
+            <span onclick="closeTaskReplaceModal()" class="absolute top-4 right-4 text-gray-400 hover:text-red-500 cursor-pointer text-2xl transition">&times;</span>
+            <h3 class="text-2xl font-bold text-[#112a2e] mb-1"><i class="fas fa-repeat text-[#259b94]"></i> Task Replace Request</h3>
+            <p class="text-sm text-gray-500 mb-5">Is date ke assigned task ki jagah naya task approval ke baad apply hoga.</p>
+            <input type="hidden" id="replaceTaskId"><input type="hidden" id="replaceTaskRow"><input type="hidden" id="replaceTaskUser">
+            <div class="space-y-4">
+                <div><label class="block text-sm font-semibold text-gray-700 mb-1">Task Date</label><input type="date" id="replaceTaskDate" class="w-full border border-gray-300 p-3 rounded-lg"></div>
+                <div><label class="block text-sm font-semibold text-gray-700 mb-1">New Task</label><textarea id="replaceTaskName" rows="3" class="w-full border border-gray-300 p-3 rounded-lg" placeholder="Naya task manually likhein..."></textarea></div>
+                <button id="replaceTaskSubmitBtn" onclick="submitTaskReplaceRequest()" class="w-full bg-[#259b94] hover:bg-[#1f827c] text-white font-bold py-3 rounded-lg shadow-lg">Raise Request</button>
+            </div>
         </div>
     </div>
 
@@ -974,8 +989,7 @@
                 <div id="advanceScheduleEndDateBox" class="hidden"><label class="block text-sm font-semibold text-gray-700 mb-1">Schedule To Date:</label><input type="date" id="advanceScheduleEndDate" class="w-full border border-gray-300 p-3 rounded-lg"></div>
                 <div><label class="block text-sm font-semibold text-gray-700 mb-1">Request Type:</label><select id="advanceScheduleType" onchange="toggleAdvanceScheduleFields()" class="w-full border border-gray-300 p-3 rounded-lg"><option value="Leave">Leave</option><option value="Weekoff Adjustment">Weekoff Adjustment</option><option value="Meeting">Meeting</option><option value="Meeting Journey">Meeting Journey</option><option value="3 Days Qafila">3 Days Qafila</option><option value="Tarbiyati Ijtima">Tarbiyati Ijtima</option></select></div>
                 <div id="weekoffAdjustmentBox" class="hidden">
-                    <div class="mb-2 text-xs font-semibold text-[#1f827c]">Upar selected Schedule Date aapke configured Weekoff (jaise Sunday) par honi chahiye. Us Weekoff ko kis date par adjust karna hai woh date select karein.</div>
-                    <div><label class="block text-xs font-semibold text-gray-600 mb-1">New Weekoff Date:</label><input type="date" id="newWeekoffDate" class="w-full border border-gray-300 p-3 rounded-lg"></div>
+                    <div class="mb-2 text-xs font-semibold text-[#1f827c]">Monday-Saturday mein jis working date ko temporary Weekoff banana hai, upar wahi date select karein. Approval ke baad regular Weekoff (jaise Sunday) Working Day ho jayega.</div>
                 </div>
                 <div id="meetingModeBox" class="hidden"><label class="block text-sm font-semibold text-gray-700 mb-1">Meeting Type:</label><select id="meetingMode" onchange="toggleMeetingMode()" class="w-full border border-gray-300 p-3 rounded-lg"><option value="Online">Online</option><option value="Physical">Physical</option></select></div>
                 <div id="onlineDurationBox" class="hidden grid grid-cols-2 gap-3"><div><label class="block text-xs font-semibold text-gray-600 mb-1">From:</label><input type="time" id="meetingFrom" class="w-full border border-gray-300 p-3 rounded-lg"></div><div><label class="block text-xs font-semibold text-gray-600 mb-1">To:</label><input type="time" id="meetingTo" class="w-full border border-gray-300 p-3 rounded-lg"></div></div>
