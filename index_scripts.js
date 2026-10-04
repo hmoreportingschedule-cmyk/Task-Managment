@@ -935,9 +935,9 @@
                 (data.users||[]).forEach(u=>{
                     const safe=encodeURIComponent(u.username);
                     const self=String(u.username||'').trim().toLowerCase()===String(document.getElementById('displayUser').innerText||'').trim().toLowerCase();
-                    const action=self ? '<span class="text-xs text-gray-400 font-semibold">Owner only</span>' : `<button onclick="openEditUserModal(decodeURIComponent('${safe}'))" class="text-xs bg-[#e6fcf5] text-[#1f827c] border border-[#b2d8d8] px-3 py-1.5 rounded-md font-bold"><i class="fas fa-pen"></i> Edit</button>`;
+                    const action=self ? '<span class="text-xs text-gray-400 font-semibold">Protected</span>' : `<div class="flex flex-wrap gap-1"><button onclick="openEditUserModal(decodeURIComponent('${safe}'))" class="text-xs bg-[#e6fcf5] text-[#1f827c] border border-[#b2d8d8] px-2 py-1 rounded-md font-bold"><i class="fas fa-pen"></i> Edit</button><button onclick="toggleUserAccount('${safe}',${u.accountEnabled!==false})" class="text-xs ${u.accountEnabled!==false?'bg-amber-50 text-amber-700 border-amber-200':'bg-green-50 text-green-700 border-green-200'} border px-2 py-1 rounded-md font-bold">${u.accountEnabled!==false?'OFF':'ON'}</button><button onclick="deleteAdminUser('${safe}')" class="text-xs bg-red-50 text-red-600 border border-red-200 px-2 py-1 rounded-md font-bold"><i class="fas fa-trash"></i> Delete</button></div>`;
                     const webToggle=self ? `<span class="text-xs text-gray-400 font-semibold">Current Admin</span>` : `<label class="web-switch" title="Turn user Web Link ON/OFF"><input type="checkbox" ${u.webLinkEnabled!==false?'checked':''} onchange="toggleUserWebLink('${safe}',this.checked)"><span class="web-slider"></span></label>`;
-                    body.innerHTML+=`<tr class="border-t"><td class="p-2 font-semibold">${u.username}</td><td class="p-2">${u.role}</td><td class="p-2">${u.department||'-'}</td><td class="p-2">${u.hod||'-'}</td><td class="p-2 text-xs">${u.emailAddress?`<a href="mailto:${u.emailAddress}" class="text-[#259b94] font-bold">${u.emailAddress}</a>`:'-'}</td><td class="p-2 text-xs">${u.contactNumber?`<a href="tel:${u.contactNumber}" class="text-[#259b94] font-bold">${u.contactNumber}</a>`:'-'}</td><td class="p-2 text-xs">${u.whatsappNumber?`<a target="_blank" href="https://wa.me/${String(u.whatsappNumber).replace(/\D/g,'')}" class="text-green-600 font-bold">${u.whatsappNumber}</a>`:'-'}</td><td class="p-2">${webToggle}</td><td class="p-2 text-xs">${u.accessPermissions||'All / Not Set'}${u.attendanceEntryStart&&u.attendanceEntryEnd?`<br><span class="text-[#259b94]">Att: ${u.attendanceEntryStart} → ${u.attendanceEntryEnd}</span>`:''}</td><td class="p-2">${action}</td></tr>`;
+                    body.innerHTML+=`<tr class="border-t"><td class="p-2 font-semibold">${u.username}</td><td class="p-2">${u.role}</td><td class="p-2">${u.department||'-'}</td><td class="p-2">${u.hod||'-'}</td><td class="p-2 text-xs">${u.emailAddress?`<a href="mailto:${u.emailAddress}" class="text-[#259b94] font-bold">${u.emailAddress}</a>`:'-'}</td><td class="p-2 text-xs">${u.contactNumber?`<a href="tel:${u.contactNumber}" class="text-[#259b94] font-bold">${u.contactNumber}</a>`:'-'}</td><td class="p-2 text-xs">${u.whatsappNumber?`<a target="_blank" href="https://wa.me/${String(u.whatsappNumber).replace(/\D/g,'')}" class="text-green-600 font-bold">${u.whatsappNumber}</a>`:'-'}</td><td class="p-2">${webToggle}</td><td class="p-2"><span class="font-bold ${u.accountEnabled!==false?'text-green-600':'text-red-600'}">${u.accountEnabled!==false?'ON':'OFF'}</span></td><td class="p-2 text-xs">${u.accessPermissions||'All / Not Set'}${u.attendanceEntryStart&&u.attendanceEntryEnd?`<br><span class="text-[#259b94]">Att: ${u.attendanceEntryStart} → ${u.attendanceEntryEnd}</span>`:''}</td><td class="p-2">${action}</td></tr>`;
                 });
                 toggleAdminUserHod();
             }).catch(()=>alert('Unable to load users.'));
@@ -949,6 +949,20 @@
                 if(d.status!=='success'){alert(d.message||'Web Link update failed.');loadAdminUsers();return;}
                 loadAdminUsers();
             }).catch(()=>{alert('Web Link update failed.');loadAdminUsers();});
+        }
+        function toggleUserAccount(encodedUsername, currentEnabled){
+            const username=decodeURIComponent(encodedUsername);
+            const next=!currentEnabled;
+            const label=next?'ON':'OFF';
+            if(!confirm(username+' ka account '+label+' karna hai?'))return;
+            const fd=new FormData(); fd.append('action','adminSetAccountStatus'); fd.append('sessionToken',sessionToken); fd.append('username',username); fd.append('enabled',next?'true':'false');
+            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd,cache:'no-store'}).then(r=>r.json()).then(d=>{alert(d.message||'Account status updated.');if(d.status==='success')loadAdminUsers();}).catch(()=>alert('Account status update failed.'));
+        }
+        function deleteAdminUser(encodedUsername){
+            const username=decodeURIComponent(encodedUsername);
+            if(!confirm('Kya aap '+username+' ko User Management se permanently delete karna chahte hain? Employee backup/data sheet delete nahi hogi.'))return;
+            const fd=new FormData(); fd.append('action','adminDeleteUser'); fd.append('sessionToken',sessionToken); fd.append('username',username);
+            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd,cache:'no-store'}).then(r=>r.json()).then(d=>{alert(d.message||'User delete status.');if(d.status==='success')loadAdminUsers();}).catch(()=>alert('User delete failed.'));
         }
         function mergeExistingEmployeeFiles(){
             if(!confirm('Existing employee files ko ek format mein merge karke Annual Backup folder mein move karna hai? Ye one-time migration hai.'))return;

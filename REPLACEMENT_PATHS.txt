@@ -1,0 +1,12 @@
+V33 REPLACEMENT PATHS
+
+1. Vercel/GitHub project root:
+   index.html
+   index_scripts.js
+
+2. Google Apps Script project:
+   backend_code.js
+
+IMPORTANT: index.html now explicitly loads ./index_scripts.js. Do not paste index_scripts.js into Apps Script. Keep both frontend files in the same Vercel/GitHub folder.
+
+Deploy the updated Google Apps Script backend as a new version after replacing backend_code.js.
