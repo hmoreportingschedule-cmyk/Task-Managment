@@ -1,24 +1,15 @@
-Office Task Reporting V45
+V46 – MasterAdmin Web App URL + User Creation Sync Fix
 
-GitHub / Vercel project root:
-1. Replace index.html with this V45 index.html.
-2. Replace index_scripts.js with this V45 index_scripts.js.
+GitHub / Vercel (project root):
+1. index.html
+2. index_scripts.js
 
 Google Apps Script:
-3. Replace backend_code.js with this V45 backend_code.js.
-4. Deploy a NEW Apps Script Web App version after replacing backend_code.js:
-   Deploy -> Manage deployments -> Edit -> New version -> Deploy.
+3. backend_code.js
 
-Important:
-- Keep index.html and index_scripts.js in the same Vercel/GitHub root folder.
-- index_scripts.js must not be pasted into Apps Script.
-- backend_code.js belongs only in Google Apps Script.
-- Existing Google Sheet/employee backup files are not deleted by this update.
-
-V45 changes:
-- Break Start -> Namaz now uses two separate dropdowns: Zohar and Juma (Friday).
-- Zohar is available on all selectable days.
-- Juma (Friday) is visible/selectable only when the selected attendance date is Friday.
-- Selecting one Namaz dropdown clears the other.
-- Server also rejects Juma on non-Friday dates and rejects old Asr/Magrib break labels for new entries.
-- Employee Monthly Grade card background is light teal and title is "Monthly Grade"; existing font colors are preserved and percentage digits remain black.
+IMPORTANT:
+- index.html and index_scripts.js must remain in the same folder.
+- index_scripts.js is configured for the current MasterAdmin Apps Script Web App URL supplied by the user.
+- Google Apps Script backend uses the MASTER_SPREADSHEET_ID stored in Script Properties as the authoritative Master Google Sheet.
+- The URL supplied by the user is an Apps Script Web App /exec URL, not a Google Sheet URL. If the MasterAdmin Web App is connected to the wrong Master Sheet, run setup/configuration in that Apps Script project or provide the actual Google Sheet URL/ID.
+- After replacing backend_code.js, deploy a NEW Apps Script version and update the Web App deployment.

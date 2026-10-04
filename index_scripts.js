@@ -4,7 +4,7 @@
 
         // YAHAN APNA NAYA GOOGLE SCRIPT URL DAALEIN
         // GOOGLE SHEET / APPS SCRIPT URL: Is URL ko change karein agar Web App deployment URL badle.
-        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzLoOPtmn1wfe929TWPOVt52GijbtJJ5LthLmvZsik9bi0NR4q7TR8HKlyPgmM1UG05lw/exec";
+        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw9x_CwQz3CAQFSZENxZ6tFwTETOv-vol39dGDR5-A0cFj-pvbgd5_HI_1vLLm5yOxG4Q/exec";
         
         let globalAllTasks = []; 
         let globalTeamMembers = [];
