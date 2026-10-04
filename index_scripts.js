@@ -716,7 +716,8 @@ function parseBreakTimeClient(v){
             select.innerHTML='<option value="">-- Select Active Task --</option>';
             const loggedForDate=new Set((globalWorkLogs||[]).filter(w=>{
                 const d=String(w.WorkDate||w.workDate||'');
-                return d===workDate;
+                const st=String(w.ApprovalStatus||w.approvalStatus||'Approved').toLowerCase();
+                return d===workDate && st!=='rejected';
             }).map(w=>String(w.TaskRowIndex||w.taskRowIndex||'')));
             const d=parseLocalDateKey(workDate);
             (tasks||[]).forEach(t=>{
@@ -785,6 +786,31 @@ function parseBreakTimeClient(v){
             }
         }
 
+        function buildTaskHodStatusHTML(task, isHOD, isAdmin) {
+            const status = String(task.hodStatus || 'Pending');
+            const empStatus = String(task.empStatus || '').toLowerCase();
+            const completionRequested = empStatus === 'completion requested';
+            if (String(status).toLowerCase() === 'approved') {
+                return '<span class="px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">Approved</span>';
+            }
+            if (!isHOD && !isAdmin) {
+                const cls = String(status).toLowerCase() === 'rejected'
+                    ? 'bg-red-100 text-red-700'
+                    : 'bg-gray-100 text-gray-600';
+                return `<span class="px-3 py-1 rounded-full text-xs font-bold shadow-sm ${cls}">${escapeHtml(completionRequested ? 'Pending' : (status || 'Pending'))}</span>`;
+            }
+            if (!completionRequested) {
+                const label = String(status).toLowerCase() === 'rejected' ? 'Rejected' : 'Pending';
+                const cls = label === 'Rejected' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600';
+                return `<span class="px-3 py-1 rounded-full text-xs font-bold shadow-sm ${cls}">${label}</span>`;
+            }
+            return `<select onchange="updateTaskDB(${Number(task.rowIndex)}, 'hod', this.value, ${JSON.stringify(task.assignedTo)})" class="border border-[#7db0b1] rounded-md px-2 py-1 bg-white text-xs font-semibold text-[#2a4d53] cursor-pointer focus:ring-1 focus:ring-[#259b94]">
+                <option value="Pending" ${String(status).toLowerCase()==='pending' ? 'selected' : ''}>Pending</option>
+                <option value="Approved">Approve</option>
+                <option value="Rejected">Reject</option>
+            </select>`;
+        }
+
         function renderTasks(tasksToRender, role) {
             window.__taskActionCache = {};
             const tbody = document.getElementById('taskTableBody'); 
@@ -842,22 +868,20 @@ function parseBreakTimeClient(v){
                         const eBadge = task.empStatus === 'Completed'
                             ? 'text-green-600 font-bold bg-green-50 px-2 py-1 rounded'
                             : 'text-yellow-600 font-semibold bg-yellow-50 px-2 py-1 rounded';
-                        const employeeStatusLabel = task.empStatus === 'Completed' && String(task.completionType||'').toLowerCase()==='before' ? 'Before • Completed & Locked' : (task.empStatus === 'Completed' ? 'Completed & Locked' : 'Pending — complete via Log Daily Work');
+                        const employeeStatusLabel = String(task.empStatus||'').toLowerCase()==='completion requested'
+                            ? (String(task.completionType||'').toLowerCase()==='before' ? 'Before Completion • Pending Approval' : 'Closing • Pending Approval')
+                            : (task.empStatus === 'Completed' && String(task.completionType||'').toLowerCase()==='before' ? 'Before • Completed & Locked' : (task.empStatus === 'Completed' ? 'Completed & Locked' : 'Pending — complete via Log Daily Work'));
                         empStatusHTML = `<span class="${eBadge}">${employeeStatusLabel}</span>`;
                         let hBadge = task.hodStatus === 'Approved' ? 'bg-green-100 text-green-700' : (task.hodStatus === 'Rejected' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600');
                         hodStatusHTML = `<span class="px-3 py-1 rounded-full text-xs font-bold shadow-sm ${hBadge}">${task.hodStatus}</span>`;
                     } 
                     else if (isHOD && !isAdmin) { 
                         let eBadge = task.empStatus === 'Completed' ? 'text-green-600 font-bold bg-green-50 px-2 py-1 rounded' : 'text-yellow-600 font-semibold bg-yellow-50 px-2 py-1 rounded';
-                        const managerStatusLabel = task.empStatus === 'Completed' && String(task.completionType||'').toLowerCase()==='before' ? 'Before • Completed' : task.empStatus;
+                        const managerStatusLabel = String(task.empStatus||'').toLowerCase()==='completion requested'
+                            ? (String(task.completionType||'').toLowerCase()==='before' ? 'Before Completion • Pending Approval' : 'Closing • Pending Approval')
+                            : (task.empStatus === 'Completed' && String(task.completionType||'').toLowerCase()==='before' ? 'Before • Completed' : task.empStatus);
                         empStatusHTML = `<span class="${eBadge}">${managerStatusLabel}</span>`;
-                        hodStatusHTML = String(task.hodStatus||'').toLowerCase()==='approved'
-                            ? '<span class="px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">Approved</span>'
-                            : `<select onchange="updateTaskDB(${task.rowIndex}, 'hod', this.value, ${JSON.stringify(task.assignedTo)})" class="border border-[#7db0b1] rounded-md px-2 py-1 bg-white text-xs font-semibold text-[#2a4d53] cursor-pointer focus:ring-1 focus:ring-[#259b94]">
-                                <option value="Pending" ${task.hodStatus === 'Pending' ? 'selected' : ''}>Pending</option>
-                                <option value="Approved" ${task.hodStatus === 'Approved' ? 'selected' : ''}>Approve</option>
-                                <option value="Rejected" ${task.hodStatus === 'Rejected' ? 'selected' : ''}>Reject</option>
-                            </select>`;
+                        hodStatusHTML = buildTaskHodStatusHTML(task, isHOD, isAdmin);
                     } 
                     else if (isAdmin) { 
                         empStatusHTML = `
@@ -866,13 +890,7 @@ function parseBreakTimeClient(v){
                                 <option value="Completed" ${task.empStatus === 'Completed' ? 'selected' : ''}>Completed</option>
                                 <option value="Incomplete" ${task.empStatus === 'Incomplete' ? 'selected' : ''}>Incomplete</option>
                             </select>`;
-                        hodStatusHTML = String(task.hodStatus||'').toLowerCase()==='approved'
-                            ? '<span class="px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">Approved</span>'
-                            : `<select onchange="updateTaskDB(${task.rowIndex}, 'hod', this.value, ${JSON.stringify(task.assignedTo)})" class="border border-[#7db0b1] rounded-md px-2 py-1 bg-white text-xs font-semibold text-[#2a4d53] cursor-pointer focus:ring-1 focus:ring-[#259b94]">
-                                <option value="Pending" ${task.hodStatus === 'Pending' ? 'selected' : ''}>Pending</option>
-                                <option value="Approved" ${task.hodStatus === 'Approved' ? 'selected' : ''}>Approve</option>
-                                <option value="Rejected" ${task.hodStatus === 'Rejected' ? 'selected' : ''}>Reject</option>
-                            </select>`;
+                        hodStatusHTML = buildTaskHodStatusHTML(task, isHOD, isAdmin);
                     }
 
                     const replacementForToday = getApprovedTaskReplacement(task, new Date());
@@ -1752,7 +1770,7 @@ function parseBreakTimeClient(v){
             const sel=document.getElementById('logTaskSelect'),cb=document.getElementById('markTaskCompleted'),wrap=document.getElementById('delayReasonWrap'),reason=document.getElementById('delayReason'); if(!sel||!cb)return;
             const task=(globalAllTasks||[]).find(t=>String(t.rowIndex)===String(sel.value)); if(!task){cb.disabled=true;cb.checked=false;if(wrap)wrap.classList.add('hidden');if(reason)reason.value='';updateBeforeCompletionUI();return;}
             const selectedDate=parseLocalDateKey(document.getElementById('logWorkDate')?.value||localDateKey()),due=parseReportDate(task.endDate),can=!!due&&!!selectedDate&&selectedDate.getTime()>=due.getTime();
-            cb.disabled=!can;cb.title=can?'Completion can be marked on or after the closing date.':'Before closing date use Before Completed request.';if(!can)cb.checked=false;
+            cb.disabled=!can;cb.title=can?'Closing approval request can be submitted on or after the task closing date.':'Before closing date use Before Completion request.';if(!can)cb.checked=false;
             const isDelayed=!!due&&!!selectedDate&&selectedDate.getTime()>due.getTime()&&String(task.empStatus||'').toLowerCase()!=='completed';
             if(wrap)wrap.classList.toggle('hidden',!isDelayed);if(!isDelayed&&reason)reason.value='';updateBeforeCompletionUI();
         }
@@ -1770,7 +1788,8 @@ function parseBreakTimeClient(v){
             const duplicateAlreadyLogged=(globalWorkLogs||[]).some(w=>{
                 const d=String(w.WorkDate||w.workDate||'');
                 const r=String(w.TaskRowIndex||w.taskRowIndex||'');
-                return d===workDate && r===String(tIdx);
+                const st=String(w.ApprovalStatus||w.approvalStatus||'Approved').toLowerCase();
+                return d===workDate && r===String(tIdx) && st!=='rejected';
             });
             if(duplicateAlreadyLogged){
                 alert('Yeh task aapne is date par already submit kar diya hai. Double entry allowed nahi hai.');
@@ -1779,7 +1798,7 @@ function parseBreakTimeClient(v){
             }
             const before=!!document.getElementById('requestBeforeCompletion')?.checked;
             const done=!!document.getElementById('markTaskCompleted')?.checked;
-            if(before&&done){alert('Before Completed aur Mark Completed ek saath select nahi kar sakte.');return;}
+            if(before&&done){alert('Before Completion aur Closing Request ek saath select nahi kar sakte.');return;}
             const btn=document.getElementById('saveLogBtn');btn.innerText='Saving...';btn.disabled=true;
             const formData=new FormData();formData.append('action','logWork');formData.append('username',username);formData.append('rowIndex',tIdx);formData.append('taskName',tName);formData.append('timeSpent',mins);formData.append('description',desc);formData.append('workDate',workDate);formData.append('delayReason',document.getElementById('delayReason')?.value.trim()||'');formData.append('markCompleted',done?'true':'false');formData.append('beforeCompletion',before?'true':'false');formData.append('clientTodayKey',localDateKey());formData.append('sessionToken',sessionToken);
             fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:formData}).then(res=>res.json()).then(data=>{alert(data.message||'Work log processed.');if(data.status==='success'){btn.innerText='Save Log';btn.disabled=false;document.getElementById('logTimeMins').value='';document.getElementById('logDesc').value='';if(document.getElementById('delayReason'))document.getElementById('delayReason').value='';if(document.getElementById('delayReasonWrap'))document.getElementById('delayReasonWrap').classList.add('hidden');document.getElementById('markTaskCompleted').checked=false;if(document.getElementById('requestBeforeCompletion'))document.getElementById('requestBeforeCompletion').checked=false;closeLogWorkModal();fetchDashboardDataSilently();}else{btn.innerText='Save Log';btn.disabled=false;}}).catch(e=>{alert('Unable to save work log. Please try again.');btn.innerText='Save Log';btn.disabled=false;});
