@@ -332,7 +332,7 @@ function parseBreakTimeClient(v){
             }
             return !!reason;
         }
-        document.addEventListener('change',function(e){if(e.target&&e.target.id==='attendanceDate'){updateAttendanceNonWorkingDay();renderSelectedAttendanceState();}});
+        document.addEventListener('change',function(e){if(e.target&&e.target.id==='attendanceDate'){updateAttendanceNonWorkingDay();renderSelectedAttendanceState();updateTodayUrgentTaskButtonState();}});
 
         function getShiftStartMinsClient(){ const s=document.getElementById('displayOfficeTime')?.innerText||''; const parts=s.toLowerCase().split('to'); return parts.length>1?timeToMins(parts[0].trim()):-1; }
         function getShiftEndMinsClient(){ const s=document.getElementById('displayOfficeTime')?.innerText||''; const parts=s.toLowerCase().split('to'); return parts.length>1?timeToMins(parts[1].trim()):-1; }
@@ -388,7 +388,7 @@ function parseBreakTimeClient(v){
                 statusEl.classList.remove('text-[#f59e0b]'); statusEl.classList.add('text-[#e6fcf5]');
             }
         }
-        function refreshDailyActionWidgets(){ renderSelectedAttendanceState(); renderTodayLocation(); if(typeof updateLogDailyWorkButtonState==='function')updateLogDailyWorkButtonState(); }
+        function refreshDailyActionWidgets(){ renderSelectedAttendanceState(); renderTodayLocation(); if(typeof updateLogDailyWorkButtonState==='function')updateLogDailyWorkButtonState(); if(typeof updateTodayUrgentTaskButtonState==='function')updateTodayUrgentTaskButtonState(); }
 
         function markAttendance(){
             if(updateAttendanceNonWorkingDay())return;
@@ -505,7 +505,7 @@ function parseBreakTimeClient(v){
                 globalWorkLogs=[]; window.globalDelayReports=[];
                 globalTeamAttendance=Array.isArray(data.teamAttendance)?data.teamAttendance:[];
                 globalAdvanceScheduleRequests=Array.isArray(data.advanceScheduleRequests)?data.advanceScheduleRequests:[];
-                globalAttendanceRequests=Array.isArray(data.attendanceRequests)?data.attendanceRequests:[]; globalOfficeEvents=Array.isArray(data.officeEvents)?data.officeEvents:[];updateAttendanceNonWorkingDay();updateAttendanceNonWorkingDay();v4UpdateAttendanceAvailability(); window.serverNotifications=Array.isArray(data.serverNotifications)?data.serverNotifications:[]; window.serverDashboardSummary=Array.isArray(data.dashboardSummary)?data.dashboardSummary:[];
+                globalAttendanceRequests=Array.isArray(data.attendanceRequests)?data.attendanceRequests:[]; globalOfficeEvents=Array.isArray(data.officeEvents)?data.officeEvents:[];updateAttendanceNonWorkingDay();updateAttendanceNonWorkingDay();v4UpdateAttendanceAvailability();updateTodayUrgentTaskButtonState(); window.serverNotifications=Array.isArray(data.serverNotifications)?data.serverNotifications:[]; window.serverDashboardSummary=Array.isArray(data.dashboardSummary)?data.dashboardSummary:[];
                 attendanceEntryStart=data.todayAttendanceEntryStart||attendanceEntryStart;
                 attendanceEntryEnd=data.todayAttendanceEntryEnd||attendanceEntryEnd;
                 setDateConstraints();
@@ -586,7 +586,7 @@ function parseBreakTimeClient(v){
                 setDateConstraints();
                 globalTeamAttendance = Array.isArray(data.teamAttendance) ? data.teamAttendance : [];
                 globalAdvanceScheduleRequests = Array.isArray(data.advanceScheduleRequests) ? data.advanceScheduleRequests : [];
-                globalAttendanceRequests = Array.isArray(data.attendanceRequests) ? data.attendanceRequests : []; globalOfficeEvents = Array.isArray(data.officeEvents) ? data.officeEvents : [];updateAttendanceNonWorkingDay();updateAttendanceNonWorkingDay();v4UpdateAttendanceAvailability(); window.serverNotifications=Array.isArray(data.serverNotifications)?data.serverNotifications:[]; window.serverDashboardSummary=Array.isArray(data.dashboardSummary)?data.dashboardSummary:[];
+                globalAttendanceRequests = Array.isArray(data.attendanceRequests) ? data.attendanceRequests : []; globalOfficeEvents = Array.isArray(data.officeEvents) ? data.officeEvents : [];updateAttendanceNonWorkingDay();updateAttendanceNonWorkingDay();v4UpdateAttendanceAvailability();updateTodayUrgentTaskButtonState(); window.serverNotifications=Array.isArray(data.serverNotifications)?data.serverNotifications:[]; window.serverDashboardSummary=Array.isArray(data.dashboardSummary)?data.dashboardSummary:[];
 
                 // Keep the latest successful result locally so the next page/login opens instantly.
                 try {
@@ -1648,6 +1648,21 @@ function parseBreakTimeClient(v){
             const reason=isLogWorkNonWorkingDate(key);
             btn.disabled=!!reason; btn.classList.toggle('opacity-50',!!reason); btn.classList.toggle('cursor-not-allowed',!!reason);
             btn.title=reason?`Log Daily Work frozen: ${reason}`:'Log Daily Work';
+        }
+        // Today Urgent Task is available only when the office is open for the employee today.
+        // Weekoff, approved Leave and Office Closed/Holiday days keep the button frozen.
+        function updateTodayUrgentTaskButtonState(){
+            const btn=document.getElementById('todayUrgentTaskBtn') || document.querySelector('button[onclick="openEmergencyTaskModal()"]');
+            if(!btn)return;
+            const todayKey=localDateKey();
+            const selectedKey=document.getElementById('attendanceDate')?.value||todayKey;
+            const reason=isLogWorkNonWorkingDate(todayKey);
+            const previousDate=selectedKey!==todayKey;
+            const frozen=!!reason || previousDate;
+            btn.disabled=frozen;
+            btn.classList.toggle('opacity-50',frozen);
+            btn.classList.toggle('cursor-not-allowed',frozen);
+            btn.title=previousDate?'Today Urgent Task sirf current date par available hai.':(reason?`Today Urgent Task frozen: ${reason}`:'Today Urgent Task');
         }
         function openLogWorkModal() {
             const modal=document.getElementById('logWorkModal'); if(!modal)return;
@@ -3179,7 +3194,8 @@ function parseBreakTimeClient(v){
                     totalAvailability++;
                     const key=attendanceDateKey(dt);
                     const rec=attendanceRecordFor(records,user,key);
-                    if(rec && rec.InTime) totalPresence++;
+                    const recStatus=String(rec?.Status||'').toLowerCase();
+                    if(rec && recStatus==='approved') totalPresence++;
                     else if(rec && String(rec.Leave||'').toLowerCase().includes('leave')) totalLeave++;
                     else if(isPast) totalAbsence++;
                 });
@@ -3219,7 +3235,8 @@ function parseBreakTimeClient(v){
                     g.dates.forEach(dt=>{
                         if(officeEventForDate(dt) || !attendanceIsWorkingDay(dt,meta.weekoff,meta.username||name) || dt>cutoff) return;
                         const rec=attendanceRecordFor(records,user,attendanceDateKey(dt));
-                        if(rec&&rec.InTime) gp++; else if(!(rec&&String(rec.Leave||'').toLowerCase().includes('leave'))) ga++;
+                        const recStatus=String(rec?.Status||'').toLowerCase();
+                        if(rec&&recStatus==='approved') gp++; else if(!(rec&&String(rec.Leave||'').toLowerCase().includes('leave'))) ga++;
                     });
                 });
                 const max=Math.max(1,gp+ga), h=Math.max(4,Math.round(gp/max*120));
@@ -3270,7 +3287,8 @@ function parseBreakTimeClient(v){
                 if(!matrix[r.user]) return;
                 const parts=String(r.date).split('-'), d=parseInt(parts[0],10);
                 let status='';
-                if(r.inTime) status='P';
+                const recStatus=String(r.status||'').toLowerCase();
+                if(recStatus==='approved') status='P';
                 else if(String(r.leave||'').toLowerCase().includes('leave')) status='L';
                 else if(String(r.leave||'').toLowerCase().includes('weekoff')) status='W';
                 if(status==='P'||!matrix[r.user][d]) matrix[r.user][d]=status;
@@ -3376,6 +3394,11 @@ function parseBreakTimeClient(v){
         }
         let emergencyTaskTemplateCache=[];
         function openEmergencyTaskModal(){
+            const todayKey=localDateKey();
+            const selectedKey=document.getElementById('attendanceDate')?.value||todayKey;
+            if(selectedKey!==todayKey){ alert('Today Urgent Task sirf current date ke liye available hai. Previous date par yeh freeze rahega.'); updateTodayUrgentTaskButtonState(); return; }
+            const nonWorking=isLogWorkNonWorkingDate(todayKey);
+            if(nonWorking){ alert(`Today Urgent Task frozen: ${nonWorking}. Office closed hai, is din urgent task request nahi ki ja sakti.`); updateTodayUrgentTaskButtonState(); return; }
             const today=new Date(); const key=today.toISOString().split('T')[0];
             const label=document.getElementById('emergencyTaskToday');if(label)label.textContent=today.toLocaleDateString('en-IN',{day:'2-digit',month:'2-digit',year:'numeric'});
             const sel=document.getElementById('emergencyTaskTemplate');if(sel)sel.innerHTML='<option value="">Loading templates...</option>';
@@ -3389,7 +3412,12 @@ function parseBreakTimeClient(v){
         function applyEmergencyTaskTemplate(){const id=document.getElementById('emergencyTaskTemplate')?.value||'',t=emergencyTaskTemplateCache.find(x=>String(x.templateId)===String(id));const cat=document.getElementById('emergencyTaskCategory');if(cat)cat.value=t?.category||'';}
         function closeEmergencyTaskModal(){document.getElementById('emergencyTaskModal').style.display='none';}
         function submitEmergencyTaskRequest(){
-            const templateId=document.getElementById('emergencyTaskTemplate')?.value||'',assignBy=document.getElementById('emergencyTaskAssignBy')?.value||'',details=document.getElementById('emergencyTaskDetails')?.value.trim()||'',today=new Date().toISOString().split('T')[0];
+            const todayKey=localDateKey();
+            const selectedKey=document.getElementById('attendanceDate')?.value||todayKey;
+            if(selectedKey!==todayKey){ alert('Today Urgent Task sirf current date ke liye available hai.'); updateTodayUrgentTaskButtonState(); return; }
+            const nonWorking=isLogWorkNonWorkingDate(todayKey);
+            if(nonWorking){ alert(`Today Urgent Task frozen: ${nonWorking}.`); updateTodayUrgentTaskButtonState(); return; }
+            const templateId=document.getElementById('emergencyTaskTemplate')?.value||'',assignBy=document.getElementById('emergencyTaskAssignBy')?.value||'',details=document.getElementById('emergencyTaskDetails')?.value.trim()||'',today=todayKey;
             if(!templateId){alert('Task Template select karein.');return;} if(!assignBy){alert('Assign By select karein.');return;}
             const t=emergencyTaskTemplateCache.find(x=>String(x.templateId)===String(templateId));if(!t){alert('Selected template nahi mila.');return;}
             const fd=new FormData();fd.append('action','emergencyTaskRequest');fd.append('templateId',templateId);fd.append('requestDate',today);fd.append('assignBy',assignBy);fd.append('details',details);fd.append('sessionToken',sessionToken);
