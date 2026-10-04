@@ -102,6 +102,31 @@
         .login-card{backdrop-filter:blur(14px);background:rgba(255,255,255,.96);border:1px solid rgba(255,255,255,.55);}
         .profile-photo{object-fit:cover;width:48px;height:48px;border-radius:9999px;border:2px solid #5fd3cc;background:#259b94;}
 
+        /* Assign New Task: larger desktop workspace */
+        #assignTaskModal .assign-task-content{
+            width:94vw !important;
+            max-width:1180px !important;
+            max-height:95vh !important;
+            margin:1.5vh auto !important;
+            padding:28px !important;
+            overflow-y:auto;
+        }
+        #assignTaskModal .assign-task-content #assignEmployeeList{
+            max-height:360px !important;
+        }
+        @media (max-width: 767px){
+            #assignTaskModal .assign-task-content{
+                width:100% !important;
+                max-width:100% !important;
+                max-height:96vh !important;
+                margin:8px auto !important;
+                padding:18px !important;
+            }
+            #assignTaskModal .assign-task-content #assignEmployeeList{
+                max-height:300px !important;
+            }
+        }
+
         /* User Management: larger desktop workspace */
         #userManagementModal .user-management-content{
             width:94vw !important;
@@ -535,7 +560,7 @@
 
     <!-- HOD ASSIGN TASK MODAL -->
     <div id="assignTaskModal" class="modal">
-        <div class="modal-content relative max-w-lg shadow-2xl">
+        <div class="modal-content assign-task-content relative shadow-2xl">
             <span onclick="closeAssignTaskModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-800 cursor-pointer text-2xl transition">&times;</span>
             <h3 class="text-2xl font-bold text-[#112a2e] mb-6">Assign New Task</h3>
             <div class="mb-5 border border-[#b2d8d8] rounded-xl bg-[#f7fbfb] p-4">
@@ -702,10 +727,10 @@
         <div class="modal-content relative max-w-3xl shadow-2xl">
             <span onclick="closeImportCenterModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-800 cursor-pointer text-2xl transition">&times;</span>
             <h3 class="text-2xl font-extrabold text-[#112a2e] mb-1"><i class="fas fa-file-import text-[#7c3aed]"></i> Import Center</h3>
-            <p class="text-sm text-gray-500 mb-5">Attendance, Tasks aur Office Events ko CSV / Excel se ek hi jagah import karein.</p>
+            <p class="text-sm text-gray-500 mb-5">Attendance, Task Templates aur Office Events ko CSV / Excel se ek hi jagah import karein.</p>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
                 <button type="button" id="importTabAttendance" onclick="selectImportType('attendance')" class="import-tab active">🕒 Attendance</button>
-                <button type="button" id="importTabTasks" onclick="selectImportType('tasks')" class="import-tab">📋 Tasks</button>
+                <button type="button" id="importTabTasks" onclick="selectImportType('tasks')" class="import-tab">📋 Task Templates</button>
                 <button type="button" id="importTabEvents" onclick="selectImportType('events')" class="import-tab">🗓️ Office Events</button>
             </div>
             <div id="importDropZone" class="border-2 border-dashed border-[#7c3aed] bg-[#faf5ff] rounded-2xl p-8 text-center cursor-pointer transition hover:bg-[#f5edff]">

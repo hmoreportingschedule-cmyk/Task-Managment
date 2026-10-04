@@ -1132,39 +1132,99 @@
                     if(!importCenterRows.length)throw new Error('Valid attendance rows nahi mili.');
                     importPreviewRows(importCenterRows,'attendance');
                 } else if(importCenterType==='tasks'){
-                    importCenterRows=arr.map(r=>({employee:String(r['Employee ID']||r['Employee Username']||r['Employee']||r['Username']||'').trim(),taskName:String(r['Task Name']||r['Task']||'').trim(),startDate:importExcelDate(r['Start Date']||r['Start']),endDate:importExcelDate(r['End Date']||r['End']),priority:String(r['Priority']||'Normal').trim(),frequency:String(r['Frequency']||'One-time').trim(),weightage:Number(r['Weightage'])||10,assignedBy:String(r['Assigned By']||'').trim(),category:String(r['Category']||'').trim(),work:String(r['Work']||'').trim(),workWeightage:Number(r['Work Weightage'])||0})).filter(r=>r.employee||r.taskName);
-                    if(!importCenterRows.length)throw new Error('Valid task rows nahi mili.');
-                    importPreviewRows(importCenterRows,'task');
+                    // Task import in Import Center is intentionally TEMPLATE import.
+                    // One template can occupy multiple rows; rows are grouped by Template ID.
+                    const hasTemplateFields=arr.some(r=>r['Task Name']||r['Template ID']||r['Template Name']||r['Work Name']||r['Work']);
+                    if(!hasTemplateFields)throw new Error('Task Template format required: Template ID, Task Name aur Work Name columns check karein.');
+                    importCenterRows=arr.map(r=>({
+                        templateId:String(r['Template ID']||r['TemplateId']||r['Template']||'').trim(),
+                        taskName:String(r['Task Name']||r['Template Name']||r['Task']||'').trim(),
+                        category:String(r['Category']||r['Template Category']||'').trim(),
+                        description:String(r['Description']||r['Task Description']||'').trim(),
+                        priority:String(r['Priority']||'Normal').trim(),
+                        weightage:Number(r['Weightage'])||10,
+                        startDay:Number(r['Start Day']||r['StartDay']||1)||1,
+                        endDay:Number(r['End Day']||r['EndDay']||r['Start Day']||1)||1,
+                        active:String(r['Active']??'TRUE').trim().toLowerCase()!=='false' && String(r['Active']??'TRUE').trim()!=='0' && String(r['Active']??'TRUE').trim().toLowerCase()!=='off',
+                        repeat:String(r['Repeat']||r['Frequency']||'Monthly').trim()||'Monthly',
+                        work:{
+                            category:String(r['Work Category']||r['Work Category Name']||r['Category']||'').trim(),
+                            workName:String(r['Work Name']||r['Work']||'').trim(),
+                            weightage:Number(r['Work Weightage']||r['WorkWeightage'])||0
+                        }
+                    })).filter(r=>r.taskName);
+                    if(!importCenterRows.length)throw new Error('Valid Task Template rows nahi mili.');
+                    const grouped={};
+                    importCenterRows.forEach(r=>{
+                        const key=(r.templateId||r.taskName).toLowerCase();
+                        if(!grouped[key])grouped[key]=[];
+                        grouped[key].push(r);
+                    });
+                    const templateCount=Object.keys(grouped).length;
+                    const workCount=importCenterRows.filter(r=>r.work.workName).length;
+                    document.getElementById('importPreview').innerHTML=`<div class="bg-green-50 border border-green-200 rounded-lg p-3 text-green-900"><b>${templateCount}</b> Task Template(s) aur <b>${workCount}</b> Work row(s) ready hain. Same Template ID/name wali rows ek hi template mein merge hongi.</div>`;
+                    enableConfirmImportButton();
                 } else {
                     importCenterRows=arr.map(r=>({eventName:String(r['Event Name']||r['Event']||'').trim(),fromDate:importExcelDate(r['From Date']||r['Date']),toDate:importExcelDate(r['To Date']||r['From Date']||r['Date']),type:String(r['Type']||'Office Closed').trim(),details:String(r['Details']||'').trim()})).filter(r=>r.eventName||r.fromDate);
                     if(!importCenterRows.length)throw new Error('Valid office event rows nahi mili.');
                     importPreviewRows(importCenterRows,'office event');
                 }
-            }catch(e){importCenterRows=[];document.getElementById('importPreview').innerHTML='<div class="bg-red-50 border border-red-200 rounded-lg p-3 font-semibold text-red-700">File format read nahi ho saka: '+e.message+'</div>';}};
+            }catch(e){importCenterRows=[];document.getElementById('importPreview').innerHTML='<div class="bg-red-50 border border-red-200 rounded-lg p-3 font-semibold text-red-700">File format read nahi ho saka: '+escapeHtml(e.message)+'</div>';}};
             rd.readAsArrayBuffer(file);
         }
         async function confirmImportCenter(){
             if(!importCenterFile||!importCenterRows.length){alert('Pehle CSV / Excel file select karein.');return;}
             const btn=document.getElementById('confirmImportBtn'); btn.disabled=true; btn.innerText='Syncing...';
-            const fd=new FormData(); fd.append('action',importCenterType==='attendance'?'bulkAttendanceUpload':importCenterType==='tasks'?'bulkTaskUpload':'uploadOfficeEvents'); fd.append('rowsJson',JSON.stringify(importCenterRows)); fd.append('sessionToken',sessionToken);
             try{
+                let payloadRows=importCenterRows;
+                let action=importCenterType==='attendance'?'bulkAttendanceUpload':importCenterType==='tasks'?'importCommonTaskTemplates':'uploadOfficeEvents';
+                if(importCenterType==='tasks'){
+                    // Backend importCommonTaskTemplates accepts one row per Work.
+                    // Repeating the same Template ID makes all Work rows merge into one template.
+                    const generatedIds={};
+                    payloadRows=importCenterRows.map(r=>{
+                        let tid=r.templateId;
+                        if(!tid){
+                            const key=r.taskName.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,28)||'template';
+                            if(!generatedIds[key])generatedIds[key]='IMP_'+key.toUpperCase();
+                            tid=generatedIds[key];
+                        }
+                        return {...r,templateId:tid,work:r.work};
+                    });
+                }
+                const fd=new FormData(); fd.append('action',action); fd.append('rowsJson',JSON.stringify(payloadRows)); fd.append('sessionToken',sessionToken);
                 const d=await fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json());
                 if(d.failed&&d.failed.length)alert(d.failed.join('\n'));
                 if(d.status==='success'){
-                    const summary='Import & Sync completed.\nNew: '+(d.imported||0)+'\nUpdated: '+(d.updated||0)+'\nSkipped: '+(d.skipped||0)+'\nFailed: '+(d.failed?d.failed.length:0);
-                    alert(summary);
+                    const summary=importCenterType==='tasks'
+                        ? 'Task Templates import completed.\nNew: '+(d.created||0)+'\nUpdated: '+(d.updated||0)
+                        : 'Import & Sync completed.\nNew: '+(d.imported||0)+'\nUpdated: '+(d.updated||0)+'\nSkipped: '+(d.skipped||0)+'\nFailed: '+(d.failed?d.failed.length:0);
+                    alert(d.message?d.message+'\n\n'+summary:summary);
                     document.getElementById('importCenterFile').value=''; importCenterRows=[]; importCenterFile=null; document.getElementById('importSelectedFile').innerText=''; document.getElementById('importPreview').innerHTML='';
-                    closeImportCenterModal(); fetchDashboardDataSilently();
+                    closeImportCenterModal();
+                    if(importCenterType==='tasks')refreshAssignTemplateData();
+                    fetchDashboardDataSilently();
                 } else { alert(d.message||'Import failed.'); enableConfirmImportButton(); }
-            }catch(err){alert('Import / Sync failed.');enableConfirmImportButton();}
+            }catch(err){alert('Import / Sync failed: '+(err.message||''));enableConfirmImportButton();}
         }
         function downloadImportFormat(){
             const wb=XLSX.utils.book_new();
-            if(importCenterType==='attendance'){const ws=XLSX.utils.json_to_sheet([{'Date':'2026-09-22','Employee ID':'EMP001','In Time':'09:30:00 AM','Out Time':'06:30:00 PM','Break Start':'02:00:00 PM','Break End':'02:30:00 PM','Leave/Weekoff':'','Reason':'','Approval Status':'Approved'}]);XLSX.utils.book_append_sheet(wb,ws,'Attendance');XLSX.writeFile(wb,'Attendance_Import_Format.xlsx');}
-            else if(importCenterType==='tasks'){const ws=XLSX.utils.json_to_sheet([{'Employee ID':'EMP001','Task Name':'Client Follow-up','Start Date':'2026-09-22','End Date':'2026-09-22','Priority':'Normal','Frequency':'One-time','Weightage':10,'Assigned By':'MasterAdmin','Category':'Calling','Work':'Member Follow-up','Work Weightage':100}]);XLSX.utils.book_append_sheet(wb,ws,'Tasks');XLSX.writeFile(wb,'Task_Import_Format.xlsx');}
-            else {const ws=XLSX.utils.json_to_sheet([{'Event Name':'Independence Day','From Date':'2026-08-15','To Date':'2026-08-15','Type':'National Holiday','Details':'Office Closed'}]);XLSX.utils.book_append_sheet(wb,ws,'Office Events');XLSX.writeFile(wb,'Office_Events_Import_Format.xlsx');}
+            if(importCenterType==='attendance'){
+                const ws=XLSX.utils.json_to_sheet([{'Date':'2026-09-22','Employee ID':'EMP001','In Time':'09:30:00 AM','Out Time':'06:30:00 PM','Break Start':'02:00:00 PM','Break End':'02:30:00 PM','Leave/Weekoff':'','Reason':'','Approval Status':'Approved'}]);
+                XLSX.utils.book_append_sheet(wb,ws,'Attendance'); XLSX.writeFile(wb,'Attendance_Import_Format.xlsx');
+            } else if(importCenterType==='tasks'){
+                // Exact Task Template import format. Repeat Template ID for each work row.
+                const rows=[
+                    {'Template ID':'TPL001','Task Name':'Client Follow-up','Category':'Calling','Description':'Daily client follow-up task','Priority':'Normal','Weightage':10,'Start Day':1,'End Day':31,'Active':'TRUE','Repeat':'Monthly','Work Category':'Calling','Work Name':'Member Follow-up','Work Weightage':50},
+                    {'Template ID':'TPL001','Task Name':'Client Follow-up','Category':'Calling','Description':'Daily client follow-up task','Priority':'Normal','Weightage':10,'Start Day':1,'End Day':31,'Active':'TRUE','Repeat':'Monthly','Work Category':'Reporting','Work Name':'Daily Follow-up Report','Work Weightage':50},
+                    {'Template ID':'TPL002','Task Name':'Weekly Review','Category':'Meeting','Description':'Weekly review template','Priority':'High','Weightage':15,'Start Day':1,'End Day':31,'Active':'TRUE','Repeat':'Monthly','Work Category':'Review','Work Name':'Weekly Team Review','Work Weightage':100}
+                ];
+                const ws=XLSX.utils.json_to_sheet(rows); XLSX.utils.book_append_sheet(wb,ws,'Task Templates'); XLSX.writeFile(wb,'Task_Template_Import_Format.xlsx');
+            } else {
+                const ws=XLSX.utils.json_to_sheet([{'Event Name':'Independence Day','From Date':'2026-08-15','To Date':'2026-08-15','Type':'National Holiday','Details':'Office Closed'}]);
+                XLSX.utils.book_append_sheet(wb,ws,'Office Events'); XLSX.writeFile(wb,'Office_Events_Import_Format.xlsx');
+            }
         }
-
         function openTaskExcelModal(){document.getElementById('taskExcelFile').value='';document.getElementById('taskExcelPreview').innerHTML='';document.getElementById('taskExcelModal').style.display='block';}
         function closeTaskExcelModal(){document.getElementById('taskExcelModal').style.display='none';}
         function downloadTaskExcelTemplate(){
