@@ -680,9 +680,10 @@ function parseBreakTimeClient(v){
         }
         function setLogWorkDateConstraints(){
             const el=document.getElementById('logWorkDate'); if(!el)return;
-            const today=localDateKey(), t=parseLocalDateKey(today), start=attendanceEntryStart?String(attendanceEntryStart).slice(0,10):'';
-            const min=start||(()=>{const x=new Date(t);x.setDate(x.getDate()-2);return localDateKey(x)})();
-            el.min=min;el.max=today;if(!el.value)el.value=today;
+            const today=localDateKey(), t=parseLocalDateKey(today);
+            const minDate=new Date(t); minDate.setDate(minDate.getDate()-2);
+            const min=localDateKey(minDate);
+            el.min=min;el.max=today;if(!el.value||!isLogWorkDateAllowed(el.value))el.value=today;
         }
         function populateLogTaskDropdown(tasks, dateKey){
             const select=document.getElementById('logTaskSelect'); if(!select)return;
@@ -1646,8 +1647,11 @@ function parseBreakTimeClient(v){
             const btn=document.getElementById('logDailyWorkBtn'); if(!btn)return;
             const key=document.getElementById('attendanceDate')?.value||localDateKey();
             const reason=isLogWorkNonWorkingDate(key);
-            btn.disabled=!!reason; btn.classList.toggle('opacity-50',!!reason); btn.classList.toggle('cursor-not-allowed',!!reason);
-            btn.title=reason?`Log Daily Work frozen: ${reason}`:'Log Daily Work';
+            const allowed=isLogWorkDateAllowed(key);
+            const rangeReason=!allowed?'Log Daily Work sirf current date aur previous 2 days ke liye available hai.':'';
+            const frozen=!!reason||!allowed;
+            btn.disabled=frozen; btn.classList.toggle('opacity-50',frozen); btn.classList.toggle('cursor-not-allowed',frozen);
+            btn.title=reason?`Log Daily Work frozen: ${reason}`:(rangeReason||'Log Daily Work');
         }
         // Today Urgent Task is available only when the office is open for the employee today.
         // Weekoff, approved Leave and Office Closed/Holiday days keep the button frozen.
@@ -1670,8 +1674,10 @@ function parseBreakTimeClient(v){
             const dateEl=document.getElementById('logWorkDate');
             const dateKey=dateEl?.value||localDateKey();
             const nonWorking=isLogWorkNonWorkingDate(dateKey);
+            const allowed=isLogWorkDateAllowed(dateKey);
             const btn=document.querySelector('button[onclick="openLogWorkModal()"]');
             if(nonWorking){ alert(`Log Daily Work frozen: ${nonWorking}.`); if(btn)btn.disabled=true; return; }
+            if(!allowed){ alert('Log Daily Work sirf current date aur previous 2 days ke liye available hai.'); if(btn)btn.disabled=true; return; }
             if(btn)btn.disabled=false;
             modal.style.display='block';
             ensureWorkLogsLoaded(true).catch(()=>{}).finally(()=>{populateLogTaskDropdown(globalAllTasks,dateKey);updateCompletionCheckboxState();});
@@ -1682,11 +1688,11 @@ function parseBreakTimeClient(v){
         }
         function updateLogWorkDateUI(){
             const el=document.getElementById('logWorkDate'); if(!el)return;
-            const key=el.value, nonWorking=isLogWorkNonWorkingDate(key), hint=document.getElementById('logWorkDateHint');
+            const key=el.value, nonWorking=isLogWorkNonWorkingDate(key), allowed=isLogWorkDateAllowed(key), hint=document.getElementById('logWorkDateHint');
             const modal=document.getElementById('logWorkModal');
-            if(hint)hint.textContent=nonWorking?`Log Daily Work frozen: ${nonWorking}.`:'Sirf aaj ya Attendance Entry allowed previous date select karein.';
-            if(modal&&modal.style.display!=='none'&&nonWorking){document.getElementById('logTaskSelect').innerHTML='<option value="">-- Log Daily Work Frozen --</option>';}
-            else if(!nonWorking)populateLogTaskDropdown(globalAllTasks,key);
+            if(hint)hint.textContent=nonWorking?`Log Daily Work frozen: ${nonWorking}.`:(!allowed?'Sirf current date aur previous 2 days select kar sakte hain.':'Current date ya previous 2 days mein Log Daily Work add kar sakte hain.');
+            if(modal&&modal.style.display!=='none'&&(!allowed||nonWorking)){document.getElementById('logTaskSelect').innerHTML='<option value="">-- Log Daily Work Frozen --</option>';}
+            else if(allowed&&!nonWorking)populateLogTaskDropdown(globalAllTasks,key);
             updateCompletionCheckboxState(); updateLogDailyWorkButtonState();
         }
         function updateBeforeCompletionUI(){
@@ -1709,7 +1715,7 @@ function parseBreakTimeClient(v){
         function submitWorkLog() {
             const taskSel=document.getElementById('logTaskSelect'), tIdx=taskSel.value, tName=taskSel.options[taskSel.selectedIndex]?.text||'', mins=document.getElementById('logTimeMins').value, desc=document.getElementById('logDesc').value, workDate=document.getElementById('logWorkDate')?.value||localDateKey(), username=document.getElementById('displayUser').innerText;
             const nonWorking=isLogWorkNonWorkingDate(workDate);
-            if(!isLogWorkDateAllowed(workDate)){alert('Is date par Log Daily Work allowed nahi hai.');return;}
+            if(!isLogWorkDateAllowed(workDate)){alert('Log Daily Work sirf current date aur previous 2 days ke liye available hai.');return;}
             if(nonWorking){alert(`Log Daily Work frozen: ${nonWorking}.`);return;}
             if(!tIdx||!mins){alert('Please select task and enter time!');return;}
             const before=!!document.getElementById('requestBeforeCompletion')?.checked;
@@ -2819,9 +2825,9 @@ function parseBreakTimeClient(v){
         function progressReportRenderDetails(stats){
             const box=document.getElementById('progressReportDetails'); if(!box)return;
             box.innerHTML=stats.map(s=>{
-                const taskRows=s.tasks.slice().sort((a,b)=>(progressReportDateObj(a.endDate)||new Date(0))-(progressReportDateObj(b.endDate)||new Date(0))).map(t=>`<tr><td>${progressReportEscape(t.taskName||'-')}</td><td>${progressReportEscape(t.startDate||'-')} → ${progressReportEscape(t.endDate||'-')}</td><td>${progressReportEscape(t.priority||'Normal')}</td><td>${progressReportEscape(t.empStatus||'Pending')}</td><td>${Number(t.timeSpent)||0} min</td></tr>`).join('')||'<tr><td colspan="5" class="p-4 text-center text-gray-500">No tasks found.</td></tr>';
+                const taskRows=s.tasks.slice().sort((a,b)=>(progressReportDateObj(a.endDate)||new Date(0))-(progressReportDateObj(b.endDate)||new Date(0))).map(t=>`<tr><td>${progressReportEscape(t.assignedBy||'-')}</td><td>${progressReportEscape(t.taskName||'-')}</td><td>${progressReportEscape(t.startDate||'-')} → ${progressReportEscape(t.endDate||'-')}</td><td>${progressReportEscape(t.priority||'Normal')}</td><td>${progressReportEscape(t.empStatus||'Pending')}</td><td>${Number(t.timeSpent)||0} min</td></tr>`).join('')||'<tr><td colspan="6" class="p-4 text-center text-gray-500">No tasks found.</td></tr>';
                 const parseProgressTimeMinutes=v=>{const s=String(v||'').trim(); if(!s)return null; const m=s.match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?/i); if(!m)return null; let h=Number(m[1]),mi=Number(m[2]); const ap=(m[3]||'').toUpperCase(); if(ap==='PM'&&h<12)h+=12; if(ap==='AM'&&h===12)h=0; return h*60+mi;}; const progressTotalWorkingMinutes=a=>{const st=parseProgressTimeMinutes(a.InTime),en=parseProgressTimeMinutes(a.OutTime); if(st===null||en===null)return '-'; let total=en-st; if(total<0)total+=1440; const extra=Number(a.ExtraBreakMinutes)||0; return Math.max(0,Math.round(total-extra));}; const attRows=s.rows.map(a=>{const st=String(a.Status||'').trim();const statusLabel=st?st:(a.InTime?'Pending':'-');return `<tr><td>${progressReportEscape(a.Date||'-')}</td><td>${a.InTime||'-'}</td><td>${a.OutTime||'-'}</td><td>${progressReportEscape(statusLabel)}</td><td>${progressReportEscape(a.ExtraBreakMinutes ? (a.ExtraBreakMinutes+' min') : '-')}</td><td>${progressReportEscape(a.BreakTimeForIjara||'-')}</td><td>${progressReportEscape(a.Reason||'-')}</td><td>${progressTotalWorkingMinutes(a)==='-'?'-':progressTotalWorkingMinutes(a)+' min'}</td></tr>`;}).join('')||'<tr><td colspan="8" class="p-4 text-center text-gray-500">No attendance records found.</td></tr>';
-                return `<div class="progress-report-section"><div class="flex flex-wrap justify-between items-center gap-2 mb-3"><div><h3 class="text-xl font-extrabold text-[#112a2e]">${progressReportEscape(s.emp)}${s.employeeId?` <span class=\"text-sm text-gray-500\">(${progressReportEscape(s.employeeId)})</span>`:''}</h3><div class="text-xs text-gray-500">Attendance ${s.attendancePct}% · Task ${s.taskPct}% · Overall ${s.overall}%</div></div><div class="text-sm font-bold text-[#259b94]">${s.completed}/${s.tasks.length} Tasks Complete</div></div><div class="grid grid-cols-2 md:grid-cols-6 gap-2 mb-4"><div class="bg-[#f0f7f7] p-3 rounded-lg"><b>${s.present}</b><small class="block text-gray-500">Present</small></div><div class="bg-red-50 p-3 rounded-lg"><b>${s.absent}</b><small class="block text-gray-500">Absent</small></div><div class="bg-amber-50 p-3 rounded-lg"><b>${s.leave}</b><small class="block text-gray-500">Leave</small></div><div class="bg-blue-50 p-3 rounded-lg"><b>${s.weekoff}</b><small class="block text-gray-500">Weekoff</small></div><div class="bg-green-50 p-3 rounded-lg"><b>${s.completed}</b><small class="block text-gray-500">Completed</small></div><div class="bg-orange-50 p-3 rounded-lg"><b>${s.tasks.length-s.completed}</b><small class="block text-gray-500">Pending</small></div></div><div class="overflow-x-auto mb-4"><h4 class="font-bold mb-2">Attendance Details</h4><table class="progress-report-mini-table"><thead><tr><th>Date</th><th>In Time</th><th>Out Time</th><th>Status</th><th>Extra Break Time</th><th>Break Time For Ijara</th><th>Reason</th><th>Total Working Minutes</th></tr></thead><tbody>${attRows}</tbody></table></div><div class="overflow-x-auto"><h4 class="font-bold mb-2">Task Details</h4><table class="progress-report-mini-table"><thead><tr><th>Task</th><th>Timeline</th><th>Priority</th><th>Status</th><th>Time</th></tr></thead><tbody>${taskRows}</tbody></table></div></div>`;
+                return `<div class="progress-report-section"><div class="flex flex-wrap justify-between items-center gap-2 mb-3"><div><h3 class="text-xl font-extrabold text-[#112a2e]">${progressReportEscape(s.emp)}${s.employeeId?` <span class=\"text-sm text-gray-500\">(${progressReportEscape(s.employeeId)})</span>`:''}</h3><div class="text-xs text-gray-500">Attendance ${s.attendancePct}% · Task ${s.taskPct}% · Overall ${s.overall}%</div></div><div class="text-sm font-bold text-[#259b94]">${s.completed}/${s.tasks.length} Tasks Complete</div></div><div class="grid grid-cols-2 md:grid-cols-6 gap-2 mb-4"><div class="bg-[#f0f7f7] p-3 rounded-lg"><b>${s.present}</b><small class="block text-gray-500">Present</small></div><div class="bg-red-50 p-3 rounded-lg"><b>${s.absent}</b><small class="block text-gray-500">Absent</small></div><div class="bg-amber-50 p-3 rounded-lg"><b>${s.leave}</b><small class="block text-gray-500">Leave</small></div><div class="bg-blue-50 p-3 rounded-lg"><b>${s.weekoff}</b><small class="block text-gray-500">Weekoff</small></div><div class="bg-green-50 p-3 rounded-lg"><b>${s.completed}</b><small class="block text-gray-500">Completed</small></div><div class="bg-orange-50 p-3 rounded-lg"><b>${s.tasks.length-s.completed}</b><small class="block text-gray-500">Pending</small></div></div><div class="overflow-x-auto mb-4"><h4 class="font-bold mb-2">Attendance Details</h4><table class="progress-report-mini-table"><thead><tr><th>Date</th><th>In Time</th><th>Out Time</th><th>Status</th><th>Extra Break Time</th><th>Break Time For Ijara</th><th>Reason</th><th>Total Working Minutes</th></tr></thead><tbody>${attRows}</tbody></table></div><div class="overflow-x-auto"><h4 class="font-bold mb-2">Task Details</h4><table class="progress-report-mini-table"><thead><tr><th>Task Assign By</th><th>Task</th><th>Timeline</th><th>Priority</th><th>Status</th><th>Time</th></tr></thead><tbody>${taskRows}</tbody></table></div></div>`;
             }).join('');
         }
         function renderProgressReport(){
@@ -2908,7 +2914,7 @@ function parseBreakTimeClient(v){
                     let yy=124;
                     yy=drawTable(['Date','In Time','Out Time','Status','Reason'],s.rows.map(a=>[a.Date||'-',a.InTime||'-',a.OutTime||'-',a.InTime?'Present':(String(a.Leave||'').toLowerCase().includes('leave')?'Leave':String(a.Leave||'').toLowerCase().includes('weekoff')?'Weekoff':'Absent'),a.Reason||a.Leave||'-']),[28,30,30,30,119],yy,5.2);
                     if(yy>H-55){footer();doc.addPage('a4','landscape');header('EMPLOYEE REPORT — TASK DETAILS',s.emp+' | '+month);yy=30;}
-                    yy+=5;drawTable(['Task','Timeline','Priority','Status','Time'],s.tasks.map(t=>[t.taskName||'-',(t.startDate||'-')+' → '+(t.endDate||'-'),t.priority||'Normal',t.empStatus||'Pending',(Number(t.timeSpent)||0)+' min']),[120,55,30,45,25],yy,5.2);footer();
+                    yy+=5;drawTable(['Task Assign By','Task','Timeline','Priority','Status','Time'],s.tasks.map(t=>[t.assignedBy||'-',t.taskName||'-',(t.startDate||'-')+' → '+(t.endDate||'-'),t.priority||'Normal',t.empStatus||'Pending',(Number(t.timeSpent)||0)+' min']),[38,82,55,30,45,25],yy,5.2);footer();
                 });
                 // Build the clickable index after all target pages are known.
                 const indexRows=[{title:'Employee Summary',detail:'Overall attendance, task and completion summary',page:summaryPage}].concat(employeePages.map(x=>({title:x.name,detail:(x.employeeId?'Employee ID: '+x.employeeId+'  ·  ':'')+(x.department||'Department not set'),page:x.page})));
