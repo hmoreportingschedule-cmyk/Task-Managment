@@ -9,7 +9,8 @@
         let globalAllTasks = []; 
         let globalTeamMembers = [];
         let globalTeamMemberMeta = [];
-        let globalMonthlyFullAttendance = []; 
+        let globalMonthlyFullAttendance = [];
+        let ramadanLunchFrozen = false; 
         let globalWorkLogs = [];
         let globalTeamAttendance = [];
         let monthlyChartInst = null;
@@ -80,7 +81,8 @@
             const msg=event?'Aaj office band hai: '+String(event.name||event.eventName||'Holiday')+'. Attendance ki zaroorat nahi.':isWeekoff?'Aaj aapka Weekoff hai. Attendance ki zaroorat nahi.':'';
             notice.textContent=msg;notice.classList.toggle('hidden',!msg);btn.disabled=!!msg;btn.style.opacity=msg?'0.5':'';btn.title=msg;
         }
-        document.addEventListener('change',e=>{if(e.target&&e.target.id==='attendanceDate')v4UpdateAttendanceAvailability();});
+        document.addEventListener('change',e=>{if(e.target&&e.target.id==='attendanceDate'){v4UpdateAttendanceAvailability();updateAttendanceReasonUI();} if(e.target&&(e.target.id==='attendanceAction'||e.target.id==='actionReasonSelect'||e.target.id==='namazReasonSelect'||e.target.id==='jumaReasonSelect')){if(e.target.id==='attendanceAction')toggleInputs(); updateAttendanceReasonUI();}});
+        document.addEventListener('input',e=>{if(e.target&&e.target.id==='manualTime')updateBreakExtraReasonVisibility();});
         function toggleInputs() {
             const action = document.getElementById('attendanceAction').value;
             const timeBox = document.getElementById('manualTimeBox');
@@ -90,15 +92,67 @@
                 timeBox.classList.add('hidden');
             }
         }
-        toggleInputs();
+        toggleInputs(); updateAttendanceReasonUI();
 
+        function getSelectedAttendanceDate(){ return document.getElementById('attendanceDate')?.value || ''; }
+        function isFridaySelected(){ const d=getSelectedAttendanceDate(); if(!d)return false; const dt=new Date(d+'T12:00:00'); return !Number.isNaN(dt.getTime()) && dt.getDay()===5; }
+        function toggleJumaBox(){
+            const friday=isFridaySelected(), jbox=document.getElementById('jumaReasonBox'), hint=document.getElementById('jumaDayHint'), jsel=document.getElementById('jumaReasonSelect');
+            if(jbox) jbox.classList.toggle('hidden',!friday);
+            if(hint) hint.classList.toggle('hidden',friday);
+            if(!friday && jsel) jsel.value='';
+            updateBreakExtraReasonVisibility();
+        }
         function toggleOtherReason() {
-            const val = document.getElementById('actionReasonSelect').value;
+            const val = document.getElementById('actionReasonSelect')?.value || '';
             const other = document.getElementById('actionReasonOther');
             const namaz = document.getElementById('namazReasonBox');
-            if(val === 'Other') other.classList.remove('hidden'); else { other.classList.add('hidden'); other.value=''; }
-            if(val === 'Namaz') namaz.classList.remove('hidden'); else { namaz.classList.add('hidden'); document.getElementById('namazReasonSelect').value=''; }
+            const juma = document.getElementById('jumaReasonBox');
+            const isFriday=isFridaySelected();
+            if(other) other.classList.toggle('hidden',val !== 'Other');
+            if(val !== 'Other' && other) other.value='';
+            if(namaz) namaz.classList.toggle('hidden',val !== 'Namaz');
+            if(val !== 'Namaz' && document.getElementById('namazReasonSelect')) document.getElementById('namazReasonSelect').value='';
+            if(juma) juma.classList.toggle('hidden',!(val==='Namaz' && isFriday));
+            if(val!=='Namaz' || !isFriday){ const j=document.getElementById('jumaReasonSelect'); if(j)j.value=''; }
+            const lunchOpt=[...document.querySelectorAll('#actionReasonSelect option')].find(o=>o.value==='Lunch');
+            if(lunchOpt){ lunchOpt.disabled=!!ramadanLunchFrozen; lunchOpt.hidden=!!ramadanLunchFrozen; if(ramadanLunchFrozen && val==='Lunch') document.getElementById('actionReasonSelect').value=''; }
+            updateBreakExtraReasonVisibility();
         }
+        function getBreakPolicyForSelection(){
+            const type=document.getElementById('actionReasonSelect')?.value||'';
+            if(type==='Lunch') return {label:'Lunch',max:25};
+            if(type==='Namaz'){
+                const j=isFridaySelected() && document.getElementById('jumaReasonSelect')?.value==='Juma';
+                if(j)return {label:'Juma',max:70};
+                const n=document.getElementById('namazReasonSelect')?.value||'';
+                return {label:n?('Namaz - '+n):'Namaz',max:25};
+            }
+            return null;
+        }
+        function parseBreakTimeClient(v){
+            if(!v)return null; const m=String(v).trim().match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?/i); if(!m)return null;
+            let h=Number(m[1]),mi=Number(m[2]); const ap=(m[3]||'').toUpperCase(); if(ap==='PM'&&h<12)h+=12; if(ap==='AM'&&h===12)h=0; return h*60+mi;
+        }
+        function getOpenBreakStartForDate(){
+            const date=getSelectedAttendanceDate(); if(!date)return null;
+            const rec=(globalMonthlyFullAttendance||[]).find(a=>{ const raw=String(a.Date||'').trim(); let key=raw; if(/^\d{2}-\d{2}-\d{4}$/.test(raw)){const p=raw.split('-');key=`${p[2]}-${p[1]}-${p[0]}`;} return key===date && String(a.Employee||'').toLowerCase()===String(document.getElementById('displayUser')?.innerText||'').toLowerCase(); });
+            if(!rec)return null;
+            const bs=String(rec.BreakStarts||'').split('|').map(x=>x.trim()).filter(Boolean), be=String(rec.BreakEnds||'').split('|').map(x=>x.trim()).filter(Boolean);
+            if(bs.length>be.length)return parseBreakTimeClient(bs[bs.length-1]);
+            return null;
+        }
+        function updateBreakExtraReasonVisibility(){
+            const wrap=document.getElementById('extraBreakReasonBox'), text=document.getElementById('extraBreakLimitText');
+            if(!wrap)return;
+            const action=document.getElementById('attendanceAction')?.value||'';
+            if(action!=='Break End'){wrap.classList.add('hidden');if(text)text.innerText='';return;}
+            const policy=getBreakPolicyForSelection(), start=getOpenBreakStartForDate(), end=parseBreakTimeClient(document.getElementById('manualTime')?.value||'');
+            if(!policy || start===null || end===null){wrap.classList.add('hidden');if(text)text.innerText='';return;}
+            let mins=end-start;if(mins<0)mins+=1440;
+            if(mins>policy.max){wrap.classList.remove('hidden');if(text)text.innerText=`Allowed ${policy.max} minutes. Actual ${mins} minutes. Extra ${mins-policy.max} minutes duty mein count nahi honge.`;}else{wrap.classList.add('hidden');if(text)text.innerText='';document.getElementById('extraBreakReason').value='';}
+        }
+        function updateAttendanceReasonUI(){ toggleOtherReason(); toggleJumaBox(); }
 
         function formatTime12h(time24) {
             if(!time24) return "";
@@ -136,7 +190,7 @@
                 }
                 showLoginStatus('Login successful. Dashboard load ho raha hai…','info');
                 document.getElementById('login-section').style.display='none'; document.getElementById('dashboard-section').style.display='flex';
-                sessionToken=data.sessionToken||""; whatsappGroupLink=data.whatsappGroupLink||""; performanceWeights=data.performanceWeights||{attendance:50,task:50}; attendanceEntryStart=data.attendanceEntryStart||""; attendanceEntryEnd=data.attendanceEntryEnd||"";
+                sessionToken=data.sessionToken||""; whatsappGroupLink=data.whatsappGroupLink||""; performanceWeights=data.performanceWeights||{attendance:50,task:50}; ramadanLunchFrozen=!!data.ramadanLunchFrozen; attendanceEntryStart=data.attendanceEntryStart||""; attendanceEntryEnd=data.attendanceEntryEnd||"";
                 setDateConstraints(); document.getElementById('displayUser').innerText=data.actualName||data.username; window.currentUserContactNumber=data.contactNumber||''; window.currentUserWhatsappNumber=data.whatsappNumber||'';
                 document.getElementById('displayDept').innerText=data.department||'--'; document.getElementById('displayOfficeTime').innerText=data.officeTime||'--'; window.currentUserWeekoff=data.weekoff||'Sunday'; document.getElementById('displayWeekoff').innerText=data.weekoff||'Sunday';
                 document.getElementById('displayOfficeLocation').innerText=[data.officeLocation,data.officeAddress].filter(Boolean).join(' : ')||'--'; setDisplayedProfilePhoto(data.profilePhotoUrl||'');
@@ -147,7 +201,7 @@
                     document.getElementById('progressReportAttWeight')?.removeAttribute('readonly'); document.getElementById('progressReportTaskWeight')?.removeAttribute('readonly'); document.getElementById('attendanceWeightage')?.removeAttribute('readonly'); document.getElementById('taskWeightage')?.removeAttribute('readonly');
                     document.querySelectorAll('#progressReportAttWeight,#progressReportTaskWeight,#attendanceWeightage,#taskWeightage').forEach(el=>{el.classList.remove('bg-gray-100','cursor-not-allowed');});
                     document.querySelectorAll('.admin-only').forEach(el=>el.style.setProperty('display','flex','important')); document.querySelectorAll('.hod-only').forEach(el=>el.style.setProperty('display','flex','important')); const actionHdr=document.getElementById('taskActionHeader'); if(actionHdr) actionHdr.style.display='table-cell';
-                    document.getElementById('hodNoticeBox').style.display='block'; document.getElementById('teamAttendanceSection').style.display='block'; document.getElementById('taskTableTitle').innerText='System Overview';
+                    document.getElementById('hodNoticeBox').style.display='block'; document.getElementById('teamAttendanceSection').style.display='block'; const rlf=document.getElementById('ramadanLunchFreeze'); if(rlf) rlf.checked=!!ramadanLunchFrozen; document.getElementById('taskTableTitle').innerText='System Overview';
                     document.querySelectorAll('.hod-only-col').forEach(el=>el.classList.remove('hidden')); document.querySelectorAll('.emp-only').forEach(el=>el.style.setProperty('display','none','important'));
                 } else if(isTaskAssistantRole(role)){
                     document.body.classList.add('manager-mode');
@@ -194,11 +248,16 @@
             const action = document.getElementById('attendanceAction').value;
             const reasonType = document.getElementById('actionReasonSelect').value;
             let reason = reasonType;
-            if(reasonType === 'Other') reason = document.getElementById('actionReasonOther').value;
-            if(reasonType === 'Namaz') {
-                const namaz = document.getElementById('namazReasonSelect').value;
-                if(!namaz) { alert('Please select Namaz.'); return; }
-                reason = 'Namaz - ' + namaz;
+            if(action==='Break Start' || action==='Break End') {
+                if(reasonType==='Lunch' && ramadanLunchFrozen){ alert('Ramadan mein Lunch option Admin ne freeze kiya hua hai.'); return; }
+                if(reasonType === 'Other') reason = document.getElementById('actionReasonOther').value.trim();
+                if(reasonType === 'Namaz') {
+                    const juma = isFridaySelected() && document.getElementById('jumaReasonSelect').value==='Juma';
+                    const namaz = document.getElementById('namazReasonSelect').value;
+                    if(juma) reason='Juma';
+                    else { if(!namaz){ alert('Please select Namaz.'); return; } reason = 'Namaz - ' + namaz; }
+                }
+                if(!reason){ alert('Break Type select karein.'); return; }
             }
             
             const rawManualTime = document.getElementById('manualTime').value;
@@ -240,6 +299,7 @@
             formData.append('reason', reason);
             formData.append('manualTime', manualTime12h);
             formData.append('selectedDate', selectedDate);
+            formData.append('extraBreakReason', document.getElementById('extraBreakReason')?.value.trim() || '');
             formData.append('sessionToken', sessionToken);
 
             fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: formData })
@@ -258,6 +318,8 @@
                 document.getElementById('namazReasonBox').classList.add('hidden');
                 document.getElementById('actionReasonOther').value = '';
                 document.getElementById('actionReasonOther').classList.add('hidden');
+                if(document.getElementById('extraBreakReason')) document.getElementById('extraBreakReason').value='';
+                document.getElementById('extraBreakReasonBox')?.classList.add('hidden');
                 
                 fetchDashboardDataSilently();
             }).catch(err => { alert("Saved!"); btn.innerText = "Submit Record"; btn.disabled = false; });
@@ -318,10 +380,12 @@
                 outM = now.getHours() * 60 + now.getMinutes();
             }
             if (outM < inM) outM += 24 * 60;
-            const net = Math.max(0, (outM - inM) - breakM);
+            const extraBreak = Math.max(0, Number(att.extraBreakMinutes || att.ExtraBreakMinutes || 0));
+            const net = Math.max(0, (outM - inM) - extraBreak);
             const h = Math.floor(net / 60);
             const m = net % 60;
             netEl.innerText = `${h}h ${m}m`;
+            if(extraBreak>0) breakEl.innerText = `${breakM} Min (Extra ${extraBreak} Min)`, breakEl.title='Extra break duty mein count nahi hai.';
         }
 
         // ================= FETCH ALL DATA =================
@@ -1508,6 +1572,12 @@
             });
         }
 
+        function saveRamadanLunchControl(){
+            const cb=document.getElementById('ramadanLunchFreeze'); if(!cb||!isFullAdminRole(String(document.getElementById('displayRole')?.innerText||'').toLowerCase())) return;
+            const fd=new FormData(); fd.append('action','setRamadanLunchControl'); fd.append('frozen',cb.checked?'ON':'OFF'); fd.append('sessionToken',sessionToken);
+            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(d=>{if(d.status!=='success'){alert(d.message||'Ramadan Lunch setting save nahi hui.');cb.checked=ramadanLunchFrozen;return;}ramadanLunchFrozen=!!d.ramadanLunchFrozen;updateAttendanceReasonUI();alert(d.message||'Ramadan Lunch setting saved.');}).catch(()=>{cb.checked=ramadanLunchFrozen;alert('Ramadan Lunch setting save nahi hui.');});
+        }
+
         // ================= COMPREHENSIVE MONTHLY GRADE =================
         function calculateReportCard(tasks) {
             // Monthly grade must use the same server-configured performance weights
@@ -1564,7 +1634,7 @@
             const mg = document.getElementById('monthlyGrade');
             if (mg) {
                 mg.innerText = `${grade} (${grade === 'A' ? 'Mumtaz' : grade === 'B' ? 'Behtar' : grade === 'C' ? 'Munasib' : 'Kamzor'})`;
-                mg.className = `text-3xl font-extrabold leading-tight break-words whitespace-normal overflow-hidden max-w-full px-1 ${color}`;
+                mg.className = `text-3xl font-extrabold leading-tight break-words whitespace-normal overflow-hidden max-w-full px-1 ${color}`; mg.style.background='transparent';
             }
             const monthlyPercEl = document.getElementById('monthlyPerc');
             if (monthlyPercEl) monthlyPercEl.innerText = `${finalScore}% Overall`;
@@ -1657,6 +1727,8 @@
                 "Break End": a.BreakEnds,
                 "Leave/Weekoff": a.Leave,
                 "Reason": a.Reason,
+                "Extra Break Minutes": a.ExtraBreakMinutes || 0,
+                "Extra Break Reason": a.ExtraBreakReason || '',
                 "HOD Status": a.Status
             }));
             let wsAtt = XLSX.utils.json_to_sheet(attForExport);

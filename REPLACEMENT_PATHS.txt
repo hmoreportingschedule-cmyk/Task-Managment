@@ -1,15 +1,19 @@
-Office Task Reporting — V40 Full Fix
+V41 — Daily Actions Namaz/Juma + Break Policy + Monthly Grade UI
 
-GitHub/Vercel (project root):
-1. index.html
-2. index_scripts.js
+GitHub / Vercel (project root):
+1. Replace index.html with V41 index.html
+2. Replace index_scripts.js with V41 index_scripts.js
 
-Google Apps Script: replace the full backend_code.js.
+Google Apps Script Web App:
+3. Replace the full backend_code.js in Apps Script
+4. Deploy a NEW version: Deploy -> Manage deployments -> Edit -> New version -> Deploy
 
-V40 fixes:
-- Advance Schedule Requests: legacy 8-column sheet migration to 17-column schema; pending requests are reliably listed for Admin/HOD; direct approval button added; Admin fallback notifications added.
-- Monthly Grade card: white background, “Monthly Grade” capitalization, existing label colours preserved, percentage digits black.
-- Employee-only Monthly Grade Details: View Details function restored and wired.
-- Daily Actions remains limited to Punch In, Punch Out, Break Start, Break End.
+Important: index.html and index_scripts.js must remain in the same Vercel/GitHub root folder.
 
-Important: Deploy the new backend_code.js as a new Apps Script Web App version, then ensure index_scripts.js points to that deployed Web App URL.
+New backend Attendance columns are added automatically to each employee Attendance sheet when accessed:
+J = Break Details
+K = Extra Break Minutes
+L = Extra Break Reason
+
+Admin control:
+Progress Chart -> Ramadan mein Lunch Freeze checkbox. This setting is stored in Script Properties and does not create a new Google Sheet.

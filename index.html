@@ -284,25 +284,38 @@
                         <input type="time" id="manualTime" class="w-full bg-[#2a4d53] border border-[#5a8789] text-white px-2 py-2 rounded-lg text-xs focus:outline-none focus:border-[#5fd3cc]">
                     </div>
                     
-                    <select id="actionReasonSelect" class="w-full bg-[#2a4d53] border border-[#5a8789] text-white px-2 py-2 rounded-lg mb-3 text-xs focus:outline-none focus:border-[#5fd3cc]" onchange="toggleOtherReason()">
-                        <option value="">-- Select Reason --</option>
-                        <option value="Lunch">Lunch</option>
-                        <option value="Namaz">Namaz</option>
-                        <option value="Bimari">Bimari</option>
-                        <option value="Ghar Men Emergency">Ghar Men Emergency</option>
-                        <option value="Trafic">Trafic</option>
-                        <option value="Other">Other</option>
-                    </select>
+                    <div id="breakReasonBox" class="mb-3">
+                        <label class="text-xs font-semibold text-[#a5cacc]">Break Type:</label>
+                        <select id="actionReasonSelect" class="w-full bg-[#2a4d53] border border-[#5a8789] text-white px-2 py-2 rounded-lg mb-2 text-xs focus:outline-none focus:border-[#5fd3cc]" onchange="toggleOtherReason()">
+                            <option value="">-- Select Break Type --</option>
+                            <option value="Lunch">Lunch</option>
+                            <option value="Namaz">Namaz</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
                     <div id="namazReasonBox" class="mb-3 hidden">
                         <label class="text-xs font-semibold text-[#a5cacc]">Namaz:</label>
-                        <select id="namazReasonSelect" class="w-full bg-[#2a4d53] border border-[#5a8789] text-white px-2 py-2 rounded-lg text-xs focus:outline-none focus:border-[#5fd3cc]">
+                        <select id="namazReasonSelect" class="w-full bg-[#2a4d53] border border-[#5a8789] text-white px-2 py-2 rounded-lg text-xs focus:outline-none focus:border-[#5fd3cc]" onchange="toggleJumaBox()">
                             <option value="">-- Select Namaz --</option>
-                            <option value="Zohar / Juma">Zohar / Juma</option>
+                            <option value="Zohar">Zohar</option>
                             <option value="Asr">Asr</option>
                             <option value="Magrib">Magrib</option>
                         </select>
                     </div>
+                    <div id="jumaReasonBox" class="mb-3 hidden">
+                        <label class="text-xs font-semibold text-[#a5cacc]">Juma:</label>
+                        <select id="jumaReasonSelect" class="w-full bg-[#2a4d53] border border-[#5a8789] text-white px-2 py-2 rounded-lg text-xs focus:outline-none focus:border-[#5fd3cc]" onchange="toggleOtherReason()">
+                            <option value="">-- Select Juma --</option>
+                            <option value="Juma">Juma</option>
+                        </select>
+                        <p id="jumaDayHint" class="text-[10px] text-[#f59e0b] mt-1 hidden">Juma sirf Friday ko select ki ja sakti hai.</p>
+                    </div>
                     <textarea id="actionReasonOther" class="w-full bg-[#2a4d53] border border-[#5a8789] text-white px-2 py-2 rounded-lg mb-3 text-xs hidden focus:outline-none focus:border-[#5fd3cc]" rows="2" placeholder="Write your reason here..."></textarea>
+                    <div id="extraBreakReasonBox" class="mb-3 hidden">
+                        <label class="text-xs font-semibold text-[#f59e0b]">Extra Time Reason (Required):</label>
+                        <textarea id="extraBreakReason" class="w-full bg-[#2a4d53] border border-[#f59e0b] text-white px-2 py-2 rounded-lg text-xs focus:outline-none" rows="2" placeholder="Maximum time se zyada kyun laga? Reason likhein..."></textarea>
+                        <p id="extraBreakLimitText" class="text-[10px] text-[#f59e0b] mt-1"></p>
+                    </div>
                     
                     <button id="attendanceBtn" onclick="markAttendance()" class="w-full bg-[#259b94] hover:bg-[#1f827c] text-white font-bold text-sm py-2 rounded-lg shadow-md transition">Submit Record</button>
                 </div>
@@ -332,7 +345,7 @@
 
             <!-- Comprehensive Report Card Sidebar -->
             <div class="emp-only p-4 rounded-xl mb-4 text-center" style="background:#ffffff !important; border:1px solid #3e6a6e;">
-                <h3 class="text-[#7db0b1] text-xs font-bold mb-2" style="color:#7db0b1 !important;">Monthly Grade</h3>
+                <h3 class="text-[#7db0b1] text-xs font-bold mb-2" style="color:#7db0b1 !important; text-transform:none !important;">Monthly Grade</h3>
                 <div id="monthlyGrade" class="text-3xl font-extrabold leading-tight break-words whitespace-normal overflow-hidden max-w-full px-1 text-[#f59e0b]">-</div>
                 <div class="mt-2 text-xs text-[#a5cacc] flex justify-between px-2" style="color:#a5cacc !important;">
                     <span>Task: <b id="taskPercText" style="color:#000000 !important;">0%</b></span>
@@ -1204,9 +1217,13 @@
             <span onclick="closeAnalysationModal()" class="absolute top-2 right-4 text-gray-500 hover:text-red-500 cursor-pointer text-3xl font-bold">&times;</span>
             <h2 class="text-2xl font-bold text-[#112a2e] mb-1"><i class="fas fa-chart-line text-orange-500"></i> Progress Chart</h2>
             <p class="text-sm text-gray-500 mb-5">Attendance + Task performance with adjustable weightage.</p>
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-3 p-4 bg-gray-50 border rounded-lg mb-5">
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-3 p-4 bg-gray-50 border rounded-lg mb-5">
                 <div><label class="block text-xs font-bold text-gray-600 mb-1">Attendance Weightage %</label><input id="attendanceWeightage" type="number" min="0" max="100" value="50" readonly class="w-full border p-2 rounded-lg bg-gray-100 cursor-not-allowed"></div>
                 <div><label class="block text-xs font-bold text-gray-600 mb-1">Task Weightage %</label><input id="taskWeightage" type="number" min="0" max="100" value="50" readonly class="w-full border p-2 rounded-lg bg-gray-100 cursor-not-allowed"></div>
+                <div class="admin-only hidden items-center gap-2 border border-amber-200 bg-amber-50 rounded-lg p-2">
+                    <input id="ramadanLunchFreeze" type="checkbox" class="h-4 w-4" onchange="saveRamadanLunchControl()">
+                    <label for="ramadanLunchFreeze" class="text-xs font-bold text-gray-700">Ramadan mein Lunch Freeze</label>
+                </div>
                 <div><label class="block text-xs font-bold text-gray-600 mb-1">Employee</label><select id="progressEmpFilter" class="w-full border p-2 rounded-lg"></select></div>
                 <div><label class="block text-xs font-bold text-gray-600 mb-1">Period</label><select id="progressPeriodType" onchange="toggleProgressPeriodInputs()" class="w-full border p-2 rounded-lg"><option value="default">Daily/Weekly/Monthly</option><option value="day">Daily</option><option value="week">Weekly</option><option value="month">Monthly</option><option value="year">Yearly</option></select></div>
                 <div id="progressPeriodDateBox" class="hidden"><label class="block text-xs font-bold text-gray-600 mb-1">Date</label><input type="date" id="progressPeriodDate" class="w-full border p-2 rounded-lg"></div>
