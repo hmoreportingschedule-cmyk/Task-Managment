@@ -83,16 +83,58 @@
             const msg=event?'Aaj office band hai: '+String(event.name||event.eventName||'Holiday')+'. Attendance ki zaroorat nahi.':isWeekoff?'Aaj aapka Weekoff hai. Attendance ki zaroorat nahi.':'';
             notice.textContent=msg;notice.classList.toggle('hidden',!msg);btn.disabled=!!msg;btn.style.opacity=msg?'0.5':'';btn.title=msg;
         }
-        document.addEventListener('change',e=>{if(e.target&&e.target.id==='attendanceDate'){v4UpdateAttendanceAvailability();updateAttendanceReasonUI();updateBreakTypeOptions();} if(e.target&&(e.target.id==='attendanceAction'||e.target.id==='actionReasonSelect'||e.target.id==='namazTypeSelect'||e.target.id==='namazBreakTime'||e.target.id==='lunchBreakTime')){if(e.target.id==='attendanceAction')toggleInputs(); updateBreakTypeOptions(); updateAttendanceReasonUI(); updateAttendanceTimingReasonUI();}});
-        document.addEventListener('input',e=>{if(e.target&&e.target.id==='manualTime'){updateBreakExtraReasonVisibility();updateAttendanceTimingReasonUI();}});
-        function toggleInputs() {
-            const action = document.getElementById('attendanceAction').value;
-            const timeBox = document.getElementById('manualTimeBox');
-            if (['Punch In', 'Punch Out', 'Break Start', 'Break End'].includes(action)) {
-                timeBox.classList.remove('hidden');
-            } else {
-                timeBox.classList.add('hidden');
+        let pendingBreakAction = '';
+        let pendingBreakReason = '';
+
+        document.addEventListener('change',e=>{
+            if(e.target&&e.target.id==='attendanceDate'){
+                clearPendingBreakAction();
+                v4UpdateAttendanceAvailability();
+                updateAttendanceReasonUI();
+                updateBreakTypeOptions();
             }
+            if(e.target&&e.target.id==='attendanceAction'){
+                clearPendingBreakAction();
+                toggleInputs();
+                updateAttendanceReasonUI();
+                updateAttendanceTimingReasonUI();
+            }
+            if(e.target&&e.target.id==='namazTypeSelect'){
+                selectNamazBreakType();
+                updateBreakTypeOptions();
+            }
+        });
+        document.addEventListener('input',e=>{if(e.target&&e.target.id==='manualTime'){updateBreakExtraReasonVisibility();updateAttendanceTimingReasonUI();}});
+
+        function clearPendingBreakAction(){
+            pendingBreakAction='';
+            pendingBreakReason='';
+            const el=document.getElementById('breakActionState'); if(el)el.value='';
+        }
+        function setBreakActionFromField(reasonType, action, fieldId){
+            if(reasonType==='Lunch' && typeof ramadanLunchFrozen!=='undefined' && ramadanLunchFrozen){
+                const field=document.getElementById(fieldId); if(field)field.value='';
+                alert('Ramadan mein Lunch option Admin ne freeze kiya hua hai.');
+                clearPendingBreakAction();
+                return;
+            }
+            if(reasonType==='Namaz' && !getSelectedNamazType()){
+                const field=document.getElementById(fieldId); if(field)field.value='';
+                alert('Pehle Namaz select karein.');
+                clearPendingBreakAction();
+                return;
+            }
+            const value=document.getElementById(fieldId)?.value||'';
+            if(!value){ clearPendingBreakAction(); return; }
+            pendingBreakAction=action;
+            pendingBreakReason=reasonType;
+            const state=document.getElementById('breakActionState'); if(state)state.value=action;
+            const manual=document.getElementById('manualTime'); if(manual)manual.value=value;
+            updateBreakExtraReasonVisibility();
+        }
+        function toggleInputs() {
+            const timeBox = document.getElementById('manualTimeBox');
+            if (timeBox) timeBox.classList.remove('hidden');
         }
         const _attendanceActionEl = document.getElementById('attendanceAction');
         if (_attendanceActionEl) {
@@ -100,7 +142,7 @@
             _attendanceActionEl.classList.remove('hidden');
         }
         const _manualTimeBoxEl = document.getElementById('manualTimeBox');
-        if (_manualTimeBoxEl && _attendanceActionEl && ['Punch In','Punch Out','Break Start','Break End'].includes(_attendanceActionEl.value)) _manualTimeBoxEl.classList.remove('hidden');
+        if (_manualTimeBoxEl) _manualTimeBoxEl.classList.remove('hidden');
         toggleInputs(); updateAttendanceReasonUI(); updateAttendanceTimingReasonUI();
 
         function getSelectedAttendanceDate(){ return document.getElementById('attendanceDate')?.value || ''; }
@@ -123,21 +165,15 @@
             const val=document.getElementById('namazTypeSelect')?.value||'';
             if(!val)return;
             document.getElementById('actionReasonSelect').value='Namaz';
-            const time=document.getElementById('namazBreakTime')?.value||'';
-            if(time) document.getElementById('manualTime').value=time;
+            const activeField=pendingBreakAction==='Break End'?'namazBreakEndTime':pendingBreakAction==='Break Start'?'namazBreakStartTime':'';
+            if(activeField){
+                const time=document.getElementById(activeField)?.value||'';
+                if(time) document.getElementById('manualTime').value=time;
+            }
             updateBreakExtraReasonVisibility();
         }
         function selectBreakTiming(type){
-            const sel=document.getElementById('actionReasonSelect'); if(!sel)return;
-            if(type==='Lunch' && ramadanLunchFrozen){
-                const t=document.getElementById('lunchBreakTime'); if(t)t.value='';
-                alert('Ramadan mein Lunch option Admin ne freeze kiya hua hai.');
-                sel.value=''; return;
-            }
-            sel.value=type;
-            const source=type==='Namaz'?'namazBreakTime':'lunchBreakTime';
-            const value=document.getElementById(source)?.value||'';
-            if(value) document.getElementById('manualTime').value=value;
+            document.getElementById('actionReasonSelect').value=type;
             updateBreakExtraReasonVisibility();
         }
         function selectNamazType(type){
@@ -177,7 +213,7 @@ function parseBreakTimeClient(v){
         function updateBreakExtraReasonVisibility(){
             const wrap=document.getElementById('extraBreakReasonBox'), text=document.getElementById('extraBreakLimitText');
             if(!wrap)return;
-            const action=document.getElementById('attendanceAction')?.value||'';
+            const action=pendingBreakAction || document.getElementById('attendanceAction')?.value||'';
             if(action!=='Break End'){wrap.classList.add('hidden');if(text)text.innerText='';return;}
             const policy=getBreakPolicyForSelection(), start=getOpenBreakStartForDate(), end=parseBreakTimeClient(document.getElementById('manualTime')?.value||'');
             if(!policy || start===null || end===null){wrap.classList.add('hidden');if(text)text.innerText='';return;}
@@ -293,8 +329,8 @@ function parseBreakTimeClient(v){
 
         function markAttendance() {
             if(updateAttendanceNonWorkingDay())return;
-            const action = document.getElementById('attendanceAction').value;
-            const reasonType = document.getElementById('actionReasonSelect').value;
+            const action = pendingBreakAction || document.getElementById('attendanceAction').value;
+            const reasonType = pendingBreakReason || document.getElementById('actionReasonSelect').value;
             let reason = reasonType;
             if(action==='Break Start' || action==='Break End') {
                 if(reasonType==='Lunch' && ramadanLunchFrozen){ alert('Ramadan mein Lunch option Admin ne freeze kiya hua hai.'); return; }
@@ -308,7 +344,7 @@ function parseBreakTimeClient(v){
             
             let rawManualTime = document.getElementById('manualTime').value;
             if(action==='Break Start' || action==='Break End'){
-                const source=reasonType==='Namaz'?'namazBreakTime':reasonType==='Lunch'?'lunchBreakTime':'';
+                const source=reasonType==='Namaz' ? (action==='Break Start'?'namazBreakStartTime':'namazBreakEndTime') : reasonType==='Lunch' ? (action==='Break Start'?'lunchBreakStartTime':'lunchBreakEndTime') : '';
                 const selectedBreakTime=source ? (document.getElementById(source)?.value||'') : '';
                 if(selectedBreakTime){ rawManualTime=selectedBreakTime; document.getElementById('manualTime').value=selectedBreakTime; }
             }
@@ -370,8 +406,11 @@ function parseBreakTimeClient(v){
                 if(document.getElementById('namazZoharSelect')) document.getElementById('namazZoharSelect').value = '';
                 if(document.getElementById('jumaReasonSelect')) document.getElementById('jumaReasonSelect').value = '';
                 if(document.getElementById('namazTypeSelect')) document.getElementById('namazTypeSelect').value = '';
-                if(document.getElementById('namazBreakTime')) document.getElementById('namazBreakTime').value = '';
-                if(document.getElementById('lunchBreakTime')) document.getElementById('lunchBreakTime').value = '';
+                if(document.getElementById('namazBreakStartTime')) document.getElementById('namazBreakStartTime').value = '';
+                if(document.getElementById('namazBreakEndTime')) document.getElementById('namazBreakEndTime').value = '';
+                if(document.getElementById('lunchBreakStartTime')) document.getElementById('lunchBreakStartTime').value = '';
+                if(document.getElementById('lunchBreakEndTime')) document.getElementById('lunchBreakEndTime').value = '';
+                clearPendingBreakAction();
                 document.getElementById('namazReasonBox').classList.add('hidden');
                 if(document.getElementById('extraBreakReason')) document.getElementById('extraBreakReason').value='';
                 document.getElementById('extraBreakReasonBox')?.classList.add('hidden');
