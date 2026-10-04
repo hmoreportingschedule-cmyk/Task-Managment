@@ -1,15 +1,10 @@
-V46 – MasterAdmin Web App URL + User Creation Sync Fix
+V49.10 – Management Analytics Button Duplicate Fix
 
-GitHub / Vercel (project root):
-1. index.html
-2. index_scripts.js
+Changed file:
+- index.html -> GitHub/Vercel root: /index.html
 
-Google Apps Script:
-3. backend_code.js
+No Apps Script/backend change.
 
-IMPORTANT:
-- index.html and index_scripts.js must remain in the same folder.
-- index_scripts.js is configured for the current MasterAdmin Apps Script Web App URL supplied by the user.
-- Google Apps Script backend uses the MASTER_SPREADSHEET_ID stored in Script Properties as the authoritative Master Google Sheet.
-- The URL supplied by the user is an Apps Script Web App /exec URL, not a Google Sheet URL. If the MasterAdmin Web App is connected to the wrong Master Sheet, run setup/configuration in that Apps Script project or provide the actual Google Sheet URL/ID.
-- After replacing backend_code.js, deploy a NEW Apps Script version and update the Web App deployment.
+Removed Management Analytics duplicate button from Manager Controls only.
+The top dashboard Management Analytics button remains.
+Do not run setupFreshTaskOffice().

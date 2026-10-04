@@ -577,9 +577,6 @@
                     <button onclick="openDelayAnalyticsModal()" class="admin-only bg-[#9a3412] hover:bg-[#7c2d12] text-white px-5 py-3 rounded-xl shadow-md font-bold items-center gap-2 transition">
                         <i class="fas fa-chart-column"></i> Delay Analytics
                     </button>
-                    <button onclick="openManagementAnalyticsModal()" class="hod-only admin-only bg-[#0f766e] hover:bg-[#115e59] text-white px-5 py-3 rounded-xl shadow-md font-bold items-center gap-2 transition">
-                        <i class="fas fa-chart-pie"></i> Management Analytics
-                    </button>
                     <button onclick="runManualBackup()" class="admin-only bg-[#475569] hover:bg-[#334155] text-white px-5 py-3 rounded-xl shadow-md font-bold items-center gap-2 transition">
                         <i class="fas fa-database"></i> Backup Now
                     </button>
@@ -609,7 +606,7 @@
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse whitespace-nowrap">
                         <thead>
-                            <tr class="bg-[#f0f7f7] text-[#4b6d70] uppercase text-xs font-bold tracking-wider">
+                            <tr class="bg-[#f0f7f7] text-[#4b6d70] text-xs font-bold tracking-wider">
                                 <th class="py-4 px-6">Date / Employee</th>
                                 <th class="py-4 px-6">In Time</th>
                                 <th class="py-4 px-6">Out Time</th>
@@ -638,7 +635,7 @@
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse whitespace-nowrap">
                         <thead>
-                            <tr class="bg-[#f0f7f7] text-[#4b6d70] uppercase text-xs font-bold tracking-wider">
+                            <tr class="bg-[#f0f7f7] text-[#4b6d70] text-xs font-bold tracking-wider">
                                 <th class="py-4 px-6">Task Name</th>
                                  <th class="py-4 px-6">Task Frequency</th>
                                  <th class="py-4 px-6 hod-only-col hidden">Employee</th>
@@ -648,8 +645,8 @@
                                 <th class="py-4 px-6">Deadline Status</th>
                                 <th class="py-4 px-6">Priority</th>
                                 <th class="py-4 px-6">Time Spent</th>
-                                <th class="py-4 px-6">Emp Status</th>
-                                <th class="py-4 px-6">HOD Approval</th><th id="taskActionHeader" class="py-4 px-3" style="display:none">Action</th>
+                                <th class="py-4 px-6">Employee Status</th>
+                                <th class="py-4 px-6">HOD Approval</th><th id="taskActionHeader" class="py-4 px-3">Task Request</th>
                             </tr>
                         </thead>
                         <tbody id="taskTableBody" class="text-gray-700 text-sm bg-white divide-y divide-gray-100">
