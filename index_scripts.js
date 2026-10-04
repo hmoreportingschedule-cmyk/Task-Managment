@@ -698,11 +698,26 @@ function parseBreakTimeClient(v){
             const min=localDateKey(minDate);
             el.min=min;el.max=today;if(!el.value||!isLogWorkDateAllowed(el.value))el.value=today;
         }
+        function getAttendanceForLogDate(workDate){
+            const key=String(workDate||'').trim();
+            const records=Array.isArray(globalMonthlyFullAttendance)?globalMonthlyFullAttendance:[];
+            return records.find(a=>{
+                const d=String(a.Date||a.date||a.WorkDate||'').trim();
+                return d===key || d===key.split('-').reverse().join('-');
+            })||null;
+        }
+        function hasPunchInForLogDate(workDate){
+            const rec=getAttendanceForLogDate(workDate);
+            return !!rec && String(rec.InTime||rec.inTime||'').trim()!=='';
+        }
         function populateLogTaskDropdown(tasks, dateKey){
             const select=document.getElementById('logTaskSelect'); if(!select)return;
             const workDate=dateKey||document.getElementById('logWorkDate')?.value||localDateKey();
             select.innerHTML='<option value="">-- Select Active Task --</option>';
-            const loggedForDate=new Set((globalWorkLogs||[]).filter(w=>String(w.WorkDate||'')===workDate).map(w=>String(w.TaskRowIndex||'')));
+            const loggedForDate=new Set((globalWorkLogs||[]).filter(w=>{
+                const d=String(w.WorkDate||w.workDate||'');
+                return d===workDate;
+            }).map(w=>String(w.TaskRowIndex||w.taskRowIndex||'')));
             const d=parseLocalDateKey(workDate);
             (tasks||[]).forEach(t=>{
                 const st=String(t.empStatus||'').toLowerCase();
@@ -1732,7 +1747,21 @@ function parseBreakTimeClient(v){
             const nonWorking=isLogWorkNonWorkingDate(workDate);
             if(!isLogWorkDateAllowed(workDate)){alert('Log Daily Work sirf current date aur previous 2 days ke liye available hai.');return;}
             if(nonWorking){alert(`Log Daily Work frozen: ${nonWorking}.`);return;}
+            if(!hasPunchInForLogDate(workDate)){
+                alert('Pehle In Time (Punch In) lagayein. Uske baad hi is date ka work time add ho payega.');
+                return;
+            }
             if(!tIdx||!mins){alert('Please select task and enter time!');return;}
+            const duplicateAlreadyLogged=(globalWorkLogs||[]).some(w=>{
+                const d=String(w.WorkDate||w.workDate||'');
+                const r=String(w.TaskRowIndex||w.taskRowIndex||'');
+                return d===workDate && r===String(tIdx);
+            });
+            if(duplicateAlreadyLogged){
+                alert('Yeh task aapne is date par already submit kar diya hai. Double entry allowed nahi hai.');
+                populateLogTaskDropdown(globalAllTasks,workDate);
+                return;
+            }
             const before=!!document.getElementById('requestBeforeCompletion')?.checked;
             const done=!!document.getElementById('markTaskCompleted')?.checked;
             if(before&&done){alert('Before Completed aur Mark Completed ek saath select nahi kar sakte.');return;}
