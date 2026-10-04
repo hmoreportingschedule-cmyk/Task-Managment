@@ -301,12 +301,35 @@ function parseBreakTimeClient(v){
         function updateAttendanceNonWorkingDay(){
             const field=document.getElementById('attendanceDate'), form=document.getElementById('attendanceFormBox'), note=document.getElementById('attendanceClosedNotice');
             if(!field||!field.value||!form||!note)return false;
-            const d=new Date(field.value+'T12:00:00'); if(Number.isNaN(d.getTime()))return false;
+            const key=field.value; const d=new Date(key+'T12:00:00'); if(Number.isNaN(d.getTime()))return false;
             const event=typeof officeEventForDate==='function'?officeEventForDate(d):null;
             const configured=String(v4CurrentWeekoff||document.getElementById('displayWeekoff')?.textContent||'Sunday').split(/[,;/]/).map(x=>x.trim().toLowerCase());
-            const isWeekoff=configured.includes(['sunday','monday','tuesday','wednesday','thursday','friday','saturday'][d.getDay()]);
-            const reason=event?'Aaj office band hai: '+String(event.name||'Holiday / Event')+'. Attendance ki zaroorat nahi.':isWeekoff?'Today Weekoff':'';
-            note.textContent=reason;note.classList.toggle('hidden',!reason);form.classList.toggle('is-closed',!!reason);
+            const dayNames=['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+            const isWeekoff=configured.includes(dayNames[d.getDay()]);
+            const rec=(globalMonthlyFullAttendance||[]).find(a=>String(a.Date||'')===key);
+            const leaveText=String(rec?.Leave||'').trim().toLowerCase();
+            const isLeave=!isWeekoff && !event && leaveText.includes('leave');
+            const closedType=event ? 'Holiday' : (isLeave ? 'Leave' : (isWeekoff ? 'Weekoff' : ''));
+            const reason=event ? ('Office Closed: '+String(event.name||'Holiday / Event')) : (isLeave ? 'Today Leave' : (isWeekoff ? 'Today Weekoff' : ''));
+            note.textContent=reason; note.classList.toggle('hidden',!reason); form.classList.toggle('is-closed',!!reason);
+
+            // Non-working days: freeze Attendance + Namaz + Lunch controls.
+            const freezeIds=['attendanceAction','manualTime','namazTypeSelect','namazBreakStartTime','namazBreakEndTime','lunchBreakStartTime','lunchBreakEndTime'];
+            freezeIds.forEach(id=>{const el=document.getElementById(id); if(el) el.disabled=!!reason;});
+            const attendanceBtn=document.getElementById('attendanceBtn'); if(attendanceBtn){attendanceBtn.disabled=!!reason; attendanceBtn.style.opacity=reason?'0.5':'';}
+            const logBtn=document.getElementById('logDailyWorkBtn'); if(logBtn){logBtn.disabled=!!reason; logBtn.style.opacity=reason?'0.5':''; logBtn.title=reason?'Office closed / non-working day':'';}
+
+            const statusEl=document.getElementById('todayLocationStatus'), cityEl=document.getElementById('todayLocationCity');
+            if(statusEl&&cityEl){
+                if(reason){
+                    statusEl.textContent='Office Close';
+                    cityEl.textContent=closedType;
+                    statusEl.classList.remove('text-[#e6fcf5]','text-[#f59e0b]'); statusEl.classList.add('text-[#f59e0b]');
+                    cityEl.classList.remove('text-[#e6fcf5]'); cityEl.classList.add('text-[#f59e0b]');
+                } else {
+                    renderTodayLocation();
+                }
+            }
             return !!reason;
         }
         document.addEventListener('change',function(e){if(e.target&&e.target.id==='attendanceDate'){updateAttendanceNonWorkingDay();renderSelectedAttendanceState();}});
