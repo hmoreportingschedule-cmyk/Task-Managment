@@ -80,7 +80,7 @@
             const weekoffs=String(v4CurrentWeekoff||'Sunday').split(/[,;/]/).map(x=>x.trim().toLowerCase());
             const event=key?(globalOfficeEvents||[]).find(e=>key>=String(e.fromDate||'')&&key<=String(e.toDate||e.fromDate||'')):null;
             const isWeekoff=dt&&weekoffs.includes(names[dt.getDay()].toLowerCase());
-            const msg=event?'Aaj office band hai: '+String(event.name||event.eventName||'Holiday')+'. Attendance ki zaroorat nahi.':isWeekoff?'Aaj aapka Weekoff hai. Attendance ki zaroorat nahi.':'';
+            const msg=event?'Aaj office band hai: '+String(event.name||event.eventName||'Holiday')+'. Attendance ki zaroorat nahi.':isWeekoff?'Today Weekoff':'';
             notice.textContent=msg;notice.classList.toggle('hidden',!msg);btn.disabled=!!msg;btn.style.opacity=msg?'0.5':'';btn.title=msg;
         }
         let pendingBreakAction = '';
@@ -305,7 +305,7 @@ function parseBreakTimeClient(v){
             const event=typeof officeEventForDate==='function'?officeEventForDate(d):null;
             const configured=String(v4CurrentWeekoff||document.getElementById('displayWeekoff')?.textContent||'Sunday').split(/[,;/]/).map(x=>x.trim().toLowerCase());
             const isWeekoff=configured.includes(['sunday','monday','tuesday','wednesday','thursday','friday','saturday'][d.getDay()]);
-            const reason=event?'Aaj office band hai: '+String(event.name||'Holiday / Event')+'. Attendance ki zaroorat nahi.':isWeekoff?'Aaj aapka Weekoff hai. Attendance ki zaroorat nahi.':'';
+            const reason=event?'Aaj office band hai: '+String(event.name||'Holiday / Event')+'. Attendance ki zaroorat nahi.':isWeekoff?'Today Weekoff':'';
             note.textContent=reason;note.classList.toggle('hidden',!reason);form.classList.toggle('is-closed',!!reason);
             return !!reason;
         }
