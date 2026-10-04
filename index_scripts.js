@@ -1508,139 +1508,78 @@
             });
         }
 
-        // ================= EMAIL REPORT CARD =================
-        function openEmailModal() { document.getElementById('emailReportModal').style.display = 'block'; }
-        function closeEmailModal() { document.getElementById('emailReportModal').style.display = 'none'; }
-        
-        function sendReportCardEmail() {
-            const targetEmp = document.getElementById('emailEmpSelect').value;
-            const hodEmail = document.getElementById('hodEmailAddress').value;
-            const btn = document.getElementById('sendEmailBtn');
-
-            if(!targetEmp || !hodEmail) {
-                alert("Please select employee and provide HOD email.");
-                return;
-            }
-
-            const empTasks = globalAllTasks.filter(t => t.assignedTo.trim().toLowerCase() === targetEmp.trim().toLowerCase());
-            let comp = 0;
-            empTasks.forEach(t => { if(t.empStatus.toLowerCase() === 'completed') comp++; });
-            let taskPerc = empTasks.length > 0 ? Math.round((comp / empTasks.length) * 100) : 0;
-            
-            let attPerc = 100; // Will be properly calculated via main grade logic in backend
-            let finalScore = taskPerc; 
-            let grade = "D";
-            if (finalScore >= 90) grade = "A";
-            else if (finalScore >= 80) grade = "B";
-            else if (finalScore >= 70) grade = "C";
-
-            const reportData = {
-                total: empTasks.length,
-                completed: comp,
-                pending: empTasks.length - comp,
-                completionRate: finalScore,
-                grade: grade
-            };
-
-            btn.innerText = "Sending...";
-            btn.disabled = true;
-
-            const formData = new FormData();
-            formData.append('action', 'emailReport');
-            formData.append('empName', targetEmp);
-            formData.append('hodEmail', hodEmail);
-            formData.append('reportData', JSON.stringify(reportData));
-            formData.append('sessionToken', sessionToken);
-
-            fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: formData })
-            .then(res => res.json())
-            .then(data => {
-                alert(data.message);
-                btn.innerText = "Send Email Report";
-                btn.disabled = false;
-                closeEmailModal();
-            }).catch(err => {
-                alert("Failed to send email. Check console.");
-                btn.innerText = "Send Email Report";
-                btn.disabled = false;
-            });
-        }
-
         // ================= COMPREHENSIVE MONTHLY GRADE =================
         function calculateReportCard(tasks) {
+            // Monthly grade must use the same server-configured performance weights
+            // and only the current month's elapsed working days.
             let taskPerc = 0;
             let attPerc = 0;
-            
-            if(tasks.length > 0) {
+
+            const taskList = Array.isArray(tasks) ? tasks : [];
+            if (taskList.length > 0) {
                 let comp = 0;
-                tasks.forEach(t => { if(t.empStatus.toLowerCase() === 'completed') comp++; });
-                taskPerc = Math.round((comp / tasks.length) * 100);
-            }
-
-            const today = new Date();
-            let daysElapsed = today.getDate(); 
-            let presentDays = 0;
-            if(globalMonthlyFullAttendance && globalMonthlyFullAttendance.length > 0) {
-                globalMonthlyFullAttendance.forEach(r => {
-                    if(r.InTime) presentDays++;
+                taskList.forEach(t => {
+                    if (String(t.empStatus || '').toLowerCase() === 'completed') comp++;
                 });
-            }
-            if(daysElapsed > 0) {
-                attPerc = Math.min(100, Math.round((presentDays / daysElapsed) * 100));
+                taskPerc = Math.round((comp / taskList.length) * 100);
             }
 
-            const aw = Number(localStorage.getItem('zim_att_weight') || 15);
-            const tw = Number(localStorage.getItem('zim_task_weight') || 85);
-            let finalScore = Math.round((taskPerc * aw + attPerc * tw) / 100);
-            if(tasks.length === 0) finalScore = attPerc; 
-            
-            let grade = "D";
-            let color = "text-red-500";
-            if (finalScore >= 90) { grade = "A"; color = "text-emerald-600"; }
-            else if (finalScore >= 80) { grade = "B"; color = "text-blue-600"; }
-            else if (finalScore >= 70) { grade = "C"; color = "text-amber-600"; }
-            else { grade = "D"; color = "text-red-600"; }
+            const now = new Date();
+            now.setHours(0, 0, 0, 0);
+            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+            let workingDays = 0;
+            let presentDays = 0;
+            const records = Array.isArray(globalMonthlyFullAttendance) ? globalMonthlyFullAttendance : [];
+            const configuredWeekoffs = String(window.currentUserWeekoff || 'Sunday')
+                .split(/[,;/]/)
+                .map(x => x.trim().toLowerCase())
+                .filter(Boolean);
+            const dayNames = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+
+            for (let d = new Date(monthStart); d <= now; d.setDate(d.getDate() + 1)) {
+                const dayName = dayNames[d.getDay()];
+                if (configuredWeekoffs.includes(dayName)) continue;
+                const officeEvent = typeof officeEventForDate === 'function' ? officeEventForDate(d) : null;
+                if (officeEvent) continue;
+                workingDays++;
+                const score = getAttendanceScore(d, records);
+                if (score === 100) presentDays++;
+            }
+            attPerc = workingDays > 0 ? Math.round((presentDays / workingDays) * 100) : 100;
+
+            const awRaw = Number(performanceWeights && performanceWeights.attendance);
+            const twRaw = Number(performanceWeights && performanceWeights.task);
+            const aw = Number.isFinite(awRaw) && awRaw >= 0 ? awRaw : 50;
+            const tw = Number.isFinite(twRaw) && twRaw >= 0 ? twRaw : 50;
+            const totalWeight = aw + tw || 100;
+            let finalScore = Math.round((taskPerc * aw + attPerc * tw) / totalWeight);
+            if (taskList.length === 0) finalScore = attPerc;
+
+            let grade = 'D';
+            let color = 'text-red-600';
+            if (finalScore >= 90) { grade = 'A'; color = 'text-emerald-600'; }
+            else if (finalScore >= 80) { grade = 'B'; color = 'text-blue-600'; }
+            else if (finalScore >= 70) { grade = 'C'; color = 'text-amber-600'; }
 
             const mg = document.getElementById('monthlyGrade');
-            mg.innerText = `${grade} (${grade === 'A' ? 'Mumtaz' : grade === 'B' ? 'Behtar' : grade === 'C' ? 'Munasib' : 'Kamzor'})`;
-            mg.className = `text-3xl font-extrabold leading-tight break-words whitespace-normal overflow-hidden max-w-full px-1 ${color}`;
-            const monthlyPercEl = document.getElementById('monthlyPerc');
-            if(monthlyPercEl) monthlyPercEl.innerText = `${finalScore}% Overall`;
-            
-            document.getElementById('taskPercText').innerText = `${taskPerc}%`;
-            document.getElementById('attPercText').innerText = `${attPerc}%`;
-            
-            const indivScoreEl = document.getElementById('indivScore'); if (indivScoreEl) indivScoreEl.innerText = finalScore.toFixed(1);
-            const deptScoreEl = document.getElementById('deptScore'); if (deptScoreEl) deptScoreEl.innerText = (finalScore * 0.85).toFixed(1); 
-            const metricEfficiencyEl = document.getElementById('metricEfficiency'); if (metricEfficiencyEl) metricEfficiencyEl.innerText = `${taskPerc}%`;
-        }
-
-        function openMonthlyGradeDetails(){
-            if(!document.body.classList.contains('employee-mode')) return;
-            const modal=document.getElementById('monthlyGradeDetailsModal');
-            if(!modal) return;
-            const task=document.getElementById('taskPercText')?.innerText || '0%';
-            const att=document.getElementById('attPercText')?.innerText || '0%';
-            const overall=document.getElementById('indivScore')?.innerText || '';
-            const grade=document.getElementById('monthlyGrade')?.innerText || '-';
-            const taskEl=document.getElementById('gradeDetailTask');
-            const attEl=document.getElementById('gradeDetailAtt');
-            const overallEl=document.getElementById('gradeDetailOverall');
-            const gradeEl=document.getElementById('gradeDetailGrade');
-            if(taskEl) taskEl.innerText=task;
-            if(attEl) attEl.innerText=att;
-            if(overallEl) overallEl.innerText=overall && overall !== '-' ? `${overall}%` : '-';
-            if(gradeEl){
-                gradeEl.innerText=grade;
-                const letter=String(grade).trim().charAt(0).toUpperCase();
-                gradeEl.className='text-3xl font-extrabold mt-1';
-                applyGradeColor(gradeEl,letter);
+            if (mg) {
+                mg.innerText = `${grade} (${grade === 'A' ? 'Mumtaz' : grade === 'B' ? 'Behtar' : grade === 'C' ? 'Munasib' : 'Kamzor'})`;
+                mg.className = `text-3xl font-extrabold leading-tight break-words whitespace-normal overflow-hidden max-w-full px-1 ${color}`;
             }
-            modal.style.display='block';
-        }
-        function closeMonthlyGradeDetails(){
-            const modal=document.getElementById('monthlyGradeDetailsModal');
-            if(modal) modal.style.display='none';
+            const monthlyPercEl = document.getElementById('monthlyPerc');
+            if (monthlyPercEl) monthlyPercEl.innerText = `${finalScore}% Overall`;
+
+            const taskPercEl = document.getElementById('taskPercText');
+            const attPercEl = document.getElementById('attPercText');
+            if (taskPercEl) taskPercEl.innerText = `${taskPerc}%`;
+            if (attPercEl) attPercEl.innerText = `${attPerc}%`;
+
+            const indivScoreEl = document.getElementById('indivScore');
+            if (indivScoreEl) indivScoreEl.innerText = finalScore.toFixed(1);
+            const deptScoreEl = document.getElementById('deptScore');
+            if (deptScoreEl) deptScoreEl.innerText = (finalScore * 0.85).toFixed(1);
+            const metricEfficiencyEl = document.getElementById('metricEfficiency');
+            if (metricEfficiencyEl) metricEfficiencyEl.innerText = `${taskPerc}%`;
         }
 
         // ================= EXCEL EXPORT (SHEETJS) =================
