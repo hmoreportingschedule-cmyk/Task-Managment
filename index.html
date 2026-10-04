@@ -1130,8 +1130,9 @@
                 <div><h2 class="text-2xl font-bold text-[#112a2e]"><i class="fas fa-clipboard-check text-[#7c3aed]"></i> Approval Attendence &amp; Task</h2><p class="text-sm text-gray-500">Attendance, Task, Adjustment aur Leave approvals ko employee/date/month/task wise manage karein.</p></div>
                 <button onclick="loadApprovalAttendanceTaskCenter()" class="bg-[#7c3aed] text-white px-4 py-2 rounded-lg font-bold"><i class="fas fa-sync-alt mr-1"></i> Refresh</button>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-6 gap-3 mb-4 bg-[#f7f5ff] border border-[#ddd6fe] rounded-xl p-4">
+            <div class="grid grid-cols-1 md:grid-cols-7 gap-3 mb-4 bg-[#f7f5ff] border border-[#ddd6fe] rounded-xl p-4">
                 <div><label class="block text-xs font-bold text-gray-600 mb-1">Approval Type</label><select id="approvalCenterType" onchange="renderApprovalAttendanceTaskCenter()" class="w-full border p-2 rounded-lg text-sm"><option value="all">All</option><option value="attendance">Attendance</option><option value="task">Task</option><option value="adjustment">Adjustment</option><option value="leave">Leave</option></select></div>
+                <div><label class="block text-xs font-bold text-gray-600 mb-1">Status</label><select id="approvalCenterStatus" onchange="renderApprovalAttendanceTaskCenter()" class="w-full border p-2 rounded-lg text-sm"><option value="all">All</option><option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select></div>
                 <div><label class="block text-xs font-bold text-gray-600 mb-1">Employee</label><select id="approvalCenterEmployee" onchange="renderApprovalAttendanceTaskCenter()" class="w-full border p-2 rounded-lg text-sm"><option value="">All Employees</option></select></div>
                 <div><label class="block text-xs font-bold text-gray-600 mb-1">Task</label><input id="approvalCenterTask" oninput="renderApprovalAttendanceTaskCenter()" class="w-full border p-2 rounded-lg text-sm" placeholder="Search task..."></div>
                 <div><label class="block text-xs font-bold text-gray-600 mb-1">Month</label><input id="approvalCenterMonth" type="month" onchange="renderApprovalAttendanceTaskCenter()" class="w-full border p-2 rounded-lg text-sm"></div>
@@ -1139,7 +1140,7 @@
                 <div><label class="block text-xs font-bold text-gray-600 mb-1">To Date</label><input id="approvalCenterTo" type="date" onchange="renderApprovalAttendanceTaskCenter()" class="w-full border p-2 rounded-lg text-sm"></div>
             </div>
             <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
-                <div class="text-sm font-bold text-[#2a4d53]">Pending / Review Items: <span id="approvalCenterCount">0</span></div>
+                <div class="text-sm font-bold text-[#2a4d53]">Approval / Review Items: <span id="approvalCenterCount">0</span></div>
                 <div class="flex flex-wrap gap-2">
                     <button onclick="toggleApprovalCenterSelectAll(true)" class="border border-gray-300 bg-white px-3 py-2 rounded-lg text-xs font-bold">Select All</button>
                     <button onclick="toggleApprovalCenterSelectAll(false)" class="border border-gray-300 bg-white px-3 py-2 rounded-lg text-xs font-bold">Clear All</button>
@@ -1521,7 +1522,7 @@
                 <div class="modern-card p-4"><div class="text-xs font-bold text-red-600">TOTAL ABSENCE</div><div id="attTotalAbsence" class="text-2xl font-extrabold text-red-600">0</div></div>
                 <div class="modern-card p-4"><div class="text-xs font-bold text-[#259b94]">PRESENCE %</div><div id="attPresencePercent" class="text-2xl font-extrabold text-[#259b94]">0%</div></div>
             </div>
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
+            <div class="grid grid-cols-1 lg:grid-cols-[0.85fr_1.15fr] gap-4 mb-5">
                 <div class="border rounded-lg p-4 bg-white">
                     <h3 class="font-bold text-[#2a4d53] mb-3">Attendance Presence Ratio</h3>
                     <div class="flex items-center gap-6">

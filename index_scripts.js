@@ -259,7 +259,7 @@ function parseBreakTimeClient(v){
                 showLoginStatus('Login successful. Dashboard load ho raha hai…','info');
                 document.getElementById('login-section').style.display='none'; document.getElementById('dashboard-section').style.display='flex';
                 sessionToken=data.sessionToken||""; whatsappGroupLink=data.whatsappGroupLink||""; performanceWeights=data.performanceWeights||{attendance:50,task:50}; ramadanLunchFrozen=!!data.ramadanLunchFrozen; attendanceEntryStart=data.attendanceEntryStart||""; attendanceEntryEnd=data.attendanceEntryEnd||"";
-                setDateConstraints(); document.getElementById('displayUser').innerText=data.actualName||data.username; window.currentUserContactNumber=data.contactNumber||''; window.currentUserWhatsappNumber=data.whatsappNumber||'';
+                setDateConstraints(); document.getElementById('displayUser').innerText=data.actualName||data.username; window.currentUserContactNumber=data.contactNumber||''; window.currentUserWhatsappNumber=data.whatsappNumber||''; window.currentUserEmployeeId=data.employeeId||'';
                 document.getElementById('displayDept').innerText=data.department||'--'; document.getElementById('displayOfficeTime').innerText=data.officeTime||'--'; window.currentUserWeekoff=data.weekoff||'Sunday'; document.getElementById('displayWeekoff').innerText=data.weekoff||'Sunday';
                 document.getElementById('displayOfficeLocation').innerText=[data.officeLocation,data.officeAddress].filter(Boolean).join(' : ')||'--'; setDisplayedProfilePhoto(data.profilePhotoUrl||'');
                 const role=String(data.role||'').toLowerCase(); document.getElementById('displayRole').innerText=role;
@@ -2371,32 +2371,33 @@ function parseBreakTimeClient(v){
         function buildApprovalCenterItems(){
             const out=[];
             (globalAttendanceRequests||[]).forEach(r=>{
-                if(String(r.status||'').toLowerCase()!=='pending')return;
-                out.push({key:'attendance|'+r.rowIndex,type:'attendance',typeLabel:'Attendance',employee:r.employee||'',task:'Attendance Request',date:r.date||'',details:r.reason||'-',status:r.status||'Pending',rowIndex:r.rowIndex,action:'attendance'});
+                const status=String(r.status||'Pending');
+                out.push({key:'attendance|'+r.rowIndex,type:'attendance',typeLabel:'Attendance',employee:r.employee||'',employeeId:r.employeeId||'',task:'Attendance Request',date:r.date||'',details:r.reason||'-',status:status,rowIndex:r.rowIndex,action:'attendance'});
             });
             (globalAdvanceScheduleRequests||[]).forEach(r=>{
-                if(String(r.status||'').toLowerCase()!=='pending')return;
-                const rt=String(r.requestType||'');
+                const status=String(r.status||'Pending'), rt=String(r.requestType||'');
                 if(rt==='Emergency Task'){
-                    out.push({key:'urgent|'+r.rowIndex,type:'task',typeLabel:'Task',employee:r.employee||'',task:r.taskName||'Today Urgent Task',date:r.requestDate||'',details:(r.category?r.category+' • ':'')+(r.assignBy?'Assign By: '+r.assignBy+' • ':'')+(r.details||'-'),status:r.status||'Pending',rowIndex:r.rowIndex,action:'scheduleEmergency',requestId:r.requestId||'',assignBy:r.assignBy||'',approvalOwner:r.approvalOwner||''});
+                    out.push({key:'urgent|'+r.rowIndex,type:'task',typeLabel:'Task',employee:r.employee||'',employeeId:r.employeeId||'',task:r.taskName||'Today Urgent Task',date:r.requestDate||'',details:(r.category?r.category+' • ':'')+(r.assignBy?'Assign By: '+r.assignBy+' • ':'')+(r.details||'-'),status:status,rowIndex:r.rowIndex,action:'scheduleEmergency',requestId:r.requestId||'',assignBy:r.assignBy||'',approvalOwner:r.approvalOwner||''});
                     return;
                 }
                 const kind=rt.toLowerCase().includes('leave')?'leave':rt.toLowerCase().includes('weekoff')||rt.toLowerCase().includes('adjust')?'adjustment':'adjustment';
-                out.push({key:'schedule|'+r.rowIndex,type:kind,typeLabel:kind==='leave'?'Leave':'Adjustment',employee:r.employee||'',task:rt||'Schedule Request',date:r.requestDate||'',details:r.details||r.location||'-',status:r.status||'Pending',rowIndex:r.rowIndex,action:'schedule'});
+                out.push({key:'schedule|'+r.rowIndex,type:kind,typeLabel:kind==='leave'?'Leave':'Adjustment',employee:r.employee||'',employeeId:r.employeeId||'',task:rt||'Schedule Request',date:r.requestDate||'',details:r.details||r.location||'-',status:status,rowIndex:r.rowIndex,action:'schedule'});
             });
             (globalAllTasks||[]).forEach(t=>{
                 const empStatus=String(t.empStatus||'').toLowerCase(), hodStatus=String(t.hodStatus||'').toLowerCase();
-                if(empStatus==='completion requested') out.push({key:'task-completion|'+(t.taskId||t.rowIndex),type:'task',typeLabel:'Task',employee:t.assignedTo||t.employee||'',task:t.taskName||'Task',date:t.endDate||t.startDate||'',details:'Before/Completion approval required',status:t.empStatus||'Completion Requested',rowIndex:t.rowIndex,taskId:t.taskId||'',action:'taskCompletion',targetUser:t.assignedTo||t.employee||'',approvalOwner:t.approvalOwner||''});
-                else if(hodStatus==='pending' && String(t.assignedBy||'').trim()) out.push({key:'task-approval|'+(t.taskId||t.rowIndex),type:'task',typeLabel:'Task',employee:t.assignedTo||t.employee||'',task:t.taskName||'Task',date:t.startDate||'',details:'Task approval pending',status:t.hodStatus||'Pending',rowIndex:t.rowIndex,taskId:t.taskId||'',action:'taskApproval',targetUser:t.assignedTo||t.employee||'',approvalOwner:t.approvalOwner||''});
+                const meta=attendanceMetaForUser(t.assignedTo||t.employee||'')||{};
+                if(empStatus==='completion requested') out.push({key:'task-completion|'+(t.taskId||t.rowIndex),type:'task',typeLabel:'Task',employee:t.assignedTo||t.employee||'',employeeId:meta.employeeId||'',task:t.taskName||'Task',date:t.endDate||t.startDate||'',details:'Before/Completion approval required',status:t.empStatus||'Completion Requested',rowIndex:t.rowIndex,taskId:t.taskId||'',action:'taskCompletion',targetUser:t.assignedTo||t.employee||'',approvalOwner:t.approvalOwner||''});
+                else if(String(t.assignedBy||'').trim() && ['pending','approved','rejected'].includes(hodStatus)) out.push({key:'task-approval|'+(t.taskId||t.rowIndex),type:'task',typeLabel:'Task',employee:t.assignedTo||t.employee||'',employeeId:meta.employeeId||'',task:t.taskName||'Task',date:t.startDate||'',details:'Task approval',status:t.hodStatus||'Pending',rowIndex:t.rowIndex,taskId:t.taskId||'',action:'taskApproval',targetUser:t.assignedTo||t.employee||'',approvalOwner:t.approvalOwner||''});
             });
             return out;
         }
+        function approvalCenterStatusMatches(x,status){return status==='all'||String(x.status||'').toLowerCase()===status;}
         function openApprovalAttendanceTaskModal(){
             if(!approvalCenterRoleAllowed()){alert('Sirf HOD/Admin/MasterAdmin approval center open kar sakte hain.');return;}
             const modal=document.getElementById('approvalAttendanceTaskModal'); if(!modal)return;
             const empSel=document.getElementById('approvalCenterEmployee');
             if(empSel){const names=Array.from(new Set(approvalCenterItems.map(x=>x.employee).filter(Boolean))).sort();empSel.innerHTML='<option value="">All Employees</option>'+names.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');}
-            document.getElementById('approvalCenterType').value='all'; document.getElementById('approvalCenterTask').value=''; document.getElementById('approvalCenterMonth').value=''; document.getElementById('approvalCenterFrom').value=''; document.getElementById('approvalCenterTo').value='';
+            document.getElementById('approvalCenterType').value='all'; document.getElementById('approvalCenterStatus').value='pending'; document.getElementById('approvalCenterTask').value=''; document.getElementById('approvalCenterMonth').value=''; document.getElementById('approvalCenterFrom').value=''; document.getElementById('approvalCenterTo').value='';
             modal.style.display='block'; loadApprovalAttendanceTaskCenter();
         }
         function closeApprovalAttendanceTaskModal(){const m=document.getElementById('approvalAttendanceTaskModal');if(m)m.style.display='none';}
@@ -2407,11 +2408,17 @@ function parseBreakTimeClient(v){
         }
         function renderApprovalAttendanceTaskCenter(){
             const box=document.getElementById('approvalCenterBody'); if(!box)return;
-            const type=document.getElementById('approvalCenterType')?.value||'all', emp=(document.getElementById('approvalCenterEmployee')?.value||'').toLowerCase(), task=(document.getElementById('approvalCenterTask')?.value||'').toLowerCase().trim(), month=document.getElementById('approvalCenterMonth')?.value||'', from=document.getElementById('approvalCenterFrom')?.value||'', to=document.getElementById('approvalCenterTo')?.value||'';
-            const list=approvalCenterItems.filter(x=>(type==='all'||x.type===type)&&(!emp||String(x.employee).toLowerCase()===emp)&&(!task||String(x.task).toLowerCase().includes(task))&&approvalCenterInRange(x.date,month,from,to));
+            const type=document.getElementById('approvalCenterType')?.value||'all', statusFilter=document.getElementById('approvalCenterStatus')?.value||'pending', emp=(document.getElementById('approvalCenterEmployee')?.value||'').toLowerCase(), task=(document.getElementById('approvalCenterTask')?.value||'').toLowerCase().trim(), month=document.getElementById('approvalCenterMonth')?.value||'', from=document.getElementById('approvalCenterFrom')?.value||'', to=document.getElementById('approvalCenterTo')?.value||'';
+            const list=approvalCenterItems.filter(x=>(type==='all'||x.type===type)&&approvalCenterStatusMatches(x,statusFilter)&&(!emp||String(x.employee).toLowerCase()===emp)&&(!task||String(x.task).toLowerCase().includes(task))&&approvalCenterInRange(x.date,month,from,to));
             const count=document.getElementById('approvalCenterCount');if(count)count.textContent=list.length;
-            if(!list.length){box.innerHTML='<tr><td colspan="8" class="p-8 text-center text-gray-500">No pending approval found.</td></tr>';return;}
-            box.innerHTML=list.map(x=>`<tr class="border-t hover:bg-gray-50"><td class="p-3"><input type="checkbox" class="approval-center-check" data-key="${escapeHtml(x.key)}"></td><td class="p-3"><span class="px-2 py-1 rounded-full text-[10px] font-bold ${x.type==='task'?'bg-blue-50 text-blue-700':x.type==='leave'?'bg-amber-50 text-amber-700':'bg-purple-50 text-purple-700'}">${escapeHtml(x.typeLabel)}</span></td><td class="p-3 font-bold text-[#112a2e]">${escapeHtml(x.employee)}</td><td class="p-3 font-semibold">${escapeHtml(x.task)}</td><td class="p-3">${escapeHtml(x.date||'-')}</td><td class="p-3 text-xs text-gray-600 max-w-[320px] whitespace-normal">${escapeHtml(x.details||'-')}</td><td class="p-3 text-xs font-bold text-orange-600">${escapeHtml(x.status)}</td><td class="p-3"><div class="flex gap-1"><button onclick="approvalCenterSingleAction('${escapeHtml(x.key)}','Approved')" class="bg-[#259b94] text-white px-3 py-1.5 rounded text-xs font-bold">Approve</button><button onclick="approvalCenterSingleAction('${escapeHtml(x.key)}','Rejected')" class="bg-red-500 text-white px-3 py-1.5 rounded text-xs font-bold">Reject</button></div></td></tr>`).join('');
+            if(!list.length){box.innerHTML='<tr><td colspan="8" class="p-8 text-center text-gray-500">No approval item found.</td></tr>';return;}
+            box.innerHTML=list.map(x=>{
+                const pending=String(x.status||'').toLowerCase()==='pending';
+                const checkbox=pending?`<input type="checkbox" class="approval-center-check" data-key="${escapeHtml(x.key)}">`:'<span class="text-gray-300">—</span>';
+                const action=pending?`<div class="flex gap-1"><button onclick="approvalCenterSingleAction('${escapeHtml(x.key)}','Approved')" class="bg-[#259b94] text-white px-3 py-1.5 rounded text-xs font-bold">Approve</button><button onclick="approvalCenterSingleAction('${escapeHtml(x.key)}','Rejected')" class="bg-red-500 text-white px-3 py-1.5 rounded text-xs font-bold">Reject</button></div>`:`<span class="text-xs font-bold ${String(x.status).toLowerCase()==='approved'?'text-green-600':'text-red-500'}">${escapeHtml(x.status)}</span>`;
+                const statusClass=String(x.status).toLowerCase()==='approved'?'text-green-600':String(x.status).toLowerCase()==='rejected'?'text-red-500':'text-orange-600';
+                return `<tr class="border-t hover:bg-gray-50"><td class="p-3">${checkbox}</td><td class="p-3"><span class="px-2 py-1 rounded-full text-[10px] font-bold ${x.type==='task'?'bg-blue-50 text-blue-700':x.type==='leave'?'bg-amber-50 text-amber-700':'bg-purple-50 text-purple-700'}">${escapeHtml(x.typeLabel)}</span></td><td class="p-3 font-bold text-[#112a2e]">${escapeHtml(x.employee)}${x.employeeId?`<div class="text-[10px] text-gray-500 font-semibold">ID: ${escapeHtml(x.employeeId)}</div>`:''}</td><td class="p-3 font-semibold">${escapeHtml(x.task)}</td><td class="p-3">${escapeHtml(x.date||'-')}</td><td class="p-3 text-xs text-gray-600 max-w-[320px] whitespace-normal">${escapeHtml(x.details||'-')}</td><td class="p-3 text-xs font-bold ${statusClass}">${escapeHtml(x.status)}</td><td class="p-3">${action}</td></tr>`;
+            }).join('');
         }
         function toggleApprovalCenterSelectAll(checked){document.querySelectorAll('#approvalCenterBody .approval-center-check').forEach(c=>c.checked=!!checked);const h=document.getElementById('approvalCenterSelectAll');if(h)h.checked=!!checked;}
         function approvalCenterFind(key){return approvalCenterItems.find(x=>x.key===key)||null;}
@@ -2757,7 +2764,7 @@ function parseBreakTimeClient(v){
             const aw=Number(performanceWeights.attendance)||50,tw=Number(performanceWeights.task)||50;
             const overall=Math.round((attendancePct*aw+taskPct*tw)/100);
             const meta=attendanceMetaForUser(emp);
-            return {emp,rows,tasks,present,absent,leave,weekoff,closed,working,attendancePct,completed,taskPct,overall,department:meta.department||'',employeeId:meta.employeeId||''};
+            const rowEmployeeId=rows.find(r=>r.EmployeeId)?.EmployeeId||''; return {emp,rows,tasks,present,absent,leave,weekoff,closed,working,attendancePct,completed,taskPct,overall,department:meta.department||'',employeeId:meta.employeeId||rowEmployeeId||''};
         }
         function openEmployeeProgressDirect(emp){
             const modal=document.getElementById('progressReportModal');
@@ -2786,7 +2793,7 @@ function parseBreakTimeClient(v){
             box.innerHTML=stats.map(s=>{
                 const taskRows=s.tasks.slice().sort((a,b)=>(progressReportDateObj(a.endDate)||new Date(0))-(progressReportDateObj(b.endDate)||new Date(0))).map(t=>`<tr><td>${progressReportEscape(t.taskName||'-')}</td><td>${progressReportEscape(t.startDate||'-')} → ${progressReportEscape(t.endDate||'-')}</td><td>${progressReportEscape(t.priority||'Normal')}</td><td>${progressReportEscape(t.empStatus||'Pending')}</td><td>${Number(t.timeSpent)||0} min</td></tr>`).join('')||'<tr><td colspan="5" class="p-4 text-center text-gray-500">No tasks found.</td></tr>';
                 const attRows=s.rows.map(a=>`<tr><td>${progressReportEscape(a.Date||'-')}</td><td>${a.InTime||'-'}</td><td>${a.OutTime||'-'}</td><td>${progressReportEscape(a.Leave||'-')}</td><td>${progressReportEscape(a.Reason||'-')}</td></tr>`).join('')||'<tr><td colspan="5" class="p-4 text-center text-gray-500">No attendance records found.</td></tr>';
-                return `<div class="progress-report-section"><div class="flex flex-wrap justify-between items-center gap-2 mb-3"><div><h3 class="text-xl font-extrabold text-[#112a2e]">${progressReportEscape(s.emp)}</h3><div class="text-xs text-gray-500">Attendance ${s.attendancePct}% · Task ${s.taskPct}% · Overall ${s.overall}%</div></div><div class="text-sm font-bold text-[#259b94]">${s.completed}/${s.tasks.length} Tasks Complete</div></div><div class="grid grid-cols-2 md:grid-cols-6 gap-2 mb-4"><div class="bg-[#f0f7f7] p-3 rounded-lg"><b>${s.present}</b><small class="block text-gray-500">Present</small></div><div class="bg-red-50 p-3 rounded-lg"><b>${s.absent}</b><small class="block text-gray-500">Absent</small></div><div class="bg-amber-50 p-3 rounded-lg"><b>${s.leave}</b><small class="block text-gray-500">Leave</small></div><div class="bg-blue-50 p-3 rounded-lg"><b>${s.weekoff}</b><small class="block text-gray-500">Weekoff</small></div><div class="bg-green-50 p-3 rounded-lg"><b>${s.completed}</b><small class="block text-gray-500">Completed</small></div><div class="bg-orange-50 p-3 rounded-lg"><b>${s.tasks.length-s.completed}</b><small class="block text-gray-500">Pending</small></div></div><div class="overflow-x-auto mb-4"><h4 class="font-bold mb-2">Attendance Details</h4><table class="progress-report-mini-table"><thead><tr><th>Date</th><th>In Time</th><th>Out Time</th><th>Status</th><th>Reason</th></tr></thead><tbody>${attRows}</tbody></table></div><div class="overflow-x-auto"><h4 class="font-bold mb-2">Task Details</h4><table class="progress-report-mini-table"><thead><tr><th>Task</th><th>Timeline</th><th>Priority</th><th>Status</th><th>Time</th></tr></thead><tbody>${taskRows}</tbody></table></div></div>`;
+                return `<div class="progress-report-section"><div class="flex flex-wrap justify-between items-center gap-2 mb-3"><div><h3 class="text-xl font-extrabold text-[#112a2e]">${progressReportEscape(s.emp)}${s.employeeId?` <span class=\"text-sm text-gray-500\">(${progressReportEscape(s.employeeId)})</span>`:''}</h3><div class="text-xs text-gray-500">Attendance ${s.attendancePct}% · Task ${s.taskPct}% · Overall ${s.overall}%</div></div><div class="text-sm font-bold text-[#259b94]">${s.completed}/${s.tasks.length} Tasks Complete</div></div><div class="grid grid-cols-2 md:grid-cols-6 gap-2 mb-4"><div class="bg-[#f0f7f7] p-3 rounded-lg"><b>${s.present}</b><small class="block text-gray-500">Present</small></div><div class="bg-red-50 p-3 rounded-lg"><b>${s.absent}</b><small class="block text-gray-500">Absent</small></div><div class="bg-amber-50 p-3 rounded-lg"><b>${s.leave}</b><small class="block text-gray-500">Leave</small></div><div class="bg-blue-50 p-3 rounded-lg"><b>${s.weekoff}</b><small class="block text-gray-500">Weekoff</small></div><div class="bg-green-50 p-3 rounded-lg"><b>${s.completed}</b><small class="block text-gray-500">Completed</small></div><div class="bg-orange-50 p-3 rounded-lg"><b>${s.tasks.length-s.completed}</b><small class="block text-gray-500">Pending</small></div></div><div class="overflow-x-auto mb-4"><h4 class="font-bold mb-2">Attendance Details</h4><table class="progress-report-mini-table"><thead><tr><th>Date</th><th>In Time</th><th>Out Time</th><th>Status</th><th>Reason</th></tr></thead><tbody>${attRows}</tbody></table></div><div class="overflow-x-auto"><h4 class="font-bold mb-2">Task Details</h4><table class="progress-report-mini-table"><thead><tr><th>Task</th><th>Timeline</th><th>Priority</th><th>Status</th><th>Time</th></tr></thead><tbody>${taskRows}</tbody></table></div></div>`;
             }).join('');
         }
         function renderProgressReport(){
@@ -3073,9 +3080,9 @@ function parseBreakTimeClient(v){
             sel.innerHTML = '';
             if(role.indexOf('admin') > -1 || role.indexOf('hod') > -1) {
                 sel.innerHTML = '<option value="All">All Employees</option>';
-                (globalTeamMembers || []).forEach(n => sel.innerHTML += `<option value="${String(n).replace(/"/g,'&quot;')}">${n}</option>`);
+                (globalTeamMembers || []).forEach(n => { const meta=attendanceMetaForUser(n)||{}; const label=meta.employeeId?`${n} — ${meta.employeeId}`:n; sel.innerHTML += `<option value="${String(n).replace(/"/g,'&quot;')}">${escapeHtml(label)}</option>`; });
             } else {
-                sel.innerHTML = `<option value="${me}">${me}</option>`;
+                const myMeta=attendanceMetaForUser(me)||{}; sel.innerHTML = `<option value="${me}">${escapeHtml(myMeta.employeeId?me+' — '+myMeta.employeeId:me)}</option>`;
             }
         }
 
@@ -3126,7 +3133,7 @@ function parseBreakTimeClient(v){
         function attendanceMetaForUser(name) {
             const needle=String(name||'').trim().toLowerCase();
             const found=(globalTeamMemberMeta||[]).find(x=>[x.username,x.displayName,x.employeeId].some(v=>String(v||'').trim().toLowerCase()===needle));
-            return found || {username:name,weekoff:'Sunday',department:'',employeeId:''};
+            return found || {username:name,weekoff:'Sunday',department:'',employeeId:(String(name||'').trim().toLowerCase()===String(document.getElementById('displayUser')?.innerText||'').trim().toLowerCase()?(window.currentUserEmployeeId||''):'')};
         }
 
         function officeEventForDate(date){ const key=`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`; return (globalOfficeEvents||[]).find(ev=>key>=String(ev.fromDate||"") && key<=String(ev.toDate||ev.fromDate||""))||null; }
