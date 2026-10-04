@@ -226,7 +226,7 @@
 </style>
 <style id="v43-grade-fix">
 /* V43: Employee Monthly Grade card - only requested visual changes. */
-.employee-monthly-grade-card{background:#ffffff!important;border:1px solid #3e6a6e!important;}
+.employee-monthly-grade-card{background:#e9f7f5!important;border:1px solid #3e6a6e!important;}
 .employee-monthly-grade-card .monthly-grade-title{color:#7db0b1!important;text-transform:none!important;}
 .employee-monthly-grade-card .grade-percent{color:#000000!important;}
 </style>
@@ -300,21 +300,19 @@
                         </select>
                     </div>
                     <div id="namazReasonBox" class="mb-3 hidden">
-                        <label class="text-xs font-semibold text-[#a5cacc]">Namaz:</label>
-                        <select id="namazReasonSelect" class="w-full bg-[#2a4d53] border border-[#5a8789] text-white px-2 py-2 rounded-lg text-xs focus:outline-none focus:border-[#5fd3cc]" onchange="toggleJumaBox()">
-                            <option value="">-- Select Namaz --</option>
+                        <label class="text-xs font-semibold text-[#a5cacc]">Zohar:</label>
+                        <select id="namazZoharSelect" class="w-full bg-[#2a4d53] border border-[#5a8789] text-white px-2 py-2 rounded-lg text-xs focus:outline-none focus:border-[#5fd3cc]" onchange="selectNamazType('Zohar')">
+                            <option value="">-- Select Zohar --</option>
                             <option value="Zohar">Zohar</option>
-                            <option value="Asr">Asr</option>
-                            <option value="Magrib">Magrib</option>
                         </select>
                     </div>
                     <div id="jumaReasonBox" class="mb-3 hidden">
-                        <label class="text-xs font-semibold text-[#a5cacc]">Juma:</label>
-                        <select id="jumaReasonSelect" class="w-full bg-[#2a4d53] border border-[#5a8789] text-white px-2 py-2 rounded-lg text-xs focus:outline-none focus:border-[#5fd3cc]" onchange="toggleOtherReason()">
-                            <option value="">-- Select Juma --</option>
-                            <option value="Juma">Juma</option>
+                        <label class="text-xs font-semibold text-[#a5cacc]">Juma (Friday):</label>
+                        <select id="jumaReasonSelect" class="w-full bg-[#2a4d53] border border-[#5a8789] text-white px-2 py-2 rounded-lg text-xs focus:outline-none focus:border-[#5fd3cc]" onchange="selectNamazType('Juma')">
+                            <option value="">-- Select Juma (Friday) --</option>
+                            <option value="Juma">Juma (Friday)</option>
                         </select>
-                        <p id="jumaDayHint" class="text-[10px] text-[#f59e0b] mt-1 hidden">Juma sirf Friday ko select ki ja sakti hai.</p>
+                        <p id="jumaDayHint" class="text-[10px] text-[#f59e0b] mt-1 hidden">Juma (Friday) sirf Friday ko select ki ja sakti hai.</p>
                     </div>
                     <textarea id="actionReasonOther" class="w-full bg-[#2a4d53] border border-[#5a8789] text-white px-2 py-2 rounded-lg mb-3 text-xs hidden focus:outline-none focus:border-[#5fd3cc]" rows="2" placeholder="Write your reason here..."></textarea>
                     <div id="attendanceTimingReasonBox" class="mb-3 hidden">

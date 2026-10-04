@@ -83,7 +83,7 @@
             const msg=event?'Aaj office band hai: '+String(event.name||event.eventName||'Holiday')+'. Attendance ki zaroorat nahi.':isWeekoff?'Aaj aapka Weekoff hai. Attendance ki zaroorat nahi.':'';
             notice.textContent=msg;notice.classList.toggle('hidden',!msg);btn.disabled=!!msg;btn.style.opacity=msg?'0.5':'';btn.title=msg;
         }
-        document.addEventListener('change',e=>{if(e.target&&e.target.id==='attendanceDate'){v4UpdateAttendanceAvailability();updateAttendanceReasonUI();} if(e.target&&(e.target.id==='attendanceAction'||e.target.id==='actionReasonSelect'||e.target.id==='namazReasonSelect'||e.target.id==='jumaReasonSelect')){if(e.target.id==='attendanceAction')toggleInputs(); updateAttendanceReasonUI(); updateAttendanceTimingReasonUI();}});
+        document.addEventListener('change',e=>{if(e.target&&e.target.id==='attendanceDate'){v4UpdateAttendanceAvailability();updateAttendanceReasonUI();} if(e.target&&(e.target.id==='attendanceAction'||e.target.id==='actionReasonSelect'||e.target.id==='namazZoharSelect'||e.target.id==='jumaReasonSelect')){if(e.target.id==='attendanceAction')toggleInputs(); updateAttendanceReasonUI(); updateAttendanceTimingReasonUI();}});
         document.addEventListener('input',e=>{if(e.target&&e.target.id==='manualTime'){updateBreakExtraReasonVisibility();updateAttendanceTimingReasonUI();}});
         function toggleInputs() {
             const action = document.getElementById('attendanceAction').value;
@@ -105,6 +105,21 @@
             if(!friday && jsel) jsel.value='';
             updateBreakExtraReasonVisibility();
         }
+        function selectNamazType(type){
+            const z=document.getElementById('namazZoharSelect'), j=document.getElementById('jumaReasonSelect');
+            if(type==='Zohar'){ if(j) j.value=''; }
+            if(type==='Juma'){
+                if(!isFridaySelected()){ if(j) j.value=''; alert('Juma (Friday) sirf Friday ko select ki ja sakti hai.'); }
+                else if(z) z.value='';
+            }
+            updateBreakExtraReasonVisibility();
+        }
+        function getSelectedNamazType(){
+            const j=isFridaySelected() ? (document.getElementById('jumaReasonSelect')?.value||'') : '';
+            if(j==='Juma') return 'Juma';
+            const z=document.getElementById('namazZoharSelect')?.value||'';
+            return z==='Zohar' ? 'Zohar' : '';
+        }
         function toggleOtherReason() {
             const val = document.getElementById('actionReasonSelect')?.value || '';
             const other = document.getElementById('actionReasonOther');
@@ -114,7 +129,7 @@
             if(other) other.classList.toggle('hidden',val !== 'Other');
             if(val !== 'Other' && other) other.value='';
             if(namaz) namaz.classList.toggle('hidden',val !== 'Namaz');
-            if(val !== 'Namaz' && document.getElementById('namazReasonSelect')) document.getElementById('namazReasonSelect').value='';
+            if(val !== 'Namaz' && document.getElementById('namazZoharSelect')) document.getElementById('namazZoharSelect').value='';
             if(juma) juma.classList.toggle('hidden',!(val==='Namaz' && isFriday));
             if(val!=='Namaz' || !isFriday){ const j=document.getElementById('jumaReasonSelect'); if(j)j.value=''; }
             const lunchOpt=[...document.querySelectorAll('#actionReasonSelect option')].find(o=>o.value==='Lunch');
@@ -127,8 +142,8 @@
             if(type==='Namaz'){
                 const j=isFridaySelected() && document.getElementById('jumaReasonSelect')?.value==='Juma';
                 if(j)return {label:'Juma',max:70};
-                const n=document.getElementById('namazReasonSelect')?.value||'';
-                return {label:n?('Namaz - '+n):'Namaz',max:25};
+                const n=getSelectedNamazType();
+                return {label:n==='Zohar'?'Namaz - Zohar':'Namaz',max:25};
             }
             return null;
         }
@@ -271,9 +286,9 @@
                 if(reasonType === 'Other') reason = document.getElementById('actionReasonOther').value.trim();
                 if(reasonType === 'Namaz') {
                     const juma = isFridaySelected() && document.getElementById('jumaReasonSelect').value==='Juma';
-                    const namaz = document.getElementById('namazReasonSelect').value;
+                    const namaz = getSelectedNamazType();
                     if(juma) reason='Juma';
-                    else { if(!namaz){ alert('Please select Namaz.'); return; } reason = 'Namaz - ' + namaz; }
+                    else { if(!namaz){ alert('Please select Zohar or Juma (Friday).'); return; } reason = 'Namaz - ' + namaz; }
                 }
                 if(!reason){ alert('Break Type select karein.'); return; }
             }
@@ -334,7 +349,8 @@
                 btn.innerText = "Submit Record"; btn.disabled = false;
                 
                 document.getElementById('actionReasonSelect').value = '';
-                document.getElementById('namazReasonSelect').value = '';
+                if(document.getElementById('namazZoharSelect')) document.getElementById('namazZoharSelect').value = '';
+                if(document.getElementById('jumaReasonSelect')) document.getElementById('jumaReasonSelect').value = '';
                 document.getElementById('namazReasonBox').classList.add('hidden');
                 document.getElementById('actionReasonOther').value = '';
                 document.getElementById('actionReasonOther').classList.add('hidden');

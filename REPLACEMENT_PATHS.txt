@@ -1,18 +1,24 @@
-V44 replacement paths
+Office Task Reporting V45
 
 GitHub / Vercel project root:
-- index.html -> replace existing index.html
-- index_scripts.js -> replace existing index_scripts.js
+1. Replace index.html with this V45 index.html.
+2. Replace index_scripts.js with this V45 index_scripts.js.
 
 Google Apps Script:
-- backend_code.js -> replace full backend_code.js
+3. Replace backend_code.js with this V45 backend_code.js.
+4. Deploy a NEW Apps Script Web App version after replacing backend_code.js:
+   Deploy -> Manage deployments -> Edit -> New version -> Deploy.
 
-IMPORTANT: After replacing backend_code.js, deploy a NEW Apps Script Web App version.
+Important:
+- Keep index.html and index_scripts.js in the same Vercel/GitHub root folder.
+- index_scripts.js must not be pasted into Apps Script.
+- backend_code.js belongs only in Google Apps Script.
+- Existing Google Sheet/employee backup files are not deleted by this update.
 
-Changes:
-- Attendance entry window: current day + previous 2 days.
-- Current-day Punch Out before closing time remains blocked.
-- Previous-day/previous-2-day Punch Out before closing time is allowed.
-- Manual delayed Punch In requires "Delay Hone Hone Ka Reason" + written reason.
-- Manual early Punch Out requires "Before Jaane Ka Reasion" + written reason.
-- Attendance stores In Delay Reason / Out Before Reason in employee Attendance sheet.
+V45 changes:
+- Break Start -> Namaz now uses two separate dropdowns: Zohar and Juma (Friday).
+- Zohar is available on all selectable days.
+- Juma (Friday) is visible/selectable only when the selected attendance date is Friday.
+- Selecting one Namaz dropdown clears the other.
+- Server also rejects Juma on non-Friday dates and rejects old Asr/Magrib break labels for new entries.
+- Employee Monthly Grade card background is light teal and title is "Monthly Grade"; existing font colors are preserved and percentage digits remain black.
