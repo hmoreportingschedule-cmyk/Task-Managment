@@ -2385,6 +2385,13 @@ function parseBreakTimeClient(v){
         }
         function buildApprovalCenterItems(){
             const out=[];
+            // Direct employee attendance records (Punch In/Out) are approval items too.
+            (globalTeamAttendance||[]).forEach(r=>{
+                const status=String(r.status||'Pending');
+                if(!r.employee)return;
+                const meta=attendanceMetaForUser(r.employee)||{};
+                out.push({key:'attendance-record|'+r.rowIndex,type:'attendance',typeLabel:'Attendance',employee:r.user||r.employee||'',employeeId:meta.employeeId||r.employeeId||'',task:'Attendance',date:r.date||'',details:`In: ${r.inTime||'-'} • Out: ${r.outTime||'-'} • ${r.reason||'-'}`,status:status,rowIndex:r.rowIndex,action:'attendanceRecord',targetUser:r.user||r.employee||''});
+            });
             (globalAttendanceRequests||[]).forEach(r=>{
                 const status=String(r.status||'Pending');
                 out.push({key:'attendance|'+r.rowIndex,type:'attendance',typeLabel:'Attendance',employee:r.employee||'',employeeId:r.employeeId||'',task:'Attendance Request',date:r.date||'',details:r.reason||'-',status:status,rowIndex:r.rowIndex,action:'attendance'});
@@ -2452,6 +2459,7 @@ function parseBreakTimeClient(v){
         function approvalCenterPost(item,status,rejectionReason='',rejectionReasonOther='',extra={}){
             const fd=new FormData();fd.append('sessionToken',sessionToken);
             if(item.action==='attendance'){fd.append('action','reviewAttendanceRequest');fd.append('rowIndex',item.rowIndex);fd.append('status',status);if(rejectionReason)fd.append('rejectionReason',rejectionReason);}
+            else if(item.action==='attendanceRecord'){fd.append('action','reviewAttendanceRecord');fd.append('targetUser',item.targetUser||item.employee||'');fd.append('rowIndex',item.rowIndex);fd.append('status',status);if(rejectionReason)fd.append('rejectionReason',rejectionReason);}
             else if(item.action==='schedule' || item.action==='scheduleEmergency'){fd.append('action','updateAdvanceScheduleRequest');fd.append('rowIndex',item.rowIndex);fd.append('status',status);if(item.action==='scheduleEmergency' && extra.durationDays)fd.append('durationDays',String(extra.durationDays));}
             else {fd.append('action','updateTaskStatus');fd.append('targetUser',item.targetUser||'');fd.append('rowIndex',item.rowIndex);fd.append('type','hod');fd.append('status',status);if(rejectionReason)fd.append('rejectionReason',rejectionReason);if(rejectionReasonOther)fd.append('rejectionReasonOther',rejectionReasonOther);}
             return fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json());
@@ -2481,7 +2489,7 @@ function parseBreakTimeClient(v){
             const btn=row?.querySelector('button'); if(btn){btn.disabled=true;btn.textContent='Saving...';}
             if(row)row.remove();
             approvalCenterPost(item,status).then(d=>{
-                if(d.status==='success'){fetchDashboardDataSilently();setTimeout(loadApprovalAttendanceTaskCenter,200);}
+                if(d.status==='success'){fetchDashboardDataSilently();fetchServerNotifications();setTimeout(loadApprovalAttendanceTaskCenter,200);}
                 else{alert(d.message||'Approval update failed.');loadApprovalAttendanceTaskCenter();}
             }).catch(()=>{alert('Approval update failed.');loadApprovalAttendanceTaskCenter();});
         }
@@ -2498,7 +2506,7 @@ function parseBreakTimeClient(v){
             const results=await Promise.all(items.map(item=>approvalCenterPost(item,status).catch(()=>({status:'error'}))));
             const fail=results.filter(d=>d.status!=='success').length;
             if(fail){alert(`${items.length-fail} approved successfully. ${fail} item(s) failed.`);}
-            fetchDashboardDataSilently();setTimeout(loadApprovalAttendanceTaskCenter,200);
+            fetchDashboardDataSilently();fetchServerNotifications();setTimeout(loadApprovalAttendanceTaskCenter,200);
         }
 
         function openAttendanceExcelModal(){document.getElementById('attendanceExcelFile').value='';document.getElementById('attendanceExcelPreview').innerHTML='';document.getElementById('attendanceExcelModal').style.display='block';}
@@ -2554,7 +2562,7 @@ function parseBreakTimeClient(v){
             items.forEach(n=>{const id=notificationId(n),isRead=readIds.includes(id),row=document.createElement('button');row.type='button';row.className=`w-full text-left px-4 py-3 border-b transition ${isRead?'bg-white opacity-70 hover:bg-gray-50':'bg-[#f0fbf9] hover:bg-[#e7f7f4]'}`;row.innerHTML=`<div class="flex items-start gap-2"><i class="fas fa-bell mt-1 ${isRead?'text-gray-400':'text-[#259b94]'}"></i><div class="min-w-0 flex-1"><div class="font-bold text-sm text-[#112a2e]">${n.title}${isRead?'':' <span class="ml-1 inline-block w-2 h-2 rounded-full bg-red-500 align-middle"></span>'}</div><div class="text-xs text-gray-600 mt-1">${n.text}</div><div class="text-[10px] text-gray-400 mt-1">${notificationTime(n)} ${isRead?'• Read':''}</div></div></div>`;row.onclick=()=>{markNotificationRead(id);closeNotifications();if(n.action==='task')openTaskReportModal();else if(n.action==='schedule')openAdvanceScheduleApprovalModal();else if(n.action==='attendance-request')openAttendanceRequestsModal();else openOneViewModal();};list.appendChild(row);});
         }
         document.addEventListener('click',function(e){const b=document.getElementById('notificationBtn'),p=document.getElementById('notificationPanel');if(p&&!p.classList.contains('hidden')&&b&&!b.contains(e.target)&&!p.contains(e.target))closeNotifications();});
-        setInterval(()=>{try{if(typeof renderNotifications==='function')renderNotifications();}catch(e){}},60000);
+        setInterval(()=>{try{if(typeof renderNotifications==='function')renderNotifications();if(typeof fetchServerNotifications==='function'&&typeof approvalCenterRoleAllowed==='function'&&approvalCenterRoleAllowed())fetchServerNotifications();}catch(e){}},10000);
 
         // ================= TASK REPORT =================
 
