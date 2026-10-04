@@ -2385,23 +2385,48 @@ function parseBreakTimeClient(v){
         }
         function toggleApprovalCenterSelectAll(checked){document.querySelectorAll('#approvalCenterBody .approval-center-check').forEach(c=>c.checked=!!checked);const h=document.getElementById('approvalCenterSelectAll');if(h)h.checked=!!checked;}
         function approvalCenterFind(key){return approvalCenterItems.find(x=>x.key===key)||null;}
-        function approvalCenterPost(item,status){
+        let approvalRejectContext = null;
+        function openApprovalRejectModal(key){
+            const item=approvalCenterFind(key); if(!item)return;
+            approvalRejectContext={mode:'single',items:[item]};
+            const title=document.getElementById('approvalRejectTitle'), taskBox=document.getElementById('taskRejectReasonBox'), attBox=document.getElementById('attendanceRejectReasonBox'), otherBox=document.getElementById('taskRejectOtherBox');
+            if(title)title.textContent=item.type==='attendance'?'Attendance Reject Reason':'Task Reject Reason';
+            if(taskBox)taskBox.style.display=item.type==='task'?'block':'none'; if(attBox)attBox.style.display=item.type==='attendance'?'block':'none'; if(otherBox)otherBox.style.display='none';
+            const tr=document.getElementById('taskRejectReason');if(tr)tr.value=''; const ar=document.getElementById('attendanceRejectReason');if(ar)ar.value=''; const ot=document.getElementById('taskRejectReasonOther');if(ot)ot.value='';
+            document.getElementById('approvalRejectModal').style.display='block';
+        }
+        function closeApprovalRejectModal(){const m=document.getElementById('approvalRejectModal');if(m)m.style.display='none';approvalRejectContext=null;}
+        function toggleTaskRejectOther(){const v=document.getElementById('taskRejectReason')?.value;const b=document.getElementById('taskRejectOtherBox');if(b)b.style.display=v==='Other'?'block':'none';}
+        function approvalCenterPost(item,status,rejectionReason='',rejectionReasonOther=''){
             const fd=new FormData();fd.append('sessionToken',sessionToken);
-            if(item.action==='attendance'){fd.append('action','reviewAttendanceRequest');fd.append('rowIndex',item.rowIndex);fd.append('status',status);}
+            if(item.action==='attendance'){fd.append('action','reviewAttendanceRequest');fd.append('rowIndex',item.rowIndex);fd.append('status',status);if(rejectionReason)fd.append('rejectionReason',rejectionReason);}
             else if(item.action==='schedule'){fd.append('action','updateAdvanceScheduleRequest');fd.append('rowIndex',item.rowIndex);fd.append('status',status);}
-            else {fd.append('action','updateTaskStatus');fd.append('targetUser',item.targetUser||'');fd.append('rowIndex',item.rowIndex);fd.append('type','hod');fd.append('status',status);}
+            else {fd.append('action','updateTaskStatus');fd.append('targetUser',item.targetUser||'');fd.append('rowIndex',item.rowIndex);fd.append('type','hod');fd.append('status',status);if(rejectionReason)fd.append('rejectionReason',rejectionReason);if(rejectionReasonOther)fd.append('rejectionReasonOther',rejectionReasonOther);}
             return fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json());
+        }
+        function submitApprovalReject(){
+            const ctx=approvalRejectContext;if(!ctx||!ctx.items.length)return;
+            const item=ctx.items[0]; let reason='',other='';
+            if(item.type==='attendance'){reason=document.getElementById('attendanceRejectReason')?.value||'';if(!reason){alert('Attendance reject reason select karein.');return;}}
+            else if(item.type==='task'){reason=document.getElementById('taskRejectReason')?.value||'';if(!reason){alert('Task reject reason select karein.');return;}if(reason==='Other'){other=(document.getElementById('taskRejectReasonOther')?.value||'').trim();if(!other){alert('Other reason likhiye.');return;}}}
+            const btn=document.getElementById('approvalRejectSubmit');if(btn)btn.disabled=true;
+            Promise.all(ctx.items.map(x=>approvalCenterPost(x,'Rejected',reason,other))).then(ds=>{const bad=ds.filter(d=>d.status!=='success');if(bad.length)alert('Kuch rejection process nahi ho sake.');else alert('Rejected successfully.');closeApprovalRejectModal();fetchDashboardDataSilently();setTimeout(loadApprovalAttendanceTaskCenter,300);}).catch(()=>alert('Rejection update failed.')).finally(()=>{if(btn)btn.disabled=false;});
         }
         function approvalCenterSingleAction(key,status){
             const item=approvalCenterFind(key);if(!item)return;
+            if(status==='Rejected'){openApprovalRejectModal(key);return;}
             approvalCenterPost(item,status).then(d=>{alert(d.message||status);if(d.status==='success'){fetchDashboardDataSilently();setTimeout(loadApprovalAttendanceTaskCenter,250);}}).catch(()=>alert('Approval update failed.'));
         }
         async function bulkApprovalCenterAction(status){
             const keys=Array.from(document.querySelectorAll('#approvalCenterBody .approval-center-check:checked')).map(c=>c.dataset.key);if(!keys.length){alert('Pehle approval items select karein.');return;}
-            if(!confirm(`${keys.length} item(s) ko ${status==='Approved'?'Approve':'Reject'} karna hai?`))return;
-            let ok=0,fail=0;
-            for(const key of keys){const item=approvalCenterFind(key);if(!item)continue;try{const d=await approvalCenterPost(item,status);if(d.status==='success')ok++;else fail++;}catch(e){fail++;}}
-            alert(`${ok} approved/rejected successfully.${fail?` ${fail} item(s) failed.`:''}`);fetchDashboardDataSilently();setTimeout(loadApprovalAttendanceTaskCenter,300);
+            const items=keys.map(approvalCenterFind).filter(Boolean);
+            if(status==='Rejected'){
+                const types=new Set(items.map(x=>x.type)); if(types.size>1){alert('Bulk Reject mein ek hi type (Task ya Attendance) select karein.');return;}
+                approvalRejectContext={mode:'bulk',items:items}; const first=items[0]; document.getElementById('approvalRejectTitle').textContent=first.type==='attendance'?'Attendance Reject Reason':'Task Reject Reason'; document.getElementById('taskRejectReasonBox').style.display=first.type==='task'?'block':'none'; document.getElementById('attendanceRejectReasonBox').style.display=first.type==='attendance'?'block':'none'; document.getElementById('taskRejectOtherBox').style.display='none'; document.getElementById('taskRejectReason').value=''; document.getElementById('attendanceRejectReason').value=''; document.getElementById('taskRejectReasonOther').value=''; document.getElementById('approvalRejectModal').style.display='block'; return;
+            }
+            if(!confirm(`${items.length} item(s) ko Approve karna hai?`))return; let ok=0,fail=0;
+            for(const item of items){try{const d=await approvalCenterPost(item,status);if(d.status==='success')ok++;else fail++;}catch(e){fail++;}}
+            alert(`${ok} approved successfully.${fail?` ${fail} item(s) failed.`:''}`);fetchDashboardDataSilently();setTimeout(loadApprovalAttendanceTaskCenter,300);
         }
 
         function openAttendanceExcelModal(){document.getElementById('attendanceExcelFile').value='';document.getElementById('attendanceExcelPreview').innerHTML='';document.getElementById('attendanceExcelModal').style.display='block';}

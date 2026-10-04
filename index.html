@@ -1142,6 +1142,40 @@
         </div>
     </div>
 
+    <!-- APPROVAL REJECTION REASON MODAL -->
+    <div id="approvalRejectModal" class="modal">
+        <div class="modal-content relative max-w-lg shadow-2xl">
+            <span onclick="closeApprovalRejectModal()" class="absolute top-4 right-4 text-gray-400 hover:text-red-500 cursor-pointer text-2xl font-bold">&times;</span>
+            <h3 id="approvalRejectTitle" class="text-xl font-bold text-[#112a2e] mb-4">Reject Reason</h3>
+            <div id="taskRejectReasonBox" style="display:none" class="space-y-3">
+                <label class="block text-sm font-semibold text-gray-700">Task Reject Reason</label>
+                <select id="taskRejectReason" onchange="toggleTaskRejectOther()" class="w-full border border-gray-300 p-3 rounded-lg">
+                    <option value="">-- Select Reason --</option>
+                    <option value="Work Incomplete">Work Incomplete</option>
+                    <option value="Work Complete But Not Perfect Plz. Sahi Karke Dubara Dijiye">Work Complete But Not Perfect Plz. Sahi Karke Dubara Dijiye</option>
+                    <option value="Other">Other</option>
+                </select>
+                <div id="taskRejectOtherBox" style="display:none">
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Other Reason</label>
+                    <textarea id="taskRejectReasonOther" rows="3" class="w-full border border-gray-300 p-3 rounded-lg" placeholder="Reason likhiye..."></textarea>
+                </div>
+            </div>
+            <div id="attendanceRejectReasonBox" style="display:none" class="space-y-3">
+                <label class="block text-sm font-semibold text-gray-700">Attendance Reject Reason</label>
+                <select id="attendanceRejectReason" class="w-full border border-gray-300 p-3 rounded-lg">
+                    <option value="">-- Select Reason --</option>
+                    <option value="UR Not Available in Office">UR Not Available in Office</option>
+                    <option value="No Advance Update">No Advance Update</option>
+                </select>
+                <p class="text-xs text-red-600 font-semibold">Reject karte hi employee ki is date ki Attendance Absent mark hogi aur dobara attendance submit nahi ho sakegi.</p>
+            </div>
+            <div class="flex justify-end gap-2 mt-5">
+                <button onclick="closeApprovalRejectModal()" class="border border-gray-300 bg-white px-4 py-2 rounded-lg font-bold">Cancel</button>
+                <button id="approvalRejectSubmit" onclick="submitApprovalReject()" class="bg-red-500 hover:bg-red-600 text-white px-5 py-2 rounded-lg font-bold">Reject</button>
+            </div>
+        </div>
+    </div>
+
     <!-- WHATSAPP REPORT MODAL -->
     <div id="whatsappReportModal" class="modal">
         <div class="modal-content relative max-w-lg shadow-2xl">
