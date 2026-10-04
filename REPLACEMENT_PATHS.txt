@@ -1,19 +1,23 @@
-V41 — Daily Actions Namaz/Juma + Break Policy + Monthly Grade UI
+OFFICE TASK REPORTING DASHBOARD — V42
 
-GitHub / Vercel (project root):
-1. Replace index.html with V41 index.html
-2. Replace index_scripts.js with V41 index_scripts.js
+GitHub / Vercel project root:
+1. index.html
+2. index_scripts.js
 
-Google Apps Script Web App:
-3. Replace the full backend_code.js in Apps Script
-4. Deploy a NEW version: Deploy -> Manage deployments -> Edit -> New version -> Deploy
+Google Apps Script project:
+3. backend_code.js
 
-Important: index.html and index_scripts.js must remain in the same Vercel/GitHub root folder.
+Important V42 behavior:
+- Assign New Task > Select Employees shows ONLY active Employee accounts.
+- Assign To (Employee) shows ONLY active Employee accounts.
+- OFF/inactive users are excluded immediately after cache refresh.
+- Deleted users cannot appear because they no longer exist in Users.
+- Backend also blocks assigning a task/template to an inactive employee, so UI filtering cannot be bypassed.
+- Newly created Admin Employee users are written immediately to the master Users sheet with Account Status=ON.
+- After user creation, the Users cache is invalidated and the UI refreshes its user/employee lists.
+- Task assignment/template assignment bumps dashboard cache via audit and triggers notification; employee dashboard can receive the new task on its next fast sync.
 
-New backend Attendance columns are added automatically to each employee Attendance sheet when accessed:
-J = Break Details
-K = Extra Break Minutes
-L = Extra Break Reason
-
-Admin control:
-Progress Chart -> Ramadan mein Lunch Freeze checkbox. This setting is stored in Script Properties and does not create a new Google Sheet.
+Deployment:
+- Replace both frontend files in GitHub/Vercel.
+- Replace backend_code.js in Apps Script.
+- Deploy Apps Script as a NEW VERSION.

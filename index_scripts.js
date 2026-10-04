@@ -554,8 +554,9 @@
             emailEmpSelect.innerHTML = '';
             if(whatsappEmpSelect) whatsappEmpSelect.innerHTML = '';
             
-            members.forEach(m => {
-                assignSelect.innerHTML += `<option value="${m}">${m}</option>`;
+            members=(members||[]).filter(m=>{const v=(typeof m==='string'?m:(m&&m.username)||''); return !!v;});
+            members.forEach(m => { const mv=(typeof m==='string'?m:(m.username||'')); const md=(typeof m==='string'?m:(m.displayName||m.username||''));
+                assignSelect.innerHTML += `<option value="${escapeHtml(mv)}">${escapeHtml(md)}</option>`;
                 filterSelect.innerHTML += `<option value="${m}">${m}</option>`;
                 emailEmpSelect.innerHTML += `<option value="${m}">${m}</option>`;
                 if(whatsappEmpSelect) whatsappEmpSelect.innerHTML += `<option value="${m}">${m}</option>`;
@@ -1387,7 +1388,7 @@
                 if(td.status!=='success') throw new Error(td.message||'Template load failed');
                 if(ed.status!=='success') throw new Error(ed.message||'Employee load failed');
                 assignTemplateCache=td.templates||[];
-                assignEmployeeCache=ed.employees||[];
+                assignEmployeeCache=(ed.employees||[]).filter(x=>x && x.active!==false && x.accountEnabled!==false);
                 if(tSel){
                     tSel.innerHTML='<option value="">-- Select Task Template --</option>';
                     assignTemplateCache.filter(x=>x.active!==false).forEach(t=>{
@@ -1402,6 +1403,7 @@
         }
 
         function renderAssignEmployees(){
+            assignEmployeeCache=(assignEmployeeCache||[]).filter(e=>e && e.active!==false && e.accountEnabled!==false);
             const box=document.getElementById('assignEmployeeList'); if(!box)return;
             if(!assignEmployeeCache.length){box.innerHTML='<div class="text-sm text-gray-500 p-2">No active employees found.</div>';updateAssignEmployeeCount();return;}
             box.innerHTML=assignEmployeeCache.map((e,i)=>{
@@ -1504,7 +1506,8 @@
                 document.getElementById('saveTaskBtn').innerText="Assign Task";
                 if(data.status==='success'){
                     closeAssignTaskModal();
-                    setTimeout(fetchDashboardDataSilently,250);
+                    refreshAssignTemplateData();
+                    setTimeout(fetchDashboardDataSilently,120);
                 }
             }).catch(e=>{
                 alert("Task assignment failed. Please try again.");
