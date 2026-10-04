@@ -2805,10 +2805,15 @@ function parseBreakTimeClient(v){
             if(p.length!==2)return null;
             return {start:new Date(+p[0],+p[1]-1,1),end:new Date(+p[0],+p[1],0)};
         }
-        function progressReportBuildChart(canvasId, labels, values, label, type){
+        function progressReportBuildChart(canvasId, labels, values, label, type, pieLabels){
             const ctx=document.getElementById(canvasId)?.getContext('2d'); if(!ctx)return null;
             const old=type==='attendance'?progressReportAttendanceChart:progressReportTaskChart; if(old)old.destroy();
-            const inst=new Chart(ctx,{type:'bar',data:{labels,datasets:[{label,data:values,backgroundColor:'#259b94',borderRadius:5,barPercentage:.65}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,max:100,ticks:{callback:v=>v+'%'}},x:{grid:{display:false}}}}});
+            const sliceLabels=Array.isArray(pieLabels)&&pieLabels.length?pieLabels:labels;
+            const inst=new Chart(ctx,{
+                type:'pie',
+                data:{labels:sliceLabels,datasets:[{label,data:values,backgroundColor:['#259b94','#ef4444','#f59e0b','#3b82f6','#8b5cf6','#14b8a6'],borderColor:'#ffffff',borderWidth:2}]},
+                options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'right',labels:{usePointStyle:true,padding:14}},tooltip:{callbacks:{label:(ctx)=>{const total=(ctx.dataset.data||[]).reduce((a,b)=>a+(Number(b)||0),0);const v=Number(ctx.raw)||0;const pct=total?Math.round(v/total*100):0;return `${ctx.label}: ${v} (${pct}%)`;}}}}} 
+            });
             if(type==='attendance')progressReportAttendanceChart=inst; else progressReportTaskChart=inst; return inst;
         }
         function progressReportRenderDetails(stats){
@@ -2828,7 +2833,23 @@ function parseBreakTimeClient(v){
             const today=new Date(); today.setHours(0,0,0,0); const onTime=stats.filter(s=>s.rows.some(a=>{const d=progressReportDateObj(a.Date);return d&&d.getTime()===today.getTime()&&a.InTime;})).length;
             document.getElementById('prTotalEmployees').innerText=stats.length; document.getElementById('prOnTimeAvailable').innerText=onTime; document.getElementById('prTotalTasks').innerText=totalTasks; document.getElementById('prCompletedTasks').innerText=completed; document.getElementById('prTaskProgress').innerText=(totalTasks?Math.round(completed/totalTasks*100):0)+'%';
             const body=document.getElementById('progressReportEmployeeBody'); body.innerHTML=stats.map(s=>`<tr class="border-t progress-click-row" data-employee="${progressReportEscape(s.emp)}" onclick="openEmployeeProgressDirect(this.dataset.employee)" title="Open ${progressReportEscape(s.emp)} detailed report"><td class="p-3 font-bold"><div>${progressReportEscape(s.emp)}</div><div class="text-[10px] text-gray-500 font-semibold">${progressReportEscape(s.department||'Department not set')}${s.employeeId?' · '+progressReportEscape(s.employeeId):''}</div></td><td class="p-3 text-center">${s.attendancePct}%</td><td class="p-3 text-center text-green-600 font-bold">${s.present}</td><td class="p-3 text-center text-red-600">${s.absent}</td><td class="p-3 text-center text-amber-600">${s.leave}</td><td class="p-3 text-center text-blue-600">${s.weekoff}</td><td class="p-3 text-center">${s.tasks.length}</td><td class="p-3 text-center text-green-600 font-bold">${s.completed}</td><td class="p-3 text-center text-orange-600 font-bold">${s.taskPct}%</td><td class="p-3 text-center font-extrabold">${s.overall}%</td></tr>`).join('')||'<tr><td colspan="10" class="p-6 text-center text-gray-500">No report data.</td></tr>';
-            const labels=stats.map(s=>s.emp.length>16?s.emp.slice(0,16)+'…':s.emp), att=stats.map(s=>s.attendancePct), task=stats.map(s=>s.taskPct); progressReportBuildChart('progressReportAttendanceChart',labels,att,'Attendance %','attendance'); progressReportBuildChart('progressReportTaskChart',labels,task,'Task %','task'); progressReportRenderDetails(stats);
+            const selectedEmployee=selected&&selected!=='__ALL__';
+            let attendancePieLabels,attendancePieValues,taskPieLabels,taskPieValues;
+            if(selectedEmployee && stats.length===1){
+                const s=stats[0];
+                attendancePieLabels=['Present','Absent','Leave','Weekoff','Office Closed'];
+                attendancePieValues=[s.present,s.absent,s.leave,s.weekoff,s.closed];
+                taskPieLabels=['Completed','Pending'];
+                taskPieValues=[s.completed,Math.max(0,s.tasks.length-s.completed)];
+            }else{
+                attendancePieLabels=['Present','Absent','Leave','Weekoff','Office Closed'];
+                attendancePieValues=[stats.reduce((n,s)=>n+s.present,0),stats.reduce((n,s)=>n+s.absent,0),stats.reduce((n,s)=>n+s.leave,0),stats.reduce((n,s)=>n+s.weekoff,0),stats.reduce((n,s)=>n+s.closed,0)];
+                taskPieLabels=['Completed','Pending'];
+                taskPieValues=[completed,Math.max(0,totalTasks-completed)];
+            }
+            progressReportBuildChart('progressReportAttendanceChart',attendancePieLabels,attendancePieValues,'Attendance','attendance',attendancePieLabels);
+            progressReportBuildChart('progressReportTaskChart',taskPieLabels,taskPieValues,'Tasks','task',taskPieLabels);
+            progressReportRenderDetails(stats);
             window.currentProgressReport={range,stats,aw,tw};
         }
         function openProgressReportModal(){
