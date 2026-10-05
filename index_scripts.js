@@ -2311,6 +2311,46 @@ function parseBreakTimeClient(v){
             ws['!cols'] = widths;
         }
 
+
+        function addAssignedTaskTypeColumn_(){
+            const tables=[...document.querySelectorAll('table')];
+            const table=tables.find(tb=>{
+                const hs=[...tb.querySelectorAll('thead th')].map(x=>String(x.textContent||'').trim().toLowerCase());
+                return hs.includes('task name') && hs.includes('task frequency') && hs.includes('time spent');
+            });
+            if(!table || table.dataset.taskTypeColumnAdded==='1')return;
+            const heads=[...table.querySelectorAll('thead th')];
+            const nameIdx=heads.findIndex(h=>String(h.textContent||'').trim().toLowerCase()==='task name');
+            if(nameIdx<0)return;
+            const th=document.createElement('th');
+            th.textContent='Task Type';
+            th.className=heads[nameIdx].className||'';
+            heads[nameIdx].parentElement.insertBefore(th,heads[nameIdx]);
+            const rows=[...table.querySelectorAll('tbody tr')];
+            rows.forEach((row,i)=>{
+                const cells=[...row.children];
+                if(!cells.length)return;
+                const taskText=String(cells[nameIdx+1]?.textContent||'').trim().split('\n')[0];
+                const assigned=String(cells.find(c=>String(c.textContent||'').trim().toLowerCase().includes('masteradmin'))?.textContent||'').trim();
+                let task=(globalAllTasks||[]).find(t=>String(t.taskName||'').trim()===taskText);
+                const type=task ? (task.taskType||task.templateTaskType||task.type||task.category||'-') : '-';
+                const td=document.createElement('td');
+                td.className=cells[nameIdx+1]?.className||'';
+                td.textContent=type;
+                row.insertBefore(td,cells[nameIdx+1]||null);
+            });
+            table.dataset.taskTypeColumnAdded='1';
+        }
+        function observeAssignedTaskTypeColumn_(){
+            addAssignedTaskTypeColumn_();
+            if(window.__assignedTaskTypeObserver)return;
+            const root=document.body;
+            if(!root)return;
+            const obs=new MutationObserver(()=>addAssignedTaskTypeColumn_());
+            obs.observe(root,{childList:true,subtree:true});
+            window.__assignedTaskTypeObserver=obs;
+        }
+
         async function exportToExcel() {
             await ensureWorkLogsLoaded();
             if(typeof XLSX === 'undefined') {
@@ -2323,6 +2363,7 @@ function parseBreakTimeClient(v){
             // 1. Complete Assigned Tasks
             let tasksForExport = globalAllTasks.map(t => ({
                 "Task ID": t.taskId,
+                "Task Type": t.taskType || t.templateTaskType || t.type || t.category || "-",
                 "Task Name": t.taskName,
                 "Assigned To": t.assignedTo,
                 "Department": t.department,
@@ -4024,3 +4065,9 @@ function parseBreakTimeClient(v){
         function approveAdvanceSchedule(rowIndex){updateAdvanceScheduleRequest(rowIndex,'Approved').then(d=>{alert(d.message||'Approved');if(d.status==='success'){closeAdvanceScheduleApprovalModal();setTimeout(fetchDashboardDataSilently,250);}}).catch(()=>alert('Update failed.'));}
         function rejectAdvanceSchedule(rowIndex){updateAdvanceScheduleRequest(rowIndex,'Rejected').then(d=>{alert(d.message||'Rejected');if(d.status==='success'){closeAdvanceScheduleApprovalModal();setTimeout(fetchDashboardDataSilently,250);}}).catch(()=>alert('Update failed.'));}
 
+
+
+        document.addEventListener('DOMContentLoaded',function(){
+            setTimeout(observeAssignedTaskTypeColumn_,500);
+            setTimeout(observeAssignedTaskTypeColumn_,1500);
+        });
