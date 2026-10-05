@@ -1817,6 +1817,7 @@ function parseBreakTimeClient(v){
         }
         function resetQuickTemplateForm(){
             ensureQuickTemplatePriorityField();
+            setQuickTemplateFieldLabels_();
             ['qtTemplateId','qtCategory','qtFrequency','qtStartDay','qtEndDay'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
             const w=document.getElementById('qtWeightage');if(w)w.value='10';
             const p=document.getElementById('qtPriority');if(p)p.value='Normal';
@@ -1829,12 +1830,61 @@ function parseBreakTimeClient(v){
             resetQuickTemplateForm();document.getElementById('quickTemplateModal').style.display='block';setTimeout(renderQuickTemplateList,50);
         }
         function closeQuickTemplateModal(){const m=document.getElementById('quickTemplateModal');if(m)m.style.display='none';}
-        function updateQuickTemplateTaskTypes(){const cat=document.getElementById('qtCategory'),type=document.getElementById('qtName'),other=document.getElementById('qtOtherType');if(!cat||!type)return;const list=QUICK_TEMPLATE_TYPES[cat.value]||[];type.innerHTML='<option value="">-- Select Task Type --</option>'+list.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');type.disabled=!list.length;if(other){other.value='';other.classList.add('hidden');}}
-        function handleQuickTemplateOtherType(){const type=document.getElementById('qtName'),other=document.getElementById('qtOtherType');if(!type||!other)return;const isOther=type.value==='Others';other.classList.toggle('hidden',!isOther);if(!isOther)other.value='';}
-        function getQuickTemplateTaskType(){const type=document.getElementById('qtName')?.value||'',other=document.getElementById('qtOtherType')?.value.trim()||'';return type==='Others'?other:type;}
+        function setQuickTemplateFieldLabels_(){
+            const cat=document.getElementById('qtCategory'), type=document.getElementById('qtName');
+            if(cat){const l=cat.closest('div')?.querySelector('label');if(l)l.textContent='Task Type';cat.setAttribute('aria-label','Task Type');}
+            if(type){const l=type.closest('div')?.querySelector('label');if(l)l.textContent='Task Category';type.setAttribute('aria-label','Task Category');}
+        }
+        function getQuickTemplateTypeList_(){
+            return [...new Set(Object.values(QUICK_TEMPLATE_TYPES||{}).flat().map(v=>String(v||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+        }
+        function updateQuickTemplateTaskTypes(){
+            const typeSel=document.getElementById('qtCategory'), catSel=document.getElementById('qtName'), other=document.getElementById('qtOtherType');
+            if(!typeSel||!catSel)return;
+            setQuickTemplateFieldLabels_();
+            const currentType=typeSel.value;
+            const types=getQuickTemplateTypeList_();
+            typeSel.innerHTML='<option value="">-- Select Task Type --</option>'+types.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+            typeSel.disabled=!types.length;
+            if(currentType && types.includes(currentType))typeSel.value=currentType;
+            const selectedType=typeSel.value;
+            const categories=selectedType
+                ? Object.keys(QUICK_TEMPLATE_TYPES||{}).filter(c=>(QUICK_TEMPLATE_TYPES[c]||[]).map(String).includes(selectedType))
+                : Object.keys(QUICK_TEMPLATE_TYPES||{});
+            const currentCat=catSel.value;
+            catSel.innerHTML='<option value="">-- Select Task Category --</option>'+categories.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+            catSel.disabled=!categories.length;
+            if(currentCat && categories.includes(currentCat))catSel.value=currentCat;
+            if(other){other.value='';other.classList.add('hidden');}
+        }
+        function handleQuickTemplateOtherType(){
+            const type=document.getElementById('qtCategory'), other=document.getElementById('qtOtherType');
+            if(!type||!other)return;
+            const isOther=type.value==='Others';
+            other.classList.toggle('hidden',!isOther);
+            if(!isOther)other.value='';
+        }
+        function getQuickTemplateTaskType(){
+            const type=document.getElementById('qtCategory')?.value||'';
+            const other=document.getElementById('qtOtherType')?.value.trim()||'';
+            return type==='Others'?other:type;
+        }
+        document.addEventListener('change',function(e){
+            if(e.target?.id==='qtCategory'){updateQuickTemplateTaskTypes();handleQuickTemplateOtherType();}
+        });
         function editQuickTaskTemplate(t){
-            document.getElementById('qtTemplateId').value=t.templateId||'';const cat=document.getElementById('qtCategory'),type=document.getElementById('qtName');cat.value=t.category||'';updateQuickTemplateTaskTypes();
-            const known=(QUICK_TEMPLATE_TYPES[t.category]||[]).includes(t.taskName||'');if(known){type.value=t.taskName||'';document.getElementById('qtOtherType').value='';}else{type.value='Others';document.getElementById('qtOtherType').value=t.taskName||'';}handleQuickTemplateOtherType();
+            document.getElementById('qtTemplateId').value=t.templateId||'';
+            const type=document.getElementById('qtCategory'),cat=document.getElementById('qtName');
+            setQuickTemplateFieldLabels_();
+            updateQuickTemplateTaskTypes();
+            const taskType=String(t.taskName||'');
+            const taskCategory=String(t.category||'');
+            const known=getQuickTemplateTypeList_().includes(taskType);
+            if(known){type.value=taskType;document.getElementById('qtOtherType').value='';}
+            else{type.value='Others';document.getElementById('qtOtherType').value=taskType;}
+            updateQuickTemplateTaskTypes();
+            cat.value=taskCategory;
+            handleQuickTemplateOtherType();
             ensureQuickTemplatePriorityField();
             document.getElementById('qtFrequency').value=t.repeat||'Monthly';document.getElementById('qtStartDay').value=Number(t.startDay)||1;document.getElementById('qtEndDay').value=Number(t.endDay)||31;document.getElementById('qtWeightage').value=Number(t.weightage)||10;
             const priority=document.getElementById('qtPriority');if(priority)priority.value=['Low','Medium','High','Urgent','Normal'].includes(String(t.priority||'Normal'))?String(t.priority||'Normal'):'Normal';
