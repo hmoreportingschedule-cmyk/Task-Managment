@@ -113,8 +113,18 @@ function upgradeDailyActionDatePicker_(){
             dateInput.max = localToday;
             dateInput.disabled = false;
             dateInput.readOnly = false;
-            dateInput.value = localToday;
+            // Preserve the employee's currently selected previous date.
+            // Only initialize/reset when the value is missing or outside the
+            // global selectable window; Admin Lock/Unlock is checked separately.
+            const currentSelected=String(dateInput.value||'').trim();
+            if(!currentSelected || currentSelected<ENTRY_BASELINE_DATE || currentSelected>localToday){
+                dateInput.value=localToday;
+            }
             if(typeof updateAttendanceNonWorkingDay==='function')updateAttendanceNonWorkingDay();
+            if(typeof upgradeDailyActionDatePicker_==='function')upgradeDailyActionDatePicker_();
+            const adp=document.getElementById('attendanceDatePicker'), adDisplay=document.getElementById('attendanceDateDisplay');
+            if(adp){adp.value=dateInput.value||'';adp.min=dateInput.min||'';adp.max=dateInput.max||'';adp.disabled=false;}
+            if(adDisplay)adDisplay.value=formatDailyActionDateDisplay_(dateInput.value);
         }
 
         function updateLiveTime() {
@@ -797,7 +807,10 @@ function parseBreakTimeClient(v){
             const today=localDateKey();
             el.min=ENTRY_BASELINE_DATE;
             el.max=today;
-            if(!el.value||!isLogWorkDateAllowed(el.value))el.value=today;
+            // Do not jump back to today just because a previous date is
+            // temporarily locked or is being refreshed. Keep the selected
+            // date; the save/open validation decides whether it is writable.
+            if(!el.value||String(el.value)<ENTRY_BASELINE_DATE||String(el.value)>today)el.value=today;
         }
         function getAttendanceForLogDate(workDate){
             const key=String(workDate||'').trim();
@@ -821,15 +834,52 @@ function parseBreakTimeClient(v){
             }
             const task=(globalAllTasks||[]).find(t=>String(t.rowIndex)===String(sel.value));
             if(!task){box.classList.add('hidden');box.innerHTML='';return;}
-            const cats=[...new Set((task.works||[]).map(w=>String(w.category||'').trim()).filter(Boolean))];
+            const cats=[...new Set([String(task.category||'').trim(),...(task.works||[]).map(w=>String(w.category||'').trim())].filter(Boolean))];
             const freq=String(task.frequency||'One-time');
-            box.innerHTML=`<div class="flex flex-wrap gap-3"><span><b>Frequency:</b> ${escapeHtml(freq)}</span><span><b>Category:</b> ${escapeHtml(cats.join(', ')||'-')}</span></div>`;
+            const priority=String(task.priority||task.Priority||'Normal');
+            box.innerHTML=`<div class="flex flex-wrap gap-3"><span><b>Frequency:</b> ${escapeHtml(freq)}</span><span><b>Priority:</b> ${escapeHtml(priority)}</span></div>`;
             box.classList.remove('hidden');
         }
 
-        function populateLogTaskDropdown(tasks, dateKey){
+
+        function ensureLogWorkCategorySelector_(){
+            const taskSel=document.getElementById('logTaskSelect'); if(!taskSel)return null;
+            let catSel=document.getElementById('logTaskCategorySelect');
+            if(catSel)return catSel;
+            catSel=document.createElement('select');
+            catSel.id='logTaskCategorySelect';
+            catSel.className=taskSel.className||'w-full border rounded-lg p-2';
+            catSel.innerHTML='<option value="">-- Select Task Category --</option>';
+            const label=document.createElement('label');
+            label.htmlFor='logTaskCategorySelect';
+            label.textContent='Task Category';
+            label.className='block text-sm font-semibold mb-1';
+            const wrap=document.createElement('div');
+            wrap.id='logTaskCategoryWrap';
+            wrap.className='mb-3';
+            wrap.appendChild(label);
+            wrap.appendChild(catSel);
+            taskSel.parentElement?.parentElement?.insertBefore(wrap,taskSel.parentElement);
+            catSel.addEventListener('change',function(){
+                populateLogTaskDropdown(globalAllTasks,document.getElementById('logWorkDate')?.value||localDateKey(),catSel.value);
+            });
+            return catSel;
+        }
+        function getTaskCategories_(task){
+            return [...new Set([String(task?.category||'').trim(),...(task?.works||[]).map(w=>String(w.category||'').trim())].filter(Boolean))];
+        }
+        function populateLogWorkCategories_(tasks){
+            const catSel=ensureLogWorkCategorySelector_(); if(!catSel)return;
+            const current=catSel.value;
+            const cats=[...new Set((tasks||[]).flatMap(getTaskCategories_))].sort((a,b)=>a.localeCompare(b));
+            catSel.innerHTML='<option value="">-- Select Task Category --</option>'+cats.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+            if(cats.includes(current))catSel.value=current;
+        }
+
+        function populateLogTaskDropdown(tasks, dateKey, categoryFilter){
             const select=document.getElementById('logTaskSelect'); if(!select)return;
             const workDate=dateKey||document.getElementById('logWorkDate')?.value||localDateKey();
+            const selectedCategory=String(categoryFilter!==undefined?categoryFilter:(document.getElementById('logTaskCategorySelect')?.value||'')).trim();
             select.innerHTML='<option value="">-- Select Active Task --</option>';
             const loggedForDate=new Set((globalWorkLogs||[]).filter(w=>{
                 const d=String(w.WorkDate||w.workDate||'');
@@ -841,9 +891,12 @@ function parseBreakTimeClient(v){
                 const st=String(t.empStatus||'').toLowerCase();
                 const sd=parseReportDate(t.startDate), ed=parseReportDate(t.endDate);
                 const active=!!d&&(!sd||d>=sd)&&(!ed||d<=ed);
-                if(st!=='completed'&&active&&!loggedForDate.has(String(t.rowIndex)))select.innerHTML+=`<option value="${t.rowIndex}">${escapeHtml(t.taskName||'Task')}</option>`;
+                const categories=getTaskCategories_(t);
+                const categoryOk=!selectedCategory||categories.includes(selectedCategory);
+                if(st!=='completed'&&active&&categoryOk&&!loggedForDate.has(String(t.rowIndex)))select.innerHTML+=`<option value="${t.rowIndex}">${escapeHtml(t.taskName||'Task')}</option>`;
             });
             if(select.options.length===1)select.innerHTML='<option value="">-- No task available for selected date --</option>';
+            populateLogWorkCategories_(tasks||[]);
             updateCompletionCheckboxState(); updateLogTaskTemplateMeta();
         }
 
@@ -1881,7 +1934,13 @@ function parseBreakTimeClient(v){
 
         // ================= EMP LOG DAILY WORK =================
         document.addEventListener('change',function(e){
-            if(e.target?.id==='logWorkDate'){syncLogWorkDateDisplay();updateLogWorkDateUI();}
+            if(e.target?.id==='logWorkDate'){
+                syncLogWorkDateDisplay();
+                const c=document.getElementById('logTaskCategorySelect');
+                populateLogWorkCategories_(globalAllTasks);
+                populateLogTaskDropdown(globalAllTasks,e.target.value,c?.value||'');
+                updateLogWorkDateUI();
+            }
             if(e.target?.id==='logTaskSelect'){updateCompletionCheckboxState();updateLogTaskTemplateMeta();}
             if(e.target?.id==='requestBeforeCompletion' && e.target.checked){const done=document.getElementById('markTaskCompleted');if(done)done.checked=false;}
             if(e.target?.id==='markTaskCompleted' && e.target.checked){const before=document.getElementById('requestBeforeCompletion');if(before)before.checked=false;}
@@ -1976,7 +2035,8 @@ function parseBreakTimeClient(v){
             if(!allowed){ alert('Log Daily Work 01-Oct-2026 se aaj tak available hai. Future date allowed nahi hai. Admin Lock/Unlock rules apply honge.'); if(btn)btn.disabled=true; return; }
             if(btn)btn.disabled=false;
             modal.style.display='block';
-            ensureWorkLogsLoaded(true).catch(()=>{}).finally(()=>{populateLogTaskDropdown(globalAllTasks,dateKey);updateCompletionCheckboxState();});
+            ensureLogWorkCategorySelector_();
+            ensureWorkLogsLoaded(true).catch(()=>{}).finally(()=>{populateLogWorkCategories_(globalAllTasks);populateLogTaskDropdown(globalAllTasks,dateKey);updateCompletionCheckboxState();});
             if(document.getElementById('delayReason'))document.getElementById('delayReason').value='';
             const before=document.getElementById('requestBeforeCompletion'); if(before)before.checked=false;
             const done=document.getElementById('markTaskCompleted'); if(done)done.checked=false;
