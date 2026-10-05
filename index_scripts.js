@@ -686,16 +686,23 @@ function parseBreakTimeClient(v){
         function localDateKey(d=new Date()){ const x=new Date(d); x.setHours(12,0,0,0); return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`; }
         function getDateLockRecordClient(dateKey,targetUser){
             const key=String(dateKey||'').trim(), month=key.slice(0,7), rows=Array.isArray(globalAttendanceDateLocks)?globalAttendanceDateLocks:[];
+            const today=localDateKey();
+            // Future dates can never be unlocked. A full-month unlock is a current-month
+            // override only; it expires automatically when the month closes.
+            if(!/^\d{4}-\d{2}-\d{2}$/.test(key) || key>today)return null;
+            const currentMonth=today.slice(0,7);
             const user=String(targetUser||document.getElementById('displayUser')?.innerText||'').trim().toLowerCase();
             const candidates=rows.map((r,i)=>({r:r,i:i})).filter(x=>{
                 const r=x.r, scope=String(r.scope||'').toLowerCase(), k=String(r.key||''), ru=String(r.targetUser||'').trim().toLowerCase();
-                const matchesKey=(scope==='date'&&k===key)||(scope==='month'&&k===month);
+                // Month unlock/lock is valid only for the currently active month.
+                // A range/date rule remains limited to its explicitly selected date.
+                const matchesKey=(scope==='date'&&k===key)||(scope==='month'&&k===month&&month===currentMonth);
                 if(!matchesKey)return false;
                 return !ru || (!!user && ru===user);
             });
             if(!candidates.length)return null;
-            // Latest matching rule wins. This allows a new Month/Range unlock to
-            // override an older date lock, while a later specific-user rule still wins.
+            // Latest matching rule wins. Specific date/user rules therefore override
+            // older month rules, and a later lock can restore the default restriction.
             candidates.sort((a,b)=>b.i-a.i);
             return candidates[0].r||null;
         }
@@ -742,7 +749,10 @@ function parseBreakTimeClient(v){
             const today=localDateKey(), t=parseLocalDateKey(today);
             const minDate=new Date(t); minDate.setDate(minDate.getDate()-2);
             const min=localDateKey(minDate);
-            const unlocked=Array.isArray(globalAttendanceDateLocks)&&globalAttendanceDateLocks.some(r=>String(r.status).toUpperCase()==="UNLOCKED");el.min=unlocked?"2020-01-01":min;el.max=today;if(!el.value||!isLogWorkDateAllowed(el.value))el.value=today;
+            const user=String(document.getElementById('displayUser')?.innerText||'').trim().toLowerCase();
+            const eligible=(globalAttendanceDateLocks||[]).filter(r=>String(r.status||'').toUpperCase()==='UNLOCKED' && (!r.targetUser || String(r.targetUser).trim().toLowerCase()===user));
+            const pastUnlocked=eligible.map(r=>{const scope=String(r.scope||'').toLowerCase(),k=String(r.key||'');return scope==='date'?k:(scope==='month'&&k===today.slice(0,7)?k+'-01':'');}).filter(k=>/^\d{4}-\d{2}-\d{2}$/.test(k)&&k<=today);
+            el.min=pastUnlocked.length?pastUnlocked.sort()[0]:min;el.max=today;if(!el.value||!isLogWorkDateAllowed(el.value))el.value=today;
         }
         function getAttendanceForLogDate(workDate){
             const key=String(workDate||'').trim();
