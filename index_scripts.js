@@ -1224,14 +1224,36 @@ function parseBreakTimeClient(v){
             if(!rows.length){box.innerHTML='<div class="p-3 text-center text-gray-500">Abhi koi custom Lock/Unlock nahi hai.</div>';return;}
             box.innerHTML=rows.slice(0,50).map(r=>{const st=String(r.status||'').toUpperCase();return `<div class="flex items-center justify-between gap-2 border-b py-2 text-sm"><div><b>${String(r.scope||'').toUpperCase()}</b> • ${r.key} • <span class="text-[#259b94]">${r.targetUser||'ALL EMPLOYEES'}</span><br><span class="text-xs ${st==='UNLOCKED'?'text-green-600':'text-red-600'} font-bold">${st}</span> <span class="text-xs text-gray-400">${r.updatedBy||''}</span></div><button class="px-3 py-1 rounded-lg border text-xs font-bold" onclick="setAttendanceDateLock('${String(r.scope)}','${String(r.key)}','${st==='UNLOCKED'?'LOCKED':'UNLOCKED'}')">${st==='UNLOCKED'?'Lock':'Unlock'}</button></div>`}).join('');
         }
+        function parseJsonResponseSafe_(response){
+            return response.text().then(function(raw){
+                try{return JSON.parse(raw);}catch(err){
+                    const preview=String(raw||'').replace(/\s+/g,' ').slice(0,180);
+                    throw new Error('Google Apps Script ne JSON ke bajaye HTML response diya. Web App ko latest version par redeploy karke Access: Anyone rakhein. Response: '+preview);
+                }
+            });
+        }
+        function lockApiRequest_(params, method){
+            const query=new URLSearchParams(); Object.keys(params||{}).forEach(k=>{if(params[k]!==undefined&&params[k]!==null)query.append(k,String(params[k]));});
+            if(method==='GET'){
+                return fetch(GOOGLE_SCRIPT_URL+'?'+query.toString(),{method:'GET',cache:'no-store',credentials:'omit'}).then(parseJsonResponseSafe_);
+            }
+            const fd=new FormData(); Object.keys(params||{}).forEach(k=>{if(params[k]!==undefined&&params[k]!==null)fd.append(k,String(params[k]));});
+            return fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd,cache:'no-store',credentials:'omit'}).then(function(r){
+                return r.text().then(function(raw){
+                    try{return JSON.parse(raw);}catch(_){
+                        // Some Apps Script deployments return an HTML page for POST while GET works.
+                        return fetch(GOOGLE_SCRIPT_URL+'?'+query.toString(),{method:'GET',cache:'no-store',credentials:'omit'}).then(parseJsonResponseSafe_);
+                    }
+                });
+            });
+        }
         function refreshAttendanceDateLocksUI(){
-            const fd=new FormData();fd.append('action','getAttendanceDateLocks');fd.append('sessionToken',sessionToken);
-            return fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd,cache:'no-store'}).then(r=>r.json()).then(d=>{if(d.status!=='success')throw new Error(d.message||'Lock data load failed.');globalAttendanceDateLocks=Array.isArray(d.locks)?d.locks:[];setDateConstraints();setLogWorkDateConstraints();renderAttendanceDateLockRows();updateAttendanceNonWorkingDay();v4UpdateAttendanceAvailability();return globalAttendanceDateLocks;});
+            return lockApiRequest_({action:'getAttendanceDateLocks',sessionToken:sessionToken},'POST').then(function(d){if(d.status!=='success')throw new Error(d.message||'Lock data load failed.');globalAttendanceDateLocks=Array.isArray(d.locks)?d.locks:[];setDateConstraints();setLogWorkDateConstraints();renderAttendanceDateLockRows();updateAttendanceNonWorkingDay();v4UpdateAttendanceAvailability();return globalAttendanceDateLocks;});
         }
         function setAttendanceDateLock(scope,key,status){
             key=String(key||'').trim();if(!key){alert(scope==='month'?'Month select karein.':'Date select karein.');return;}
-            const fd=new FormData();fd.append('action','setAttendanceDateLock');fd.append('scope',scope);fd.append('key',key);fd.append('status',status);fd.append('targetUser',document.getElementById('lockUserSelect')?.value==='__ALL__'?'':(document.getElementById('lockUserSelect')?.value||''));fd.append('sessionToken',sessionToken);
-            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(d=>{if(d.status!=='success')throw new Error(d.message||'Lock update failed.');globalAttendanceDateLocks=Array.isArray(d.locks)?d.locks:[];setDateConstraints();setLogWorkDateConstraints();renderAttendanceDateLockRows();updateAttendanceNonWorkingDay();v4UpdateAttendanceAvailability();alert(d.message);}).catch(e=>alert(e.message||'Lock update failed.'));
+            const targetUser=document.getElementById('lockUserSelect')?.value==='__ALL__'?'':(document.getElementById('lockUserSelect')?.value||'');
+            lockApiRequest_({action:'setAttendanceDateLock',scope:scope,key:key,status:status,targetUser:targetUser,sessionToken:sessionToken},'POST').then(function(d){if(d.status!=='success')throw new Error(d.message||'Lock update failed.');globalAttendanceDateLocks=Array.isArray(d.locks)?d.locks:[];setDateConstraints();setLogWorkDateConstraints();renderAttendanceDateLockRows();updateAttendanceNonWorkingDay();v4UpdateAttendanceAvailability();alert(d.message);}).catch(function(e){alert(e.message||'Lock update failed.');});
         }
         function openAttendanceDateLockModal(){
             if(!isFullAdminRole(document.getElementById('displayRole')?.innerText||'')){alert('Only Admin can manage Attendance Date Lock.');return;}
