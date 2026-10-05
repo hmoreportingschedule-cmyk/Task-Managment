@@ -1826,7 +1826,7 @@ function parseBreakTimeClient(v){
 
         // ================= EMP LOG DAILY WORK =================
         document.addEventListener('change',function(e){
-            if(e.target?.id==='logWorkDate'){updateLogWorkDateUI();}
+            if(e.target?.id==='logWorkDate'){syncLogWorkDateDisplay();updateLogWorkDateUI();}
             if(e.target?.id==='logTaskSelect'){updateCompletionCheckboxState();updateLogTaskTemplateMeta();}
             if(e.target?.id==='requestBeforeCompletion' && e.target.checked){const done=document.getElementById('markTaskCompleted');if(done)done.checked=false;}
             if(e.target?.id==='markTaskCompleted' && e.target.checked){const before=document.getElementById('requestBeforeCompletion');if(before)before.checked=false;}
@@ -1857,12 +1857,61 @@ function parseBreakTimeClient(v){
             btn.classList.toggle('cursor-not-allowed',frozen);
             btn.title=previousDate?'Today Urgent Task sirf current date par available hai.':(reason?`Today Urgent Task frozen: ${reason}`:'Today Urgent Task');
         }
+        function formatLogDateDisplay(dateKey){
+            const s=String(dateKey||'').trim();
+            const m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            if(!m)return s;
+            const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            return `${Number(m[3])}-${months[Number(m[2])-1]}-${m[1]}`;
+        }
+        function upgradeLogWorkDateDisplay(){
+            const el=document.getElementById('logWorkDate');
+            if(!el || el.dataset.displayUpgraded==='1')return;
+            el.dataset.displayUpgraded='1';
+            el.type='hidden';
+            const wrap=document.createElement('div');
+            wrap.className='relative';
+            const display=document.createElement('input');
+            display.type='text';
+            display.id='logWorkDateDisplay';
+            display.readOnly=true;
+            display.className=el.className || 'w-full border rounded-lg p-2';
+            display.setAttribute('aria-label','Select Date');
+            display.placeholder='1-Oct-2026';
+            const picker=document.createElement('input');
+            picker.type='date';
+            picker.id='logWorkDatePicker';
+            picker.className='absolute inset-0 w-full h-full opacity-0 cursor-pointer';
+            picker.setAttribute('aria-label','Select Date');
+            wrap.appendChild(display);
+            wrap.appendChild(picker);
+            el.parentNode.insertBefore(wrap,el);
+            function syncDisplay(){
+                display.value=formatLogDateDisplay(el.value);
+                picker.value=el.value||'';
+            }
+            picker.addEventListener('change',function(){
+                el.value=picker.value;
+                syncDisplay();
+                el.dispatchEvent(new Event('change',{bubbles:true}));
+            });
+            display.addEventListener('click',function(){try{picker.showPicker();}catch(e){picker.focus();}});
+            syncDisplay();
+        }
+        function syncLogWorkDateDisplay(){
+            const el=document.getElementById('logWorkDate'),display=document.getElementById('logWorkDateDisplay'),picker=document.getElementById('logWorkDatePicker');
+            if(!el)return;
+            if(display)display.value=formatLogDateDisplay(el.value);
+            if(picker)picker.value=el.value||'';
+        }
         function openLogWorkModal() {
             const modal=document.getElementById('logWorkModal'); if(!modal)return;
+            upgradeLogWorkDateDisplay();
             setLogWorkDateConstraints();
             const dailyActionDate=document.getElementById('attendanceDate')?.value||localDateKey();
             const dateEl=document.getElementById('logWorkDate');
             if(dateEl) dateEl.value=dailyActionDate;
+            syncLogWorkDateDisplay();
             const dateKey=dailyActionDate;
             const nonWorking=isLogWorkNonWorkingDate(dateKey);
             const allowed=isLogWorkDateAllowed(dateKey);
