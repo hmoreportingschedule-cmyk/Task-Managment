@@ -482,6 +482,35 @@ function parseBreakTimeClient(v){
         }
         function refreshDailyActionWidgets(){ renderSelectedAttendanceState(); renderTodayLocation(); if(typeof updateLogDailyWorkButtonState==='function')updateLogDailyWorkButtonState(); if(typeof updateTodayUrgentTaskButtonState==='function')updateTodayUrgentTaskButtonState(); }
 
+        async function apiFetchJson_(url, options){
+            const opts=options||{};
+            const parseResponse=async(res)=>{
+                const text=await res.text();
+                const trimmed=String(text||'').trim();
+                try{return JSON.parse(trimmed);}
+                catch(_jsonErr){
+                    const title=(trimmed.match(/<title[^>]*>([\s\S]*?)<\/title>/i)||[])[1]||'';
+                    const body=(trimmed.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim()).slice(0,220);
+                    throw new Error('Backend ne JSON ke bajaye HTML response diya. '+(title||body||('HTTP '+res.status)));
+                }
+            };
+            let res=await fetch(url,opts);
+            try{return await parseResponse(res);}
+            catch(firstErr){
+                // Google Apps Script deployments and some Cloudflare proxies can
+                // return an HTML redirect/error page for POST. The backend also
+                // supports action-based GET, so retry the same parameters via GET.
+                if(opts.method==='POST' && opts.body instanceof FormData){
+                    const params=new URLSearchParams();
+                    opts.body.forEach((v,k)=>{ if(typeof v==='string')params.append(k,v); });
+                    const sep=url.includes('?')?'&':'?';
+                    const retry=await fetch(url+sep+params.toString(),{method:'GET',credentials:opts.credentials||'same-origin'});
+                    return await parseResponse(retry);
+                }
+                throw firstErr;
+            }
+        }
+
         function markAttendance(){
             if(updateAttendanceNonWorkingDay())return;
             const selectedDate=document.getElementById('attendanceDate')?.value||'', action=document.getElementById('attendanceAction')?.value||'Punch In', manual=document.getElementById('manualTime')?.value||'';
@@ -498,7 +527,7 @@ function parseBreakTimeClient(v){
             // Client-side punch-out restriction for today's shift.
             if(action==='Punch Out'&&selectedDate===(()=>{const d=new Date(),tz=d.getTimezoneOffset()*60000;return new Date(d-tz).toISOString().split('T')[0]})()){const shift=document.getElementById('displayOfficeTime')?.innerText||'',parts=shift.toLowerCase().split('to');if(parts.length>1){const endM=timeToMins(parts[1].trim()),now=new Date(),cur=now.getHours()*60+now.getMinutes();if(endM>=0&&cur<endM){alert(`Closing time is ${parts[1].trim().toUpperCase()}. Punch Out is not allowed before closing time.`);return;}}}
             btn.innerText='Saving...';btn.disabled=true;
-            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(d=>{if(d.status==='error')throw new Error(d.message||'Daily Actions save failed.');alert(d.message||'Daily Actions saved.');['namazTypeSelect','namazBreakStartTime','namazBreakEndTime','lunchBreakStartTime','lunchBreakEndTime','manualTime','extraBreakReason'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});const _tr=document.getElementById('attendanceTimingReason');if(_tr)_tr.value='';document.getElementById('attendanceTimingReasonBox')?.classList.add('hidden');clearPendingBreakAction();refreshDailyActionWidgets();fetchDashboardDataSilently();}).catch(e=>alert(e.message||'Daily Actions save failed.')).finally(()=>{btn.innerText='Submit Record';btn.disabled=false;updateBreakTypeOptions();});
+            apiFetchJson_(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(d=>{if(d.status==='error')throw new Error(d.message||'Daily Actions save failed.');alert(d.message||'Daily Actions saved.');['namazTypeSelect','namazBreakStartTime','namazBreakEndTime','lunchBreakStartTime','lunchBreakEndTime','manualTime','extraBreakReason'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});const _tr=document.getElementById('attendanceTimingReason');if(_tr)_tr.value='';document.getElementById('attendanceTimingReasonBox')?.classList.add('hidden');clearPendingBreakAction();refreshDailyActionWidgets();fetchDashboardDataSilently();}).catch(e=>alert(e.message||'Daily Actions save failed.')).finally(()=>{btn.innerText='Submit Record';btn.disabled=false;updateBreakTypeOptions();});
         }
 
         // ================= TODAY SHIFT TRACKER =================
@@ -1327,8 +1356,7 @@ function parseBreakTimeClient(v){
             fd.append('sessionToken',sessionToken);
 
             btn.disabled = true; btn.innerText = 'Saving...';
-            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd})
-            .then(r=>r.json())
+            apiFetchJson_(GOOGLE_SCRIPT_URL,{method:'POST',body:fd})
             .then(data=>{
                 alert(data.message || 'Attendance updated.');
                 btn.disabled=false; btn.innerText='Save Correction';
@@ -2850,7 +2878,7 @@ function parseBreakTimeClient(v){
         function fillManagerAttendanceEmployees(){const s=document.getElementById('mgrAttEmployee');if(!s)return;s.innerHTML=(globalTeamMembers||[]).map(u=>`<option value="${String(u).replace(/"/g,'&quot;')}">${u}</option>`).join('');}
         function openManagerAttendanceModal(){fillManagerAttendanceEmployees();const d=document.getElementById('mgrAttDate');if(d)d.value=new Date().toISOString().split('T')[0];document.getElementById('managerAttendanceModal').style.display='block';}
         function closeManagerAttendanceModal(){document.getElementById('managerAttendanceModal').style.display='none';}
-        function saveManagerAttendance(){const fd=new FormData();fd.append('action','adminSaveAttendance');fd.append('employee',document.getElementById('mgrAttEmployee').value);fd.append('date',document.getElementById('mgrAttDate').value);fd.append('inTime',document.getElementById('mgrAttIn').value.trim());fd.append('outTime',document.getElementById('mgrAttOut').value.trim());fd.append('breakStart',document.getElementById('mgrAttBreakStart').value.trim());fd.append('breakEnd',document.getElementById('mgrAttBreakEnd').value.trim());fd.append('leave',document.getElementById('mgrAttLeave').value.trim());fd.append('reason',document.getElementById('mgrAttReason').value.trim());fd.append('sessionToken',sessionToken);fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(d=>{alert(d.message||'Saved');if(d.status==='success'){closeManagerAttendanceModal();fetchDashboardDataSilently();}}).catch(()=>alert('Attendance save failed.'));}
+        function saveManagerAttendance(){const fd=new FormData();fd.append('action','adminSaveAttendance');fd.append('employee',document.getElementById('mgrAttEmployee').value);fd.append('date',document.getElementById('mgrAttDate').value);fd.append('inTime',document.getElementById('mgrAttIn').value.trim());fd.append('outTime',document.getElementById('mgrAttOut').value.trim());fd.append('breakStart',document.getElementById('mgrAttBreakStart').value.trim());fd.append('breakEnd',document.getElementById('mgrAttBreakEnd').value.trim());fd.append('leave',document.getElementById('mgrAttLeave').value.trim());fd.append('reason',document.getElementById('mgrAttReason').value.trim());fd.append('sessionToken',sessionToken);apiFetchJson_(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(d=>{alert(d.message||'Saved');if(d.status==='success'){closeManagerAttendanceModal();fetchDashboardDataSilently();}}).catch(e=>alert(e.message||'Attendance save failed.'));}
         function openOfficeEventsModal(){ document.getElementById('officeEventsModal').classList.add('active'); }
         function closeOfficeEventsModal(){ document.getElementById('officeEventsModal').classList.remove('active'); }
         function downloadOfficeEventsTemplate(){ const rows=[['Event Name','From Date','To Date','Type','Details'],['Independence Day','2026-08-15','2026-08-15','National Holiday','Office Closed'],['Eid','2026-06-17','2026-06-18','Religious Holiday','Office Closed']]; const wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(rows);XLSX.utils.book_append_sheet(wb,ws,'Office Events');XLSX.writeFile(wb,'Office_Events_Holidays_Format.xlsx'); }
