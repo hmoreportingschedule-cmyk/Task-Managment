@@ -32,6 +32,9 @@
         let v4CurrentWeekoff = "Sunday";
         let performanceWeights = {attendance:50, task:50};
         let globalAttendanceDateLocks = [];
+        // Temporary date baseline: Attendance/Task entry is allowed from 01-Oct-2026 onward.
+        // Admin Lock/Unlock remains the authority for older/current dates.
+        const ENTRY_BASELINE_DATE = "2026-10-01";
 
         // V.14 hosting compatibility: do not use Vercel/Cloudflare-specific APIs.
         // All backend calls remain standard browser fetch() POST requests to Apps Script.
@@ -50,19 +53,11 @@
             const twoDaysAgo = new Date(today); twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
             const localTwoDaysAgo = (new Date(twoDaysAgo - tzOffset)).toISOString().split('T')[0];
             dateInput.max = localToday;
-            const hasUnlock = Array.isArray(globalAttendanceDateLocks) && globalAttendanceDateLocks.some(r=>String(r.status).toUpperCase()==="UNLOCKED");
-            const threeDaysAgo = new Date(today); threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
-            const localThreeDaysAgo = (new Date(threeDaysAgo - tzOffset)).toISOString().split('T')[0];
-            if(hasUnlock){
-                dateInput.min = "2020-01-01";
-                dateInput.max = localToday;
-            } else if(attendanceEntryStart && attendanceEntryEnd){
-                dateInput.min = attendanceEntryStart < localThreeDaysAgo ? attendanceEntryStart : localThreeDaysAgo;
-                dateInput.max = attendanceEntryEnd > localToday ? attendanceEntryEnd : localToday;
-            } else {
-                dateInput.min = localThreeDaysAgo;
-                dateInput.max = localToday;
-            }
+            // For now, the old previous-3-days restriction is disabled.
+            // Dates from 01-Oct-2026 to today are selectable; Admin Lock/Unlock
+            // decides whether a selected date is actually writable.
+            dateInput.min = ENTRY_BASELINE_DATE;
+            dateInput.max = localToday;
             dateInput.value = localToday;
             if(typeof updateAttendanceNonWorkingDay==='function')updateAttendanceNonWorkingDay();
         }
@@ -735,24 +730,19 @@ function parseBreakTimeClient(v){
             return '';
         }
         function isLogWorkDateAllowed(dateKey){
-            // Log Daily Work is intentionally limited to Today + previous 2 days.
-            // Attendance Entry Access must NOT override this rule.
+            // Temporary baseline: Daily Work is available from 01-Oct-2026 through today.
+            // Future dates are blocked and Admin Lock/Unlock remains authoritative.
             const d=parseLocalDateKey(dateKey), today=parseLocalDateKey(localDateKey()); if(!d||!today)return false;
-            if(d>today)return false;
+            if(d>today || String(dateKey)<ENTRY_BASELINE_DATE)return false;
             if(isDateLockedClient(dateKey))return false;
-            if(isDateUnlockedClient(dateKey))return true;
-            const min=new Date(today);min.setDate(min.getDate()-2);
-            return d>=min;
+            return true;
         }
         function setLogWorkDateConstraints(){
             const el=document.getElementById('logWorkDate'); if(!el)return;
-            const today=localDateKey(), t=parseLocalDateKey(today);
-            const minDate=new Date(t); minDate.setDate(minDate.getDate()-2);
-            const min=localDateKey(minDate);
-            const user=String(document.getElementById('displayUser')?.innerText||'').trim().toLowerCase();
-            const eligible=(globalAttendanceDateLocks||[]).filter(r=>String(r.status||'').toUpperCase()==='UNLOCKED' && (!r.targetUser || String(r.targetUser).trim().toLowerCase()===user));
-            const pastUnlocked=eligible.map(r=>{const scope=String(r.scope||'').toLowerCase(),k=String(r.key||'');return scope==='date'?k:(scope==='month'&&k===today.slice(0,7)?k+'-01':'');}).filter(k=>/^\d{4}-\d{2}-\d{2}$/.test(k)&&k<=today);
-            el.min=pastUnlocked.length?pastUnlocked.sort()[0]:min;el.max=today;if(!el.value||!isLogWorkDateAllowed(el.value))el.value=today;
+            const today=localDateKey();
+            el.min=ENTRY_BASELINE_DATE;
+            el.max=today;
+            if(!el.value||!isLogWorkDateAllowed(el.value))el.value=today;
         }
         function getAttendanceForLogDate(workDate){
             const key=String(workDate||'').trim();
@@ -766,6 +756,22 @@ function parseBreakTimeClient(v){
             const rec=getAttendanceForLogDate(workDate);
             return !!rec && String(rec.InTime||rec.inTime||'').trim()!=='';
         }
+        function updateLogTaskTemplateMeta(){
+            const sel=document.getElementById('logTaskSelect'); if(!sel)return;
+            let box=document.getElementById('logTaskTemplateMeta');
+            if(!box){
+                box=document.createElement('div'); box.id='logTaskTemplateMeta';
+                box.className='mt-2 p-2 rounded-lg bg-[#f0f7f7] border border-[#b9dddd] text-xs text-[#2a4d53]';
+                sel.parentElement?.appendChild(box);
+            }
+            const task=(globalAllTasks||[]).find(t=>String(t.rowIndex)===String(sel.value));
+            if(!task){box.classList.add('hidden');box.innerHTML='';return;}
+            const cats=[...new Set((task.works||[]).map(w=>String(w.category||'').trim()).filter(Boolean))];
+            const freq=String(task.frequency||'One-time');
+            box.innerHTML=`<div class="flex flex-wrap gap-3"><span><b>Frequency:</b> ${escapeHtml(freq)}</span><span><b>Category:</b> ${escapeHtml(cats.join(', ')||'-')}</span></div>`;
+            box.classList.remove('hidden');
+        }
+
         function populateLogTaskDropdown(tasks, dateKey){
             const select=document.getElementById('logTaskSelect'); if(!select)return;
             const workDate=dateKey||document.getElementById('logWorkDate')?.value||localDateKey();
@@ -783,7 +789,7 @@ function parseBreakTimeClient(v){
                 if(st!=='completed'&&active&&!loggedForDate.has(String(t.rowIndex)))select.innerHTML+=`<option value="${t.rowIndex}">${escapeHtml(t.taskName||'Task')}</option>`;
             });
             if(select.options.length===1)select.innerHTML='<option value="">-- No task available for selected date --</option>';
-            updateCompletionCheckboxState();
+            updateCompletionCheckboxState(); updateLogTaskTemplateMeta();
         }
 
         function filterTasksByEmp() {
@@ -1821,7 +1827,7 @@ function parseBreakTimeClient(v){
         // ================= EMP LOG DAILY WORK =================
         document.addEventListener('change',function(e){
             if(e.target?.id==='logWorkDate'){updateLogWorkDateUI();}
-            if(e.target?.id==='logTaskSelect'){updateCompletionCheckboxState();}
+            if(e.target?.id==='logTaskSelect'){updateCompletionCheckboxState();updateLogTaskTemplateMeta();}
             if(e.target?.id==='requestBeforeCompletion' && e.target.checked){const done=document.getElementById('markTaskCompleted');if(done)done.checked=false;}
             if(e.target?.id==='markTaskCompleted' && e.target.checked){const before=document.getElementById('requestBeforeCompletion');if(before)before.checked=false;}
         });
@@ -1831,7 +1837,7 @@ function parseBreakTimeClient(v){
             const key=document.getElementById('attendanceDate')?.value||localDateKey();
             const reason=isLogWorkNonWorkingDate(key);
             const allowed=isLogWorkDateAllowed(key);
-            const rangeReason=!allowed?'Log Daily Work sirf current date aur previous 2 days ke liye available hai.':'';
+            const rangeReason=!allowed?'Log Daily Work 01-Oct-2026 se aaj tak available hai. Future date allowed nahi hai.':'';
             const frozen=!!reason||!allowed;
             btn.disabled=frozen; btn.classList.toggle('opacity-50',frozen); btn.classList.toggle('cursor-not-allowed',frozen);
             btn.title=reason?`Log Daily Work frozen: ${reason}`:(rangeReason||'Log Daily Work');
@@ -1863,7 +1869,7 @@ function parseBreakTimeClient(v){
             if(isDateLockedClient(dateKey)){alert('Is date par Admin ne Work/Attendance LOCK kiya hua hai. Pehle Admin se UNLOCK karwayein.');return;}
             const btn=document.querySelector('button[onclick="openLogWorkModal()"]');
             if(nonWorking){ alert(`Log Daily Work frozen: ${nonWorking}.`); if(btn)btn.disabled=true; return; }
-            if(!allowed){ alert('Log Daily Work sirf current date aur previous 2 days ke liye available hai.'); if(btn)btn.disabled=true; return; }
+            if(!allowed){ alert('Log Daily Work 01-Oct-2026 se aaj tak available hai. Future date allowed nahi hai. Admin Lock/Unlock rules apply honge.'); if(btn)btn.disabled=true; return; }
             if(btn)btn.disabled=false;
             modal.style.display='block';
             ensureWorkLogsLoaded(true).catch(()=>{}).finally(()=>{populateLogTaskDropdown(globalAllTasks,dateKey);updateCompletionCheckboxState();});
@@ -1876,7 +1882,7 @@ function parseBreakTimeClient(v){
             const el=document.getElementById('logWorkDate'); if(!el)return;
             const key=el.value, nonWorking=isLogWorkNonWorkingDate(key), allowed=isLogWorkDateAllowed(key), hint=document.getElementById('logWorkDateHint');
             const modal=document.getElementById('logWorkModal');
-            if(hint)hint.textContent=nonWorking?`Log Daily Work frozen: ${nonWorking}.`:(!allowed?'Sirf current date aur previous 2 days select kar sakte hain.':'Current date ya previous 2 days mein Log Daily Work add kar sakte hain.');
+            if(hint)hint.textContent=nonWorking?`Log Daily Work frozen: ${nonWorking}.`:(!allowed?'01-Oct-2026 se aaj tak ki date select karein.':'01-Oct-2026 se aaj tak Log Daily Work add kar sakte hain. Admin Lock/Unlock rules apply honge.');
             if(modal&&modal.style.display!=='none'&&(!allowed||nonWorking)){document.getElementById('logTaskSelect').innerHTML='<option value="">-- Log Daily Work Frozen --</option>';}
             else if(allowed&&!nonWorking)populateLogTaskDropdown(globalAllTasks,key);
             updateCompletionCheckboxState(); updateLogDailyWorkButtonState();
@@ -1901,12 +1907,8 @@ function parseBreakTimeClient(v){
         function submitWorkLog() {
             const taskSel=document.getElementById('logTaskSelect'), tIdx=taskSel.value, tName=taskSel.options[taskSel.selectedIndex]?.text||'', mins=document.getElementById('logTimeMins').value, desc=document.getElementById('logDesc').value, workDate=document.getElementById('logWorkDate')?.value||localDateKey(), username=document.getElementById('displayUser').innerText;
             const nonWorking=isLogWorkNonWorkingDate(workDate);
-            if(!isLogWorkDateAllowed(workDate)){alert('Log Daily Work sirf current date aur previous 2 days ke liye available hai.');return;}
+            if(!isLogWorkDateAllowed(workDate)){alert('Log Daily Work 01-Oct-2026 se aaj tak available hai. Future date allowed nahi hai. Admin Lock/Unlock rules apply honge.');return;}
             if(nonWorking){alert(`Log Daily Work frozen: ${nonWorking}.`);return;}
-            if(!hasPunchInForLogDate(workDate)){
-                alert('Pehle In Time (Punch In) lagayein. Uske baad hi is date ka work time add ho payega.');
-                return;
-            }
             if(!tIdx||!mins){alert('Please select task and enter time!');return;}
             const duplicateAlreadyLogged=(globalWorkLogs||[]).some(w=>{
                 const d=String(w.WorkDate||w.workDate||'').trim();
@@ -1924,7 +1926,7 @@ function parseBreakTimeClient(v){
             if(before&&done){alert('Before Completion aur Closing Request ek saath select nahi kar sakte.');return;}
             const btn=document.getElementById('saveLogBtn');btn.innerText='Saving...';btn.disabled=true;
             const formData=new FormData();formData.append('action','logWork');formData.append('username',username);formData.append('rowIndex',tIdx);formData.append('taskName',tName);formData.append('timeSpent',mins);formData.append('description',desc);formData.append('workDate',workDate);formData.append('delayReason',document.getElementById('delayReason')?.value.trim()||'');formData.append('markCompleted',done?'true':'false');formData.append('beforeCompletion',before?'true':'false');formData.append('clientTodayKey',localDateKey());formData.append('sessionToken',sessionToken);
-            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:formData}).then(res=>res.json()).then(data=>{alert(data.message||'Work log processed.');if(data.status==='success'){btn.innerText='Save Log';btn.disabled=false;document.getElementById('logTimeMins').value='';document.getElementById('logDesc').value='';if(document.getElementById('delayReason'))document.getElementById('delayReason').value='';if(document.getElementById('delayReasonWrap'))document.getElementById('delayReasonWrap').classList.add('hidden');document.getElementById('markTaskCompleted').checked=false;if(document.getElementById('requestBeforeCompletion'))document.getElementById('requestBeforeCompletion').checked=false;closeLogWorkModal();fetchDashboardDataSilently();}else{btn.innerText='Save Log';btn.disabled=false;}}).catch(e=>{alert('Unable to save work log. Please try again.');btn.innerText='Save Log';btn.disabled=false;});
+            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:formData,cache:'no-store'}).then(async res=>{const text=await res.text();let data;try{data=JSON.parse(text);}catch(_){throw new Error('Backend response valid nahi hai. Google Apps Script Web App deployment check karein.');}return data;}).then(async data=>{alert(data.message||'Work log processed.');if(data.status==='success'){btn.innerText='Save Log';btn.disabled=false;document.getElementById('logTimeMins').value='';document.getElementById('logDesc').value='';if(document.getElementById('delayReason'))document.getElementById('delayReason').value='';if(document.getElementById('delayReasonWrap'))document.getElementById('delayReasonWrap').classList.add('hidden');document.getElementById('markTaskCompleted').checked=false;if(document.getElementById('requestBeforeCompletion'))document.getElementById('requestBeforeCompletion').checked=false;closeLogWorkModal();await ensureWorkLogsLoaded(true).catch(()=>{});fetchDashboardDataSilently();}else{btn.innerText='Save Log';btn.disabled=false;}}).catch(e=>{alert(e.message||'Unable to save work log. Please try again.');btn.innerText='Save Log';btn.disabled=false;});
         }
 
         // ================= COMPREHENSIVE MONTHLY GRADE =================
