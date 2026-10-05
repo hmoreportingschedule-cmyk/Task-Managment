@@ -41,6 +41,60 @@
         const APP_HOSTING_PLATFORM = /(^|\.)vercel\.app$/i.test(location.hostname) ? 'vercel'
             : (/^(pages\.|.*\.)?cloudflarepages\.dev$/i.test(location.hostname) || /\.workers\.dev$/i.test(location.hostname) ? 'cloudflare' : 'static');
 
+
+function formatDailyActionDateDisplay_(dateKey){
+    const s=String(dateKey||'').trim();
+    const m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if(!m)return s;
+    const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${Number(m[3])}-${months[Number(m[2])-1]}-${m[1]}`;
+}
+function upgradeDailyActionDatePicker_(){
+    const el=document.getElementById('attendanceDate');
+    if(!el || el.dataset.displayUpgraded==='1')return;
+    el.dataset.displayUpgraded='1';
+    const originalType=el.type;
+    const wrap=document.createElement('div');
+    wrap.className='relative';
+    const display=document.createElement('input');
+    display.type='text';
+    display.id='attendanceDateDisplay';
+    display.readOnly=true;
+    display.className=el.className || 'w-full border rounded-lg p-2';
+    display.setAttribute('aria-label','Select Date');
+    display.placeholder='5-Oct-2026';
+    const icon=document.createElement('span');
+    icon.innerHTML='📅';
+    icon.style.cssText='position:absolute;right:12px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:14px;';
+    const picker=el.cloneNode(true);
+    picker.id='attendanceDatePicker';
+    picker.type='date';
+    picker.className='absolute inset-0 w-full h-full opacity-0 cursor-pointer';
+    picker.style.zIndex='2';
+    wrap.appendChild(display);
+    wrap.appendChild(icon);
+    wrap.appendChild(picker);
+    el.type='hidden';
+    el.parentNode.insertBefore(wrap,el);
+    function sync(){
+        display.value=formatDailyActionDateDisplay_(el.value);
+        picker.value=el.value||'';
+        picker.min=el.min||'';
+        picker.max=el.max||'';
+        picker.disabled=false;
+    }
+    picker.addEventListener('change',function(){
+        el.value=picker.value;
+        sync();
+        el.dispatchEvent(new Event('change',{bubbles:true}));
+    });
+    display.addEventListener('click',function(){try{picker.showPicker();}catch(e){picker.focus();}});
+    wrap.addEventListener('click',function(e){
+        if(e.target===display || e.target===icon){try{picker.showPicker();}catch(err){picker.focus();}}
+    });
+    sync();
+}
+
         function setDateConstraints() {
             const dateInput = document.getElementById('attendanceDate');
             if(!dateInput) return;
@@ -52,12 +106,13 @@
             const localYesterday = (new Date(yesterday - tzOffset)).toISOString().split('T')[0];
             const twoDaysAgo = new Date(today); twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
             const localTwoDaysAgo = (new Date(twoDaysAgo - tzOffset)).toISOString().split('T')[0];
-            dateInput.max = localToday;
-            // For now, the old previous-3-days restriction is disabled.
-            // Dates from 01-Oct-2026 to today are selectable; Admin Lock/Unlock
-            // decides whether a selected date is actually writable.
+            // Previous-date restriction is disabled for the temporary period
+            // starting 01-Oct-2026. The calendar remains selectable; future
+            // dates are still blocked and Admin Lock/Unlock remains authoritative.
             dateInput.min = ENTRY_BASELINE_DATE;
             dateInput.max = localToday;
+            dateInput.disabled = false;
+            dateInput.readOnly = false;
             dateInput.value = localToday;
             if(typeof updateAttendanceNonWorkingDay==='function')updateAttendanceNonWorkingDay();
         }
