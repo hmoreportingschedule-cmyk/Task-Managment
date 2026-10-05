@@ -1801,9 +1801,10 @@ function parseBreakTimeClient(v){
         }
 
         const QUICK_TEMPLATE_TYPES = {
-            'Follow-up': ['HOD-Hind Musahwarat','Telethon/Ramzan Donation','Monthly Report','Weekly Risala Report','Others'],
-            'File-Work': ['Monthly Report Errors Check & Solve','HOD-Hind Musahwarat','Telethon/Ramzan Donation','Monthly Report Analise','Weekly Risala Report','Others'],
-            'Meeting': ['Online','Physical'], 'Outdoor': ['3 Days Qafila','Tarbiyati Ijtima','Journey']
+            'Followup': ['Hind Musahwarat-Task','HOD-Task','HOM-Task','3 Days Qafila','Meeting-Physicall','Meeting-Online','Tarbiyati Ijtima','Telethon/Ramzan Atiyat','Weekly Risala Report','Tanzimi Malumat (Zimmedar Details)'],
+            'File Work': ['Hind Musahwarat-Task','HOD-Task','HOM-Task','3 Days Qafila','Meeting-Physicall','Meeting-Online','Tarbiyati Ijtima','Telethon/Ramzan Atiyat','Weekly Risala Report','Tanzimi Malumat (Zimmedar Details)'],
+            'Outdoor': ['Hind Musahwarat-Task','HOD-Task','HOM-Task','3 Days Qafila','Meeting-Physicall','Meeting-Online','Tarbiyati Ijtima','Telethon/Ramzan Atiyat','Weekly Risala Report','Tanzimi Malumat (Zimmedar Details)'],
+            'Meeting': ['Hind Musahwarat-Task','HOD-Task','HOM-Task','3 Days Qafila','Meeting-Physicall','Meeting-Online','Tarbiyati Ijtima','Telethon/Ramzan Atiyat','Weekly Risala Report','Tanzimi Malumat (Zimmedar Details)']
         };
         function ensureQuickTemplatePriorityField(){
             const weight=document.getElementById('qtWeightage');
@@ -1867,7 +1868,7 @@ function parseBreakTimeClient(v){
         function getQuickTemplateTaskType(){
             const type=document.getElementById('qtCategory')?.value||'';
             const other=document.getElementById('qtOtherType')?.value.trim()||'';
-            return type==='Others'?other:type;
+            return type;
         }
         document.addEventListener('change',function(e){
             if(e.target?.id==='qtCategory'){updateQuickTemplateTaskTypes();handleQuickTemplateOtherType();}
@@ -1877,17 +1878,16 @@ function parseBreakTimeClient(v){
             const type=document.getElementById('qtCategory'),cat=document.getElementById('qtName');
             setQuickTemplateFieldLabels_();
             updateQuickTemplateTaskTypes();
-            const taskType=String(t.taskName||'');
-            const taskCategory=String(t.category||'');
-            const known=getQuickTemplateTypeList_().includes(taskType);
-            if(known){type.value=taskType;document.getElementById('qtOtherType').value='';}
-            else{type.value='Others';document.getElementById('qtOtherType').value=taskType;}
+            const taskType=String(t.taskType||'');
+            const taskCategory=String(t.category||t.taskName||'');
+            if(getQuickTemplateTypeList_().includes(taskType)) type.value=taskType;
+            else type.value='';
             updateQuickTemplateTaskTypes();
             cat.value=taskCategory;
             handleQuickTemplateOtherType();
             ensureQuickTemplatePriorityField();
             document.getElementById('qtFrequency').value=t.repeat||'Monthly';document.getElementById('qtStartDay').value=Number(t.startDay)||1;document.getElementById('qtEndDay').value=Number(t.endDay)||31;document.getElementById('qtWeightage').value=Number(t.weightage)||10;
-            const priority=document.getElementById('qtPriority');if(priority)priority.value=['Low','Medium','High','Urgent','Normal'].includes(String(t.priority||'Normal'))?String(t.priority||'Normal'):'Normal';
+            const priority=document.getElementById('qtPriority');if(priority)priority.value=['Medium','Normal','High','Urgent'].includes(String(t.priority||'Normal'))?String(t.priority||'Normal'):'Normal';
             const btn=document.getElementById('qtSaveBtn');btn.innerText='Update Template';btn.dataset.mode='edit';document.getElementById('quickTemplateModal').style.display='block';
         }
         function deleteQuickTaskTemplate(id,name){if(!id)return;if(!confirm(`Template "${name||id}" delete karna hai? Existing assigned tasks delete nahi honge.`))return;const fd=new FormData();fd.append('action','deleteCommonTaskTemplate');fd.append('templateId',id);fd.append('sessionToken',sessionToken);fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(d=>{if(d.status!=='success')throw new Error(d.message||'Delete failed');alert(d.message||'Template deleted.');refreshAssignTemplateData();renderQuickTemplateList();}).catch(e=>alert(e.message||'Template delete failed.'));}
@@ -1897,9 +1897,9 @@ function parseBreakTimeClient(v){
         }
         function saveQuickTaskTemplate(){
             ensureQuickTemplatePriorityField();
-            const category=document.getElementById('qtCategory')?.value||'',name=getQuickTemplateTaskType(),frequency=document.getElementById('qtFrequency')?.value||'',priority=document.getElementById('qtPriority')?.value||'Normal';const startDay=Number(document.getElementById('qtStartDay')?.value),endDay=Number(document.getElementById('qtEndDay')?.value),weightage=Number(document.getElementById('qtWeightage')?.value);
-            if(!category){alert('Task Category select karein.');return;}if(!name){alert('Task Type select karein ya Others mein task type likhein.');return;}if(!frequency){alert('Task Frequency select karein.');return;}if(!Number.isInteger(startDay)||startDay<1||startDay>31){alert('From Date mein 1 se 31 tak day digit dein.');return;}if(!Number.isInteger(endDay)||endDay<1||endDay>31||endDay<startDay){alert('To Date mein valid day digit dein.');return;}if(!Number.isFinite(weightage)||weightage<0||weightage>100){alert('Task Weightage 0 se 100% ke beech hona chahiye.');return;}
-            const btn=document.getElementById('qtSaveBtn');btn.disabled=true;btn.innerText='Saving...';const fd=new FormData();fd.append('action','saveCommonTaskTemplate');fd.append('templateId',document.getElementById('qtTemplateId')?.value||'');fd.append('taskName',name);fd.append('category',category);fd.append('description','');fd.append('priority',priority);fd.append('weightage',String(weightage));fd.append('startDay',String(startDay));fd.append('endDay',String(endDay));fd.append('frequency',frequency);fd.append('active','true');fd.append('worksJson',JSON.stringify([{frequency,category,workName:name,weightage:100}]));fd.append('sessionToken',sessionToken);
+            const taskType=document.getElementById('qtCategory')?.value||'',category=document.getElementById('qtName')?.value||'',name=category,frequency=document.getElementById('qtFrequency')?.value||'',priority=document.getElementById('qtPriority')?.value||'Normal';const startDay=Number(document.getElementById('qtStartDay')?.value),endDay=Number(document.getElementById('qtEndDay')?.value),weightage=Number(document.getElementById('qtWeightage')?.value);
+            if(!taskType){alert('Task Type select karein.');return;}if(!category){alert('Task Category select karein.');return;}if(!frequency){alert('Task Frequency select karein.');return;}if(!Number.isInteger(startDay)||startDay<1||startDay>31){alert('From Date mein 1 se 31 tak day digit dein.');return;}if(!Number.isInteger(endDay)||endDay<1||endDay>31||endDay<startDay){alert('To Date mein valid day digit dein.');return;}if(!Number.isFinite(weightage)||weightage<0||weightage>100){alert('Task Weightage 0 se 100% ke beech hona chahiye.');return;}
+            const btn=document.getElementById('qtSaveBtn');btn.disabled=true;btn.innerText='Saving...';const fd=new FormData();fd.append('action','saveCommonTaskTemplate');fd.append('templateId',document.getElementById('qtTemplateId')?.value||'');fd.append('taskName',name);fd.append('taskType',taskType);fd.append('category',category);fd.append('description','');fd.append('priority',priority);fd.append('weightage',String(weightage));fd.append('startDay',String(startDay));fd.append('endDay',String(endDay));fd.append('frequency',frequency);fd.append('active','true');fd.append('worksJson',JSON.stringify([{frequency,category,workName:name,weightage:100}]));fd.append('sessionToken',sessionToken);
             fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(d=>{if(d.status!=='success')throw new Error(d.message||'Template save failed');alert(d.message||'Template saved.');resetQuickTemplateForm();refreshAssignTemplateData(true);}).catch(e=>alert(e.message||'Template save failed.')).finally(()=>{btn.disabled=false;btn.innerText='Save Template';});
         }
 
@@ -2333,7 +2333,7 @@ function parseBreakTimeClient(v){
                 const taskText=String(cells[nameIdx+1]?.textContent||'').trim().split('\n')[0];
                 const assigned=String(cells.find(c=>String(c.textContent||'').trim().toLowerCase().includes('masteradmin'))?.textContent||'').trim();
                 let task=(globalAllTasks||[]).find(t=>String(t.taskName||'').trim()===taskText);
-                const type=task ? (task.taskType||task.templateTaskType||task.type||task.category||'-') : '-';
+                const type=task ? (task.taskType||task.templateTaskType||task.type||'-') : '-';
                 const td=document.createElement('td');
                 td.className=cells[nameIdx+1]?.className||'';
                 td.textContent=type;
@@ -2363,7 +2363,7 @@ function parseBreakTimeClient(v){
             // 1. Complete Assigned Tasks
             let tasksForExport = globalAllTasks.map(t => ({
                 "Task ID": t.taskId,
-                "Task Type": t.taskType || t.templateTaskType || t.type || t.category || "-",
+                "Task Type": t.taskType || t.templateTaskType || t.type || "-",
                 "Task Name": t.taskName,
                 "Assigned To": t.assignedTo,
                 "Department": t.department,
@@ -2878,12 +2878,12 @@ function parseBreakTimeClient(v){
             });
             (globalPendingWorkLogs||[]).forEach(w=>{
                 const meta=attendanceMetaForUser(w.employee||'')||{};
-                out.push({key:w.key||('worklog|'+(w.employee||'')+'|'+(w.rowIndex||'')),type:'worklog',typeLabel:'Daily Work',employee:w.employee||'',employeeId:w.employeeId||meta.employeeId||'',task:w.task||'Daily Work',date:w.date||'',details:`${Number(w.minutes)||0} minute(s) • ${w.description||'No description'}${w.submittedAt?' • Submitted: '+w.submittedAt:''}`,status:w.status||'Pending',rowIndex:w.rowIndex,action:'workLogApproval',targetUser:w.employee||'',taskRowIndex:w.taskRowIndex||''});
+                out.push({key:w.key||('worklog|'+(w.employee||'')+'|'+(w.rowIndex||'')),type:'worklog',typeLabel:'Daily Work',employee:w.employee||'',employeeId:w.employeeId||meta.employeeId||'',task:w.task||'Daily Work',date:w.date||'',details:`Daily Work • ${Number(w.minutes)||0} minute(s) • ${w.description||'No description'}${w.submittedAt?' • Submitted: '+w.submittedAt:''}`,status:w.status||'Pending',rowIndex:w.rowIndex,action:'workLogApproval',targetUser:w.employee||'',taskRowIndex:w.taskRowIndex||''});
             });
             (globalAllTasks||[]).forEach(t=>{
                 const empStatus=String(t.empStatus||'').toLowerCase(), hodStatus=String(t.hodStatus||'').toLowerCase();
                 const meta=attendanceMetaForUser(t.assignedTo||t.employee||'')||{};
-                if(empStatus==='completion requested') out.push({key:'task-completion|'+(t.taskId||t.rowIndex),type:'task',typeLabel:'Task',employee:t.assignedTo||t.employee||'',employeeId:meta.employeeId||'',task:t.taskName||'Task',date:t.endDate||t.startDate||'',details:'Before/Completion approval required',status:t.empStatus||'Completion Requested',rowIndex:t.rowIndex,taskId:t.taskId||'',action:'taskCompletion',targetUser:t.assignedTo||t.employee||'',approvalOwner:t.approvalOwner||''});
+                if(empStatus==='completion requested') out.push({key:'task-completion|'+(t.taskId||t.rowIndex),type:'task',typeLabel:'Task',employee:t.assignedTo||t.employee||'',employeeId:meta.employeeId||'',task:t.taskName||'Task',date:t.endDate||t.startDate||'',details:'Final Before/Completion approval required — separate from Daily Work approval',status:t.empStatus||'Completion Requested',rowIndex:t.rowIndex,taskId:t.taskId||'',action:'taskCompletion',targetUser:t.assignedTo||t.employee||'',approvalOwner:t.approvalOwner||''});
                 else if(String(t.assignedBy||'').trim() && ['pending','approved','rejected'].includes(hodStatus)) out.push({key:'task-approval|'+(t.taskId||t.rowIndex),type:'task',typeLabel:'Task',employee:t.assignedTo||t.employee||'',employeeId:meta.employeeId||'',task:t.taskName||'Task',date:t.startDate||'',details:'Task approval',status:t.hodStatus||'Pending',rowIndex:t.rowIndex,taskId:t.taskId||'',action:'taskApproval',targetUser:t.assignedTo||t.employee||'',approvalOwner:t.approvalOwner||''});
             });
             return out;
