@@ -1813,22 +1813,35 @@ function parseBreakTimeClient(v){
             if(!wrap || !wrap.parentElement) return;
             const box=document.createElement('div');
             box.className='mt-3';
-            box.innerHTML='<label class=\"block text-sm font-bold text-[#112a2e] mb-1\">Priority</label><select id=\"qtPriority\" class=\"w-full border border-gray-300 rounded-lg px-3 py-2 bg-white\"><option value=\"Normal\">Normal</option><option value=\"Low\">Low</option><option value=\"Medium\">Medium</option><option value=\"High\">High</option><option value=\"Urgent\">Urgent</option></select>';
+            box.innerHTML='<label class=\"block text-sm font-bold text-[#112a2e] mb-1\">Priority</label><select id=\"qtPriority\" class=\"w-full border border-gray-300 rounded-lg px-3 py-2 bg-white\"><option value=\"Medium\">Medium</option><option value=\"Normal\">Normal</option><option value=\"High\">High</option><option value=\"Urgent\">Urgent</option></select>';
             wrap.parentElement.insertBefore(box,wrap);
         }
         function resetQuickTemplateForm(){
             ensureQuickTemplatePriorityField();
+            const type=document.getElementById('qtCategory');
+            const cat=document.getElementById('qtName');
+            const other=document.getElementById('qtOtherType');
+            const typeOptions=['Followup','File Work','Outdoor','Meeting'];
+            if(type){
+                type.innerHTML='<option value="">-- Select Task Type --</option>'+typeOptions.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+                type.disabled=false;
+                type.value='';
+            }
+            if(cat){
+                cat.innerHTML='<option value="">-- Select Task Category --</option>';
+                cat.disabled=true;
+                cat.value='';
+            }
+            if(other){other.value='';other.classList.add('hidden');}
             setQuickTemplateFieldLabels_();
-            ['qtTemplateId','qtCategory','qtFrequency','qtStartDay','qtEndDay'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+            ['qtTemplateId','qtFrequency','qtStartDay','qtEndDay'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
             const w=document.getElementById('qtWeightage');if(w)w.value='10';
-            const p=document.getElementById('qtPriority');if(p)p.value='Normal';
-            const type=document.getElementById('qtName'),other=document.getElementById('qtOtherType');
-            if(type){type.innerHTML='<option value="">-- Select Task Type --</option>';type.disabled=true;} if(other){other.value='';other.classList.add('hidden');}
+            const p=document.getElementById('qtPriority');if(p){p.innerHTML='<option value="Medium">Medium</option><option value="Normal">Normal</option><option value="High">High</option><option value="Urgent">Urgent</option>';p.value='Normal';}
             const btn=document.getElementById('qtSaveBtn');if(btn){btn.innerText='Save Template';btn.dataset.mode='create';}
         }
         function openQuickTemplateModal(){
             const role=String(document.getElementById('displayRole')?.innerText||'').toLowerCase(); if(!isFullAdminRole(role)){alert('Task Template add karne ka access sirf Admin ko hai.');return;}
-            resetQuickTemplateForm();document.getElementById('quickTemplateModal').style.display='block';setTimeout(renderQuickTemplateList,50);
+            resetQuickTemplateForm();updateQuickTemplateTaskTypes();document.getElementById('quickTemplateModal').style.display='block';setTimeout(renderQuickTemplateList,50);
         }
         function closeQuickTemplateModal(){const m=document.getElementById('quickTemplateModal');if(m)m.style.display='none';}
         function setQuickTemplateFieldLabels_(){
@@ -1840,28 +1853,33 @@ function parseBreakTimeClient(v){
             return [...new Set(Object.values(QUICK_TEMPLATE_TYPES||{}).flat().map(v=>String(v||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
         }
         function updateQuickTemplateTaskTypes(){
-            const typeSel=document.getElementById('qtCategory'), catSel=document.getElementById('qtName'), other=document.getElementById('qtOtherType');
+            const typeSel=document.getElementById('qtCategory');
+            const catSel=document.getElementById('qtName');
+            const other=document.getElementById('qtOtherType');
             if(!typeSel||!catSel)return;
             setQuickTemplateFieldLabels_();
+            const typeOptions=['Followup','File Work','Outdoor','Meeting'];
             const currentType=typeSel.value;
-            const types=getQuickTemplateTypeList_();
-            typeSel.innerHTML='<option value="">-- Select Task Type --</option>'+types.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
-            typeSel.disabled=!types.length;
-            if(currentType && types.includes(currentType))typeSel.value=currentType;
-            const selectedType=typeSel.value;
-            const categories=selectedType
-                ? Object.keys(QUICK_TEMPLATE_TYPES||{}).filter(c=>(QUICK_TEMPLATE_TYPES[c]||[]).map(String).includes(selectedType))
-                : Object.keys(QUICK_TEMPLATE_TYPES||{});
+            typeSel.innerHTML='<option value="">-- Select Task Type --</option>'+typeOptions.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+            typeSel.disabled=false;
+            if(typeOptions.includes(currentType))typeSel.value=currentType;
+            const categories=[
+                'Hind Musahwarat-Task','HOD-Task','HOM-Task','3 Days Qafila',
+                'Meeting-Physicall','Meeting-Online','Tarbiyati Ijtima',
+                'Telethon/Ramzan Atiyat','Weekly Risala Report',
+                'Tanzimi Malumat (Zimmedar Details)'
+            ];
             const currentCat=catSel.value;
-            catSel.innerHTML='<option value="">-- Select Task Category --</option>'+categories.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
-            catSel.disabled=!categories.length;
-            if(currentCat && categories.includes(currentCat))catSel.value=currentCat;
+            catSel.innerHTML='<option value="">-- Select Task Category --</option>'+
+                categories.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+            catSel.disabled=!typeSel.value;
+            if(typeSel.value && categories.includes(currentCat))catSel.value=currentCat;
             if(other){other.value='';other.classList.add('hidden');}
         }
         function handleQuickTemplateOtherType(){
             const type=document.getElementById('qtCategory'), other=document.getElementById('qtOtherType');
             if(!type||!other)return;
-            const isOther=type.value==='Others';
+            const isOther=false;
             other.classList.toggle('hidden',!isOther);
             if(!isOther)other.value='';
         }
@@ -1880,8 +1898,8 @@ function parseBreakTimeClient(v){
             updateQuickTemplateTaskTypes();
             const taskType=String(t.taskType||'');
             const taskCategory=String(t.category||t.taskName||'');
-            if(getQuickTemplateTypeList_().includes(taskType)) type.value=taskType;
-            else type.value='';
+            updateQuickTemplateTaskTypes();
+            type.value=['Followup','File Work','Outdoor','Meeting'].includes(taskType)?taskType:'';
             updateQuickTemplateTaskTypes();
             cat.value=taskCategory;
             handleQuickTemplateOtherType();
