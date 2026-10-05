@@ -4,7 +4,14 @@
 
         // YAHAN APNA NAYA GOOGLE SCRIPT URL DAALEIN
         // GOOGLE SHEET / APPS SCRIPT URL: Is URL ko change karein agar Web App deployment URL badle.
-        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw9x_CwQz3CAQFSZENxZ6tFwTETOv-vol39dGDR5-A0cFj-pvbgd5_HI_1vLLm5yOxG4Q/exec";
+        const DEFAULT_GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw9x_CwQz3CAQFSZENxZ6tFwTETOv-vol39dGDR5-A0cFj-pvbgd5_HI_1vLLm5yOxG4Q/exec";
+        // Hosting-neutral configuration: the same frontend works on Vercel, Cloudflare Pages,
+        // GitHub Pages/static hosting, etc. Optionally override the API URL via:
+        // window.__TASK_APP_CONFIG = { googleScriptUrl: "https://.../exec" };
+        // or <meta name="google-script-url" content="https://.../exec"> in index.html.
+        const GOOGLE_SCRIPT_URL = (window.__TASK_APP_CONFIG && window.__TASK_APP_CONFIG.googleScriptUrl)
+            || document.querySelector('meta[name="google-script-url"]')?.content
+            || DEFAULT_GOOGLE_SCRIPT_URL;
         
         let globalAllTasks = []; 
         let globalTeamMembers = [];
@@ -24,6 +31,12 @@
         let globalOfficeEvents = [];
         let v4CurrentWeekoff = "Sunday";
         let performanceWeights = {attendance:50, task:50};
+        let globalAttendanceDateLocks = [];
+
+        // V.14 hosting compatibility: do not use Vercel/Cloudflare-specific APIs.
+        // All backend calls remain standard browser fetch() POST requests to Apps Script.
+        const APP_HOSTING_PLATFORM = /(^|\.)vercel\.app$/i.test(location.hostname) ? 'vercel'
+            : (/^(pages\.|.*\.)?cloudflarepages\.dev$/i.test(location.hostname) || /\.workers\.dev$/i.test(location.hostname) ? 'cloudflare' : 'static');
 
         function setDateConstraints() {
             const dateInput = document.getElementById('attendanceDate');
@@ -37,7 +50,9 @@
             const twoDaysAgo = new Date(today); twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
             const localTwoDaysAgo = (new Date(twoDaysAgo - tzOffset)).toISOString().split('T')[0];
             dateInput.max = localToday;
-            if(attendanceEntryStart && attendanceEntryEnd){
+            const hasUnlock = Array.isArray(globalAttendanceDateLocks) && globalAttendanceDateLocks.some(r=>String(r.status).toUpperCase()==="UNLOCKED");
+            if(hasUnlock) dateInput.min = "2020-01-01";
+            if(attendanceEntryStart && attendanceEntryEnd && !hasUnlock){
                 dateInput.min = attendanceEntryStart < localTwoDaysAgo ? attendanceEntryStart : localTwoDaysAgo;
                 dateInput.max = attendanceEntryEnd > localToday ? attendanceEntryEnd : localToday;
             } else {
@@ -80,7 +95,7 @@
             const weekoffs=String(v4CurrentWeekoff||'Sunday').split(/[,;/]/).map(x=>x.trim().toLowerCase());
             const event=key?(globalOfficeEvents||[]).find(e=>key>=String(e.fromDate||'')&&key<=String(e.toDate||e.fromDate||'')):null;
             const isWeekoff=dt&&weekoffs.includes(names[dt.getDay()].toLowerCase());
-            const msg=event?'Aaj office band hai: '+String(event.name||event.eventName||'Holiday')+'. Attendance ki zaroorat nahi.':isWeekoff?'Today Weekoff':'';
+            const lockState=applyAttendanceLockUI(key); const msg=lockState.locked?'Admin ne is date/month ko LOCK kiya hua hai. Attendance/Breaks ke liye pehle UNLOCK zaroori hai.':event?'Aaj office band hai: '+String(event.name||event.eventName||'Holiday')+'. Attendance ki zaroorat nahi.':isWeekoff?'Today Weekoff':'';
             notice.textContent=msg;notice.classList.toggle('hidden',!msg);btn.disabled=!!msg;btn.style.opacity=msg?'0.5':'';btn.title=msg;
         }
         let pendingBreakAction = '';
@@ -288,7 +303,7 @@ function parseBreakTimeClient(v){
                     document.body.classList.add('employee-mode');
                     document.querySelectorAll('.hod-only').forEach(el=>el.style.setProperty('display','none','important')); document.querySelectorAll('.admin-only').forEach(el=>el.style.setProperty('display','none','important')); document.querySelectorAll('.emp-only').forEach(el=>el.style.setProperty('display','block','important')); document.getElementById('empTimeTracker').style.display='flex';
                 }
-                v4CurrentWeekoff=data.weekoff||'Sunday';requestAnimationFrame(()=>fetchDashboardData(data.username||user,role,data.department||''));setTimeout(v4UpdateAttendanceAvailability,100);
+                v4CurrentWeekoff=data.weekoff||'Sunday';ensureAttendanceLockAdminUI();requestAnimationFrame(()=>fetchDashboardData(data.username||user,role,data.department||''));setTimeout(v4UpdateAttendanceAvailability,100);
             })
             .catch(err=>{showLoginStatus(err&&err.name==='AbortError'?'⏱️ Server response mein zyada time lag raha hai. Please 10–15 seconds baad dobara try karein.':'⚠️ Server se connection nahi ho pa raha. Please connection check karke dobara try karein.','error');btn.innerHTML='Login to Dashboard <i class="fas fa-arrow-right ml-2"></i>';btn.disabled=false;})
             .finally(()=>clearTimeout(timeoutId));
@@ -406,7 +421,7 @@ function parseBreakTimeClient(v){
         function markAttendance(){
             if(updateAttendanceNonWorkingDay())return;
             const selectedDate=document.getElementById('attendanceDate')?.value||'', action=document.getElementById('attendanceAction')?.value||'Punch In', manual=document.getElementById('manualTime')?.value||'';
-            const btn=document.getElementById('attendanceBtn'); if(!selectedDate){alert('Select a date!');return;} v4UpdateAttendanceAvailability();if(btn.disabled)return;
+            const btn=document.getElementById('attendanceBtn'); if(!selectedDate){alert('Select a date!');return;} const lockState=applyAttendanceLockUI(selectedDate); if(lockState.locked){alert('Is date par Admin ne Attendance/Breaks LOCK kiye hue hain. Pehle Admin se UNLOCK karwayein.');return;} v4UpdateAttendanceAvailability();if(btn.disabled)return;
             const inTime=action==='Punch In'?manual:'',outTime=action==='Punch Out'?manual:'';
             const namazType=getSelectedNamazType(),namazStart=document.getElementById('namazBreakStartTime')?.value||'',namazEnd=document.getElementById('namazBreakEndTime')?.value||'',lunchStart=document.getElementById('lunchBreakStartTime')?.value||'',lunchEnd=document.getElementById('lunchBreakEndTime')?.value||'';
             if(namazStart||namazEnd){if(!namazType){alert('Pehle Namaz select karein.');return;}}
@@ -518,7 +533,7 @@ function parseBreakTimeClient(v){
                 globalWorkLogs=[]; window.globalDelayReports=[];
                 globalTeamAttendance=Array.isArray(data.teamAttendance)?data.teamAttendance:[];
                 globalAdvanceScheduleRequests=Array.isArray(data.advanceScheduleRequests)?data.advanceScheduleRequests:[];
-                globalAttendanceRequests=Array.isArray(data.attendanceRequests)?data.attendanceRequests:[]; globalOfficeEvents=Array.isArray(data.officeEvents)?data.officeEvents:[];updateAttendanceNonWorkingDay();updateAttendanceNonWorkingDay();v4UpdateAttendanceAvailability();updateTodayUrgentTaskButtonState(); window.serverNotifications=Array.isArray(data.serverNotifications)?data.serverNotifications:[]; window.serverDashboardSummary=Array.isArray(data.dashboardSummary)?data.dashboardSummary:[];
+                globalAttendanceRequests=Array.isArray(data.attendanceRequests)?data.attendanceRequests:[]; globalOfficeEvents=Array.isArray(data.officeEvents)?data.officeEvents:[];globalAttendanceDateLocks=Array.isArray(data.attendanceDateLocks)?data.attendanceDateLocks:[];updateAttendanceNonWorkingDay();updateAttendanceNonWorkingDay();v4UpdateAttendanceAvailability();updateTodayUrgentTaskButtonState(); window.serverNotifications=Array.isArray(data.serverNotifications)?data.serverNotifications:[]; window.serverDashboardSummary=Array.isArray(data.dashboardSummary)?data.dashboardSummary:[];
                 attendanceEntryStart=data.todayAttendanceEntryStart||attendanceEntryStart;
                 attendanceEntryEnd=data.todayAttendanceEntryEnd||attendanceEntryEnd;
                 setDateConstraints();
@@ -599,7 +614,7 @@ function parseBreakTimeClient(v){
                 setDateConstraints();
                 globalTeamAttendance = Array.isArray(data.teamAttendance) ? data.teamAttendance : [];
                 globalAdvanceScheduleRequests = Array.isArray(data.advanceScheduleRequests) ? data.advanceScheduleRequests : [];
-                globalAttendanceRequests = Array.isArray(data.attendanceRequests) ? data.attendanceRequests : []; globalOfficeEvents = Array.isArray(data.officeEvents) ? data.officeEvents : [];updateAttendanceNonWorkingDay();updateAttendanceNonWorkingDay();v4UpdateAttendanceAvailability();updateTodayUrgentTaskButtonState(); window.serverNotifications=Array.isArray(data.serverNotifications)?data.serverNotifications:[]; window.serverDashboardSummary=Array.isArray(data.dashboardSummary)?data.dashboardSummary:[];
+                globalAttendanceRequests = Array.isArray(data.attendanceRequests) ? data.attendanceRequests : []; globalOfficeEvents = Array.isArray(data.officeEvents) ? data.officeEvents : []; globalAttendanceDateLocks = Array.isArray(data.attendanceDateLocks) ? data.attendanceDateLocks : [];updateAttendanceNonWorkingDay();updateAttendanceNonWorkingDay();v4UpdateAttendanceAvailability();updateTodayUrgentTaskButtonState(); window.serverNotifications=Array.isArray(data.serverNotifications)?data.serverNotifications:[]; window.serverDashboardSummary=Array.isArray(data.dashboardSummary)?data.dashboardSummary:[];
 
                 // Keep the latest successful result locally so the next page/login opens instantly.
                 try {
@@ -665,6 +680,22 @@ function parseBreakTimeClient(v){
         }
 
         function localDateKey(d=new Date()){ const x=new Date(d); x.setHours(12,0,0,0); return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`; }
+        function getDateLockRecordClient(dateKey){
+            const key=String(dateKey||'').trim(), month=key.slice(0,7), rows=Array.isArray(globalAttendanceDateLocks)?globalAttendanceDateLocks:[];
+            const d=rows.find(r=>String(r.scope).toLowerCase()==='date'&&String(r.key)===key);
+            if(d)return d;
+            return rows.find(r=>String(r.scope).toLowerCase()==='month'&&String(r.key)===month)||null;
+        }
+        function isDateUnlockedClient(dateKey){const r=getDateLockRecordClient(dateKey);return !!r&&String(r.status).toUpperCase()==='UNLOCKED';}
+        function isDateLockedClient(dateKey){const r=getDateLockRecordClient(dateKey);return !!r&&String(r.status).toUpperCase()==='LOCKED';}
+        function applyAttendanceLockUI(dateKey){
+            const key=String(dateKey||'').trim(), r=getDateLockRecordClient(key), locked=!!r&&String(r.status).toUpperCase()==='LOCKED';
+            const unlocked=isDateUnlockedClient(key);
+            const notice=document.getElementById('attendanceClosedNotice');
+            if(locked&&notice){notice.textContent='Admin ne '+(String(r.scope).toLowerCase()==='month'?'is month':'is date')+' ko LOCK kiya hua hai. Attendance/Breaks ke liye Admin se UNLOCK karwayein.';notice.classList.remove('hidden');}
+            return {locked,unlocked};
+        }
+
         function parseLocalDateKey(v){ const p=String(v||'').split('-').map(Number); return p.length===3&&!p.some(Number.isNaN)?new Date(p[0],p[1]-1,p[2],12):null; }
         function isLogWorkNonWorkingDate(dateKey){
             const d=parseLocalDateKey(dateKey); if(!d)return 'Invalid date';
@@ -688,6 +719,8 @@ function parseBreakTimeClient(v){
             // Attendance Entry Access must NOT override this rule.
             const d=parseLocalDateKey(dateKey), today=parseLocalDateKey(localDateKey()); if(!d||!today)return false;
             if(d>today)return false;
+            if(isDateLockedClient(dateKey))return false;
+            if(isDateUnlockedClient(dateKey))return true;
             const min=new Date(today);min.setDate(min.getDate()-2);
             return d>=min;
         }
@@ -696,7 +729,7 @@ function parseBreakTimeClient(v){
             const today=localDateKey(), t=parseLocalDateKey(today);
             const minDate=new Date(t); minDate.setDate(minDate.getDate()-2);
             const min=localDateKey(minDate);
-            el.min=min;el.max=today;if(!el.value||!isLogWorkDateAllowed(el.value))el.value=today;
+            const unlocked=Array.isArray(globalAttendanceDateLocks)&&globalAttendanceDateLocks.some(r=>String(r.status).toUpperCase()==="UNLOCKED");el.min=unlocked?"2020-01-01":min;el.max=today;if(!el.value||!isLogWorkDateAllowed(el.value))el.value=today;
         }
         function getAttendanceForLogDate(workDate){
             const key=String(workDate||'').trim();
@@ -1174,6 +1207,33 @@ function parseBreakTimeClient(v){
         }
 
         // ================= HOD ASSIGN TASK =================
+        // ================= ADMIN ATTENDANCE DATE LOCK =================
+        function ensureAttendanceLockAdminUI(){
+            if(!isFullAdminRole(document.getElementById('displayRole')?.innerText||''))return;
+            if(document.getElementById('attendanceLockBtn'))return;
+            const btn=document.createElement('button');btn.id='attendanceLockBtn';btn.type='button';btn.className='fixed right-5 bottom-5 z-[9998] bg-[#263f45] hover:bg-[#142c31] text-white px-4 py-3 rounded-xl shadow-lg font-bold text-sm';btn.innerHTML='<i class="fas fa-lock mr-2"></i>Attendance Date Lock';btn.onclick=openAttendanceDateLockModal;document.body.appendChild(btn);
+        }
+        function closeAttendanceDateLockModal(){document.getElementById('attendanceDateLockModal')?.remove();}
+        function renderAttendanceDateLockRows(){
+            const box=document.getElementById('attendanceDateLockRows');if(!box)return;const rows=[...(globalAttendanceDateLocks||[])].sort((a,b)=>String(b.key).localeCompare(String(a.key)));
+            if(!rows.length){box.innerHTML='<div class="p-3 text-center text-gray-500">Abhi koi custom Lock/Unlock nahi hai.</div>';return;}
+            box.innerHTML=rows.slice(0,50).map(r=>{const st=String(r.status||'').toUpperCase();return `<div class="flex items-center justify-between gap-2 border-b py-2 text-sm"><div><b>${String(r.scope||'').toUpperCase()}</b> • ${r.key}<br><span class="text-xs ${st==='UNLOCKED'?'text-green-600':'text-red-600'} font-bold">${st}</span> <span class="text-xs text-gray-400">${r.updatedBy||''}</span></div><button class="px-3 py-1 rounded-lg border text-xs font-bold" onclick="setAttendanceDateLock('${String(r.scope)}','${String(r.key)}','${st==='UNLOCKED'?'LOCKED':'UNLOCKED'}')">${st==='UNLOCKED'?'Lock':'Unlock'}</button></div>`}).join('');
+        }
+        function refreshAttendanceDateLocksUI(){
+            const fd=new FormData();fd.append('action','getAttendanceDateLocks');fd.append('sessionToken',sessionToken);
+            return fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd,cache:'no-store'}).then(r=>r.json()).then(d=>{if(d.status!=='success')throw new Error(d.message||'Lock data load failed.');globalAttendanceDateLocks=Array.isArray(d.locks)?d.locks:[];setDateConstraints();setLogWorkDateConstraints();renderAttendanceDateLockRows();updateAttendanceNonWorkingDay();v4UpdateAttendanceAvailability();return globalAttendanceDateLocks;});
+        }
+        function setAttendanceDateLock(scope,key,status){
+            key=String(key||'').trim();if(!key){alert(scope==='month'?'Month select karein.':'Date select karein.');return;}
+            const fd=new FormData();fd.append('action','setAttendanceDateLock');fd.append('scope',scope);fd.append('key',key);fd.append('status',status);fd.append('sessionToken',sessionToken);
+            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(d=>{if(d.status!=='success')throw new Error(d.message||'Lock update failed.');globalAttendanceDateLocks=Array.isArray(d.locks)?d.locks:[];setDateConstraints();setLogWorkDateConstraints();renderAttendanceDateLockRows();updateAttendanceNonWorkingDay();v4UpdateAttendanceAvailability();alert(d.message);}).catch(e=>alert(e.message||'Lock update failed.'));
+        }
+        function openAttendanceDateLockModal(){
+            if(!isFullAdminRole(document.getElementById('displayRole')?.innerText||'')){alert('Only Admin can manage Attendance Date Lock.');return;}
+            if(document.getElementById('attendanceDateLockModal')){refreshAttendanceDateLocksUI().catch(e=>alert(e.message));return;}
+            const div=document.createElement('div');div.id='attendanceDateLockModal';div.className='fixed inset-0 z-[9999] bg-black/50 flex items-center justify-center p-4';div.innerHTML=`<div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-auto p-6"><div class="flex justify-between items-center mb-5"><div><h2 class="text-xl font-bold text-[#17353b]"><i class="fas fa-lock text-[#259b94] mr-2"></i>Attendance Date Lock Management</h2><p class="text-xs text-gray-500 mt-1">Admin specific Date ya poore Month ko Lock / Unlock kar sakta hai.</p></div><button onclick="closeAttendanceDateLockModal()" class="text-gray-500 hover:text-red-600 text-2xl font-bold">&times;</button></div><div class="grid md:grid-cols-2 gap-4"><div class="border rounded-xl p-4"><h3 class="font-bold mb-2">Month Control</h3><input id="lockMonthInput" type="month" class="w-full border rounded-lg p-2 mb-3"><div class="flex gap-2"><button onclick="setAttendanceDateLock('month',document.getElementById('lockMonthInput').value,'UNLOCKED')" class="flex-1 bg-green-600 text-white rounded-lg p-2 font-bold">Unlock Month</button><button onclick="setAttendanceDateLock('month',document.getElementById('lockMonthInput').value,'LOCKED')" class="flex-1 bg-red-600 text-white rounded-lg p-2 font-bold">Lock Month</button></div></div><div class="border rounded-xl p-4"><h3 class="font-bold mb-2">Date Control</h3><input id="lockDateInput" type="date" class="w-full border rounded-lg p-2 mb-3"><div class="flex gap-2"><button onclick="setAttendanceDateLock('date',document.getElementById('lockDateInput').value,'UNLOCKED')" class="flex-1 bg-green-600 text-white rounded-lg p-2 font-bold">Unlock Date</button><button onclick="setAttendanceDateLock('date',document.getElementById('lockDateInput').value,'LOCKED')" class="flex-1 bg-red-600 text-white rounded-lg p-2 font-bold">Lock Date</button></div></div></div><div class="mt-5 border rounded-xl p-4"><h3 class="font-bold mb-2">Current Lock / Unlock Controls</h3><div id="attendanceDateLockRows" class="max-h-64 overflow-auto"></div></div></div>`;document.body.appendChild(div);refreshAttendanceDateLocksUI().catch(e=>alert(e.message));
+        }
+
         function openUserManagementModal() {
             document.getElementById('userManagementModal').style.display = 'block';
             loadAdminUsers();
@@ -1738,6 +1798,7 @@ function parseBreakTimeClient(v){
             const dateKey=dailyActionDate;
             const nonWorking=isLogWorkNonWorkingDate(dateKey);
             const allowed=isLogWorkDateAllowed(dateKey);
+            if(isDateLockedClient(dateKey)){alert('Is date par Admin ne Work/Attendance LOCK kiya hua hai. Pehle Admin se UNLOCK karwayein.');return;}
             const btn=document.querySelector('button[onclick="openLogWorkModal()"]');
             if(nonWorking){ alert(`Log Daily Work frozen: ${nonWorking}.`); if(btn)btn.disabled=true; return; }
             if(!allowed){ alert('Log Daily Work sirf current date aur previous 2 days ke liye available hai.'); if(btn)btn.disabled=true; return; }
@@ -1786,10 +1847,10 @@ function parseBreakTimeClient(v){
             }
             if(!tIdx||!mins){alert('Please select task and enter time!');return;}
             const duplicateAlreadyLogged=(globalWorkLogs||[]).some(w=>{
-                const d=String(w.WorkDate||w.workDate||'');
-                const r=String(w.TaskRowIndex||w.taskRowIndex||'');
-                const st=String(w.ApprovalStatus||w.approvalStatus||'Approved').toLowerCase();
-                return d===workDate && r===String(tIdx) && st!=='rejected';
+                const d=String(w.WorkDate||w.workDate||'').trim();
+                const r=String(w.TaskRowIndex||w.taskRowIndex||'').trim();
+                const st=String(w.ApprovalStatus||w.approvalStatus||'Approved').trim().toLowerCase();
+                return d===String(workDate).trim() && r===String(tIdx).trim() && st!=='rejected';
             });
             if(duplicateAlreadyLogged){
                 alert('Yeh task aapne is date par already submit kar diya hai. Double entry allowed nahi hai.');
