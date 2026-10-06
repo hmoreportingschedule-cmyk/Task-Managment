@@ -368,7 +368,7 @@ function parseBreakTimeClient(v){
                     document.body.classList.add('employee-mode');
                     document.querySelectorAll('.hod-only').forEach(el=>el.style.setProperty('display','none','important')); document.querySelectorAll('.admin-only').forEach(el=>el.style.setProperty('display','none','important')); document.querySelectorAll('.emp-only').forEach(el=>el.style.setProperty('display','block','important')); document.getElementById('empTimeTracker').style.display='flex';
                 }
-                v4CurrentWeekoff=data.weekoff||'Sunday';ensureAttendanceLockAdminUI();requestAnimationFrame(()=>fetchDashboardData(data.username||user,role,data.department||''));setTimeout(v4UpdateAttendanceAvailability,100);
+                v4CurrentWeekoff=data.weekoff||'Sunday';ensureAttendanceLockAdminUI();addRefreshButton_();requestAnimationFrame(()=>fetchDashboardData(data.username||user,role,data.department||''));setTimeout(v4UpdateAttendanceAvailability,100);
             })
             .catch(err=>{showLoginStatus(err&&err.name==='AbortError'?'⏱️ Server response mein zyada time lag raha hai. Please 10–15 seconds baad dobara try karein.':'⚠️ Server se connection nahi ho pa raha. Please connection check karke dobara try karein.','error');btn.innerHTML='Login to Dashboard <i class="fas fa-arrow-right ml-2"></i>';btn.disabled=false;})
             .finally(()=>clearTimeout(timeoutId));
@@ -462,20 +462,34 @@ function parseBreakTimeClient(v){
             },10000);
         }
         function addRefreshButton_(){
+            if(document.getElementById('login-section')?.style.display!=='none')return;
             if(document.getElementById('appRefreshButton'))return;
             const btn=document.createElement('button');
             btn.id='appRefreshButton';
             btn.type='button';
             btn.innerHTML='<i class="fas fa-sync-alt"></i><span> Refresh</span>';
             btn.title='Latest version/data load karein';
-            btn.style.cssText='position:fixed;top:14px;right:18px;z-index:9998;border:0;border-radius:8px;padding:9px 13px;background:#0f766e;color:#fff;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.18);cursor:pointer;';
+            btn.style.cssText='border:0;border-radius:8px;padding:8px 12px;background:#0f766e;color:#fff;font-weight:700;box-shadow:0 2px 6px rgba(0,0,0,.14);cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;margin-right:8px;';
             btn.addEventListener('click',function(){
                 touchLoginActivity_();
                 btn.disabled=true;
                 btn.innerHTML='<i class="fas fa-sync-alt fa-spin"></i><span> Refreshing...</span>';
                 setTimeout(()=>location.reload(),120);
             });
-            document.body.appendChild(btn);
+            const notificationBtn=document.getElementById('notificationBtn');
+            if(notificationBtn && notificationBtn.parentElement){
+                const parent=notificationBtn.parentElement;
+                if(!parent.style.display)parent.style.display='flex';
+                parent.style.alignItems='center';
+                notificationBtn.parentElement.insertBefore(btn,notificationBtn);
+            }else{
+                // Notification button may be rendered slightly later.
+                const host=document.getElementById('dashboard-section');
+                if(host){
+                    btn.style.position='fixed';btn.style.top='14px';btn.style.right='18px';btn.style.zIndex='9998';
+                    host.appendChild(btn);
+                }
+            }
         }
         function applyRestoredSession_(p){
             sessionToken=p.sessionToken||'';
@@ -2109,10 +2123,77 @@ function parseBreakTimeClient(v){
         }
         function saveQuickTaskTemplate(){
             ensureQuickTemplatePriorityField();
-            const taskType=document.getElementById('qtCategory')?.value||'',category=document.getElementById('qtName')?.value||'',name=category,frequency=document.getElementById('qtFrequency')?.value||'',priority=document.getElementById('qtPriority')?.value||'Normal';const startDay=Number(document.getElementById('qtStartDay')?.value),endDay=Number(document.getElementById('qtEndDay')?.value),weightage=Number(document.getElementById('qtWeightage')?.value);
-            if(!taskType){alert('Task Type select karein.');return;}if(!category){alert('Task Category select karein.');return;}if(!frequency){alert('Task Frequency select karein.');return;}if(!Number.isInteger(startDay)||startDay<1||startDay>31){alert('From Date mein 1 se 31 tak day digit dein.');return;}if(!Number.isInteger(endDay)||endDay<1||endDay>31||endDay<startDay){alert('To Date mein valid day digit dein.');return;}if(!Number.isFinite(weightage)||weightage<0||weightage>100){alert('Task Weightage 0 se 100% ke beech hona chahiye.');return;}
-            const btn=document.getElementById('qtSaveBtn');btn.disabled=true;btn.innerText='Saving...';const fd=new FormData();fd.append('action','saveCommonTaskTemplate');fd.append('templateId',document.getElementById('qtTemplateId')?.value||'');fd.append('taskName',name);fd.append('taskType',taskType);fd.append('category',category);fd.append('description','');fd.append('priority',priority);fd.append('weightage',String(weightage));fd.append('startDay',String(startDay));fd.append('endDay',String(endDay));fd.append('frequency',frequency);fd.append('active','true');fd.append('worksJson',JSON.stringify([{frequency,category,workName:name,weightage:100}]));fd.append('sessionToken',sessionToken);
-            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(d=>{if(d.status!=='success')throw new Error(d.message||'Template save failed');alert(d.message||'Template saved.');resetQuickTemplateForm();quickTemplateDataCache.loadedAt=0;refreshAssignTemplateData(true,true);}).catch(e=>alert(e.message||'Template save failed.')).finally(()=>{btn.disabled=false;btn.innerText='Save Template';});
+            const taskType=document.getElementById('qtCategory')?.value||'',
+                category=document.getElementById('qtName')?.value||'',
+                name=category,
+                frequency=document.getElementById('qtFrequency')?.value||'',
+                priority=document.getElementById('qtPriority')?.value||'Normal',
+                startDay=Number(document.getElementById('qtStartDay')?.value),
+                endDay=Number(document.getElementById('qtEndDay')?.value),
+                weightage=Number(document.getElementById('qtWeightage')?.value);
+            if(!taskType){alert('Task Type select karein.');return;}
+            if(!category){alert('Task Category select karein.');return;}
+            if(!frequency){alert('Task Frequency select karein.');return;}
+            if(!Number.isInteger(startDay)||startDay<1||startDay>31){alert('From Date mein 1 se 31 tak day digit dein.');return;}
+            if(!Number.isInteger(endDay)||endDay<1||endDay>31||endDay<startDay){alert('To Date mein valid day digit dein.');return;}
+            if(!Number.isFinite(weightage)||weightage<0||weightage>100){alert('Task Weightage 0 se 100% ke beech hona chahiye.');return;}
+
+            const btn=document.getElementById('qtSaveBtn');
+            const templateId=document.getElementById('qtTemplateId')?.value||'';
+            const optimisticId=templateId||('local_'+Date.now());
+            const optimistic={
+                templateId:optimisticId,taskName:name,taskType,category,repeat:frequency,
+                priority,weightage,startDay,endDay,active:true,_optimistic:!templateId
+            };
+            btn.disabled=true;btn.innerText='Saving...';
+
+            // Update UI immediately. The Apps Script write continues in the background,
+            // so the Admin does not wait for the server round-trip to see the template.
+            const list=Array.isArray(assignTemplateCache)?assignTemplateCache.slice():[];
+            const idx=list.findIndex(x=>String(x.templateId)===String(optimisticId));
+            if(idx>=0)list[idx]=Object.assign({},list[idx],optimistic);
+            else list.unshift(optimistic);
+            assignTemplateCache=list;
+            quickTemplateDataCache.templates=list.slice();
+            quickTemplateDataCache.loadedAt=Date.now();
+            renderAssignTemplateSelect_();
+            renderQuickTemplateList();
+            resetQuickTemplateForm();
+            closeQuickTemplateModal();
+            btn.disabled=false;btn.innerText='Save Template';
+
+            const fd=new FormData();
+            fd.append('action','saveCommonTaskTemplate');
+            fd.append('templateId',templateId);
+            fd.append('taskName',name);
+            fd.append('taskType',taskType);
+            fd.append('category',category);
+            fd.append('description','');
+            fd.append('priority',priority);
+            fd.append('weightage',String(weightage));
+            fd.append('startDay',String(startDay));
+            fd.append('endDay',String(endDay));
+            fd.append('frequency',frequency);
+            fd.append('active','true');
+            fd.append('worksJson',JSON.stringify([{frequency,category,workName:name,weightage:100}]));
+            fd.append('sessionToken',sessionToken);
+
+            apiFetchJson_(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(d=>{
+                if(d.status!=='success')throw new Error(d.message||'Template save failed');
+                // Refresh once the backend write is confirmed; the immediate UI above
+                // means the user never waits for this refresh.
+                quickTemplateDataCache.loadedAt=0;
+                setTimeout(()=>refreshAssignTemplateData(true,true),250);
+            }).catch(e=>{
+                // Roll back only the optimistic item when the server rejects a new save.
+                if(!templateId){
+                    assignTemplateCache=(assignTemplateCache||[]).filter(x=>String(x.templateId)!==String(optimisticId));
+                    quickTemplateDataCache.templates=assignTemplateCache.slice();
+                    renderAssignTemplateSelect_();
+                    renderQuickTemplateList();
+                }
+                alert(e.message||'Template save failed.');
+            });
         }
 
         function refreshAssignTemplateData(templatesOnly,forceRefresh){
@@ -3319,6 +3400,8 @@ function parseBreakTimeClient(v){
             if(!items.length){list.innerHTML='<div class="p-5 text-center text-sm text-gray-500">No notifications.</div>';return;}
             items.forEach(n=>{const id=notificationId(n),isRead=readIds.includes(id),row=document.createElement('button');row.type='button';row.className=`w-full text-left px-4 py-3 border-b transition ${isRead?'bg-white opacity-70 hover:bg-gray-50':'bg-[#f0fbf9] hover:bg-[#e7f7f4]'}`;const displayTime=isRead&&readMeta[id]?`Read ${formatNotificationDate(readMeta[id])}`:notificationTime(n);row.innerHTML=`<div class="flex items-start gap-2"><i class="fas fa-bell mt-1 ${isRead?'text-gray-400':'text-[#259b94]'}"></i><div class="min-w-0 flex-1"><div class="font-bold text-sm text-[#112a2e]">${n.title}${isRead?'':' <span class="ml-1 inline-block w-2 h-2 rounded-full bg-red-500 align-middle"></span>'}</div><div class="text-xs text-gray-600 mt-1">${n.text}</div><div class="text-[10px] text-gray-400 mt-1">${displayTime}</div></div></div>`;row.onclick=()=>{markNotificationRead(id);closeNotifications();if(n.action==='approval-center'){openApprovalAttendanceTaskModal();}else if(n.action==='task')openTaskReportModal();else if(n.action==='schedule-form'){openAdvanceScheduleModal();}else if(n.action==='schedule')openAdvanceScheduleApprovalModal();else if(n.action==='attendance-request')openAttendanceRequestsModal();else openOneViewModal();};list.appendChild(row);});
         }
+        const refreshPositionObserver_=new MutationObserver(()=>{if(document.getElementById('dashboard-section')?.style.display==='flex')addRefreshButton_();});
+        refreshPositionObserver_.observe(document.body,{childList:true,subtree:true});
         document.addEventListener('click',function(e){const b=document.getElementById('notificationBtn'),p=document.getElementById('notificationPanel');if(p&&!p.classList.contains('hidden')&&b&&!b.contains(e.target)&&!p.contains(e.target))closeNotifications();});
         setInterval(()=>{try{if(typeof renderNotifications==='function')renderNotifications();if(typeof fetchServerNotifications==='function'&&typeof approvalCenterRoleAllowed==='function'&&approvalCenterRoleAllowed())fetchServerNotifications();const m=document.getElementById('approvalAttendanceTaskModal');if(m&&m.style.display!=='none'&&typeof fetchApprovalCenterData==='function')fetchApprovalCenterData(true);}catch(e){}},3000);
 
@@ -4298,7 +4381,6 @@ function parseBreakTimeClient(v){
         });
         document.addEventListener('visibilitychange',function(){if(!document.hidden)touchLoginActivity_();});
         document.addEventListener('DOMContentLoaded',function(){
-            addRefreshButton_();
             restorePersistedSession_();
             setTimeout(observeAssignedTaskTypeColumn_,500);
             setTimeout(observeAssignedTaskTypeColumn_,1500);
