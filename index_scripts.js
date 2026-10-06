@@ -1065,6 +1065,8 @@ function parseBreakTimeClient(v){
             catSel.id='logTaskCategorySelect';
             catSel.className=taskSel.className||'w-full border rounded-lg p-2';
             catSel.innerHTML='<option value="">-- Select Task Category --</option>';
+            catSel.disabled=true;
+
             const label=document.createElement('label');
             label.htmlFor='logTaskCategorySelect';
             label.textContent='Task Category';
@@ -1072,13 +1074,59 @@ function parseBreakTimeClient(v){
             const wrap=document.createElement('div');
             wrap.id='logTaskCategoryWrap';
             wrap.className='mb-3';
+
             wrap.appendChild(label);
             wrap.appendChild(catSel);
-            taskSel.parentElement?.parentElement?.insertBefore(wrap,taskSel.parentElement);
+
+            // IMPORTANT: Task comes first. Category is shown immediately BELOW
+            // the Select Task field, matching the requested order.
+            const taskWrap=taskSel.parentElement;
+            if(taskWrap && taskWrap.parentElement){
+                taskWrap.insertAdjacentElement('afterend',wrap);
+            }else if(taskSel.parentElement){
+                taskSel.parentElement.appendChild(wrap);
+            }
+
             catSel.addEventListener('change',function(){
-                populateLogTaskDropdown(globalAllTasks,document.getElementById('logWorkDate')?.value||localDateKey(),catSel.value);
+                // Category is a value belonging to the selected task/template.
+                // Keep the task selection intact; do not re-filter the task list.
+                updateLogTaskTemplateMeta();
             });
             return catSel;
+        }
+        function getTaskCategories_(task){
+            const direct=String(task?.category||task?.Category||'').trim();
+            if(direct)return [direct];
+            const workCats=(task?.works||[]).map(w=>String(w.category||w.Category||'').trim()).filter(Boolean);
+            return [...new Set(workCats)];
+        }
+        function setLogTaskCategoryFromSelectedTask_(){
+            const taskSel=document.getElementById('logTaskSelect');
+            const catSel=ensureLogWorkCategorySelector_();
+            if(!taskSel||!catSel)return;
+            const task=(globalAllTasks||[]).find(t=>String(t.rowIndex)===String(taskSel.value));
+            const categories=getTaskCategories_(task);
+            catSel.innerHTML='<option value="">-- Select Task Category --</option>'+
+                categories.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+            if(categories.length){
+                catSel.value=categories[0];
+                catSel.disabled=false;
+            }else{
+                catSel.value='';
+                catSel.disabled=true;
+            }
+        }
+        function populateLogWorkCategories_(tasks){
+            // Category is dependent on the selected Task now.
+            const catSel=ensureLogWorkCategorySelector_();
+            if(!catSel)return;
+            const taskSel=document.getElementById('logTaskSelect');
+            const task=(tasks||[]).find(t=>String(t.rowIndex)===String(taskSel?.value||''));
+            const categories=getTaskCategories_(task);
+            catSel.innerHTML='<option value="">-- Select Task Category --</option>'+
+                categories.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+            catSel.disabled=!categories.length;
+            if(categories.length)catSel.value=categories[0];
         }
         function getTaskCategories_(task){
             return [...new Set([String(task?.category||'').trim(),...(task?.works||[]).map(w=>String(w.category||'').trim())].filter(Boolean))];
@@ -1094,7 +1142,6 @@ function parseBreakTimeClient(v){
         function populateLogTaskDropdown(tasks, dateKey, categoryFilter){
             const select=document.getElementById('logTaskSelect'); if(!select)return;
             const workDate=dateKey||document.getElementById('logWorkDate')?.value||localDateKey();
-            const selectedCategory=String(categoryFilter!==undefined?categoryFilter:(document.getElementById('logTaskCategorySelect')?.value||'')).trim();
             select.innerHTML='<option value="">-- Select Active Task --</option>';
             const loggedForDate=new Set((globalWorkLogs||[]).filter(w=>{
                 const d=String(w.WorkDate||w.workDate||'');
@@ -1106,12 +1153,12 @@ function parseBreakTimeClient(v){
                 const st=String(t.empStatus||'').toLowerCase();
                 const sd=parseReportDate(t.startDate), ed=parseReportDate(t.endDate);
                 const active=!!d&&(!sd||d>=sd)&&(!ed||d<=ed);
-                const categories=getTaskCategories_(t);
-                const categoryOk=!selectedCategory||categories.includes(selectedCategory);
-                if(st!=='completed'&&active&&categoryOk&&!loggedForDate.has(String(t.rowIndex)))select.innerHTML+=`<option value="${t.rowIndex}">${escapeHtml(t.taskName||'Task')}</option>`;
+                if(st!=='completed'&&active&&!loggedForDate.has(String(t.rowIndex))){
+                    select.innerHTML+=`<option value="${t.rowIndex}">${escapeHtml(t.taskName||'Task')}</option>`;
+                }
             });
             if(select.options.length===1)select.innerHTML='<option value="">-- No task available for selected date --</option>';
-            populateLogWorkCategories_(tasks||[]);
+            setLogTaskCategoryFromSelectedTask_();
             updateCompletionCheckboxState(); updateLogTaskTemplateMeta();
         }
 
@@ -2424,7 +2471,11 @@ function parseBreakTimeClient(v){
                 populateLogTaskDropdown(globalAllTasks,e.target.value,c?.value||'');
                 updateLogWorkDateUI();
             }
-            if(e.target?.id==='logTaskSelect'){updateCompletionCheckboxState();updateLogTaskTemplateMeta();}
+            if(e.target?.id==='logTaskSelect'){
+                setLogTaskCategoryFromSelectedTask_();
+                updateCompletionCheckboxState();
+                updateLogTaskTemplateMeta();
+            }
             if(e.target?.id==='requestBeforeCompletion' && e.target.checked){const done=document.getElementById('markTaskCompleted');if(done)done.checked=false;}
             if(e.target?.id==='markTaskCompleted' && e.target.checked){const before=document.getElementById('requestBeforeCompletion');if(before)before.checked=false;}
         });
