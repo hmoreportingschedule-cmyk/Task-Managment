@@ -2010,6 +2010,7 @@ function parseBreakTimeClient(v){
         function openAssignTaskModal() {
             document.getElementById('assignTaskModal').style.display = 'block';
             clearAssignEmployees();
+            clearAssignTemplates();
             const details=document.getElementById('selectedTemplateDetails'); if(details)details.innerHTML='Template select karein. Date, frequency aur weightage template se automatically aayega.';
             refreshAssignTemplateData();
         }
@@ -2233,11 +2234,88 @@ function parseBreakTimeClient(v){
             });
         }
         function renderAssignTemplateSelect_(){
-            const tSel=document.getElementById('assignTemplateSelect');if(!tSel)return;
+            const tSel=document.getElementById('assignTemplateSelect');
+            if(!tSel)return;
+            const parent=tSel.parentElement;
             tSel.innerHTML='<option value="">-- Select Task Template --</option>';
             (assignTemplateCache||[]).filter(x=>x.active!==false).forEach(t=>{
                 tSel.innerHTML+=`<option value="${String(t.templateId).replace(/"/g,'&quot;')}">${escapeHtml(t.taskName||'Task')} — ${escapeHtml(t.taskType||'')} — ${escapeHtml(t.category||'')}</option>`;
             });
+
+            // Multi-template picker: one action can assign any number of selected templates
+            // to the same selected employees (or Select All employees).
+            let box=document.getElementById('assignTemplateMultiBox');
+            if(!box){
+                box=document.createElement('div');
+                box.id='assignTemplateMultiBox';
+                box.className='mt-2 border border-gray-200 rounded-lg bg-white';
+                tSel.insertAdjacentElement('afterend',box);
+            }
+            box.innerHTML=`
+                <div class="flex items-center justify-between gap-2 px-3 py-2 border-b bg-gray-50">
+                    <div class="text-sm font-bold text-[#112a2e]">Select Templates</div>
+                    <div class="flex gap-2">
+                        <button type="button" onclick="selectAllAssignTemplates()" class="px-3 py-1 rounded bg-[#159e99] text-white text-xs font-bold">Select All</button>
+                        <button type="button" onclick="clearAssignTemplates()" class="px-3 py-1 rounded bg-gray-100 text-gray-700 text-xs font-bold">Clear</button>
+                    </div>
+                </div>
+                <div id="assignTemplateCheckboxList" class="max-h-52 overflow-y-auto p-2"></div>
+                <div id="assignTemplateCount" class="px-3 py-2 text-xs text-gray-500">0 templates selected</div>`;
+            const list=document.getElementById('assignTemplateCheckboxList');
+            if(!list)return;
+            const templates=(assignTemplateCache||[]).filter(x=>x.active!==false);
+            if(!templates.length){
+                list.innerHTML='<div class="text-sm text-gray-500 p-2">No active templates found.</div>';
+                updateAssignTemplateCount(); return;
+            }
+            list.innerHTML=templates.map(t=>`
+                <label class="flex items-center gap-3 p-2 rounded hover:bg-[#f0f8f8] cursor-pointer border-b border-gray-100">
+                    <input type="checkbox" class="assign-template-check w-4 h-4"
+                        value="${escapeHtml(t.templateId||'')}" onchange="updateAssignTemplateCount();updateSelectedTemplateDetails()">
+                    <span class="min-w-0">
+                        <b class="text-sm text-[#112a2e]">${escapeHtml(t.taskName||'Task')}</b>
+                        <span class="block text-xs text-gray-500">${escapeHtml(t.taskType||'-')} • ${escapeHtml(t.category||'-')} • ${escapeHtml(t.repeat||'-')} • ${escapeHtml(t.priority||'Normal')}</span>
+                    </span>
+                </label>`).join('');
+            tSel.style.display='none';
+            updateAssignTemplateCount();
+        }
+        function getSelectedAssignTemplates(){
+            return [...document.querySelectorAll('.assign-template-check:checked')].map(x=>x.value).filter(Boolean);
+        }
+        function selectAllAssignTemplates(){
+            document.querySelectorAll('.assign-template-check').forEach(x=>x.checked=true);
+            updateAssignTemplateCount(); updateSelectedTemplateDetails();
+        }
+        function clearAssignTemplates(){
+            document.querySelectorAll('.assign-template-check').forEach(x=>x.checked=false);
+            const s=document.getElementById('assignTemplateSelect');if(s)s.value='';
+            updateAssignTemplateCount(); updateSelectedTemplateDetails();
+        }
+        function updateAssignTemplateCount(){
+            const ids=getSelectedAssignTemplates();
+            const legacy=document.getElementById('assignTemplateSelect');
+            if(legacy)legacy.value=ids[0]||'';
+            const n=ids.length;
+            const el=document.getElementById('assignTemplateCount');
+            if(el)el.textContent=n+' template'+(n===1?'':'s')+' selected';
+        }
+        function updateSelectedTemplateDetails(){
+            const ids=getSelectedAssignTemplates();
+            const details=document.getElementById('selectedTemplateDetails');
+            if(!details)return;
+            if(!ids.length){
+                details.innerHTML='Template select karein. Date, frequency aur weightage template se automatically aayega.';
+                return;
+            }
+            const selected=(assignTemplateCache||[]).filter(t=>ids.includes(String(t.templateId)));
+            details.innerHTML=selected.map(t=>{
+                const now=new Date(),y=now.getFullYear(),m=now.getMonth(),last=new Date(y,m+1,0).getDate();
+                const sd=Math.min(Number(t.startDay)||1,last),ed=Math.min(Number(t.endDay)||sd,last);
+                const start=`${y}-${String(m+1).padStart(2,'0')}-${String(sd).padStart(2,'0')}`;
+                const end=`${y}-${String(m+1).padStart(2,'0')}-${String(ed).padStart(2,'0')}`;
+                return `<div class="mb-2 pb-2 border-b last:border-b-0"><b>${escapeHtml(t.taskName||'Task')}</b> — ${escapeHtml(t.taskType||'-')} / ${escapeHtml(t.category||'-')} • ${escapeHtml(t.repeat||'-')} • ${escapeHtml(t.priority||'Normal')} • ${Number(t.weightage)||0}%<br><span class="text-xs text-gray-500">Date: ${start} to ${end}</span></div>`;
+            }).join('');
         }
 
         function renderAssignEmployees(){
@@ -2259,10 +2337,12 @@ function parseBreakTimeClient(v){
         function updateAssignEmployeeCount(){ const n=getSelectedAssignEmployees().length; const el=document.getElementById('assignEmployeeCount'); if(el)el.textContent=n+' employee'+(n===1?'':'s')+' selected'; }
 
         function applyAssignTemplate(){
-            const id=document.getElementById('assignTemplateSelect').value,t=(assignTemplateCache||[]).find(x=>String(x.templateId)===String(id)),details=document.getElementById('selectedTemplateDetails');
-            if(!t){if(details)details.innerHTML='Template select karein. Date, frequency aur weightage template se automatically aayega.';return;}
-            const now=new Date(),y=now.getFullYear(),m=now.getMonth(),last=new Date(y,m+1,0).getDate(),sd=Math.min(Number(t.startDay)||1,last),ed=Math.min(Number(t.endDay)||sd,last);const start=`${y}-${String(m+1).padStart(2,'0')}-${String(sd).padStart(2,'0')}`,end=`${y}-${String(m+1).padStart(2,'0')}-${String(ed).padStart(2,'0')}`;
-            if(details)details.innerHTML=`<div class="grid grid-cols-2 md:grid-cols-4 gap-2"><div><b>Task Type</b><br>${escapeHtml(t.taskName||'-')}</div><div><b>Category</b><br>${escapeHtml(t.category||'-')}</div><div><b>Frequency</b><br>${escapeHtml(t.repeat||'-')}</div><div><b>Weightage</b><br>${Number(t.weightage)||0}%</div></div><div class="mt-2 font-semibold">Date: ${start} to ${end}</div>`;
+            const ids=getSelectedAssignTemplates();
+            if(!ids.length){
+                const id=document.getElementById('assignTemplateSelect')?.value||'';
+                if(id)ids.push(id);
+            }
+            updateSelectedTemplateDetails();
         }
 
         function closeAssignTaskModal() { document.getElementById('assignTaskModal').style.display = 'none'; }
@@ -2280,13 +2360,59 @@ function parseBreakTimeClient(v){
             return [...document.querySelectorAll('#taskWorksBuilder .task-work-row')].map(r=>({category:r.querySelector('.task-work-category').value.trim(),work:r.querySelector('.task-work-name').value.trim(),weightage:Number(r.querySelector('.task-work-weight').value)||0})).filter(x=>x.category&&x.work);
         }
 
-        function submitNewTask(){
-            const templateId=document.getElementById('assignTemplateSelect')?.value||'',selectedEmployees=getSelectedAssignEmployees();if(!templateId){alert('Pehle Task Template select karein.');return;}if(!selectedEmployees.length){alert('Kam az kam ek employee select karein.');return;}
-            const t=(assignTemplateCache||[]).find(x=>String(x.templateId)===String(templateId));if(!t){alert('Selected Task Template nahi mila.');return;}
-            const now=new Date(),y=now.getFullYear(),m=now.getMonth(),last=new Date(y,m+1,0).getDate(),sd=Math.min(Number(t.startDay)||1,last),ed=Math.min(Number(t.endDay)||sd,last),startDate=`${y}-${String(m+1).padStart(2,'0')}-${String(sd).padStart(2,'0')}`,endDate=`${y}-${String(m+1).padStart(2,'0')}-${String(ed).padStart(2,'0')}`;
-            const btn=document.getElementById('saveTaskBtn');btn.disabled=true;btn.innerText=`Assigning to ${selectedEmployees.length} Employee${selectedEmployees.length===1?'':'s'}...`;
-            const fd=new FormData();fd.append('action','assignTemplateToEmployees');fd.append('templateId',templateId);fd.append('usernamesJson',JSON.stringify(selectedEmployees));fd.append('startDate',startDate);fd.append('endDate',endDate);fd.append('priority',t.priority||'Normal');fd.append('frequency',t.repeat||'One-time');fd.append('weightage',String(Number(t.weightage)||10));fd.append('assignedBy',document.getElementById('displayUser').innerText||'');fd.append('sessionToken',sessionToken);
-            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(d=>{if(d.status!=='success')throw new Error(d.message||'Task assignment failed');alert(d.message||'Task assigned.');clearAssignEmployees();fetchDashboardDataSilently();}).catch(e=>alert(e.message||'Task assignment failed.')).finally(()=>{btn.disabled=false;btn.innerText='Assign Task';});
+        async function submitNewTask(){
+            let selectedTemplateIds=getSelectedAssignTemplates();
+            const legacyId=document.getElementById('assignTemplateSelect')?.value||'';
+            if(!selectedTemplateIds.length && legacyId)selectedTemplateIds=[legacyId];
+            const selectedEmployees=getSelectedAssignEmployees();
+            if(!selectedTemplateIds.length){alert('Kam az kam ek Task Template select karein.');return;}
+            if(!selectedEmployees.length){alert('Kam az kam ek employee select karein.');return;}
+
+            const selectedTemplates=(assignTemplateCache||[]).filter(x=>selectedTemplateIds.includes(String(x.templateId)));
+            if(!selectedTemplates.length){alert('Selected Task Templates nahi mile.');return;}
+
+            const now=new Date(),y=now.getFullYear(),m=now.getMonth(),last=new Date(y,m+1,0).getDate();
+            const btn=document.getElementById('saveTaskBtn');
+            btn.disabled=true;
+            btn.innerText=`Assigning ${selectedTemplates.length} Template${selectedTemplates.length===1?'':'s'}...`;
+
+            try{
+                // One user action: each selected template is assigned to the same selected
+                // employees. Requests run in parallel so multiple templates do not become
+                // a slow serial process.
+                const requests=selectedTemplates.map(t=>{
+                    const sd=Math.min(Number(t.startDay)||1,last);
+                    const ed=Math.min(Number(t.endDay)||sd,last);
+                    const startDate=`${y}-${String(m+1).padStart(2,'0')}-${String(sd).padStart(2,'0')}`;
+                    const endDate=`${y}-${String(m+1).padStart(2,'0')}-${String(ed).padStart(2,'0')}`;
+                    const fd=new FormData();
+                    fd.append('action','assignTemplateToEmployees');
+                    fd.append('templateId',String(t.templateId));
+                    fd.append('usernamesJson',JSON.stringify(selectedEmployees));
+                    fd.append('startDate',startDate);
+                    fd.append('endDate',endDate);
+                    fd.append('priority',t.priority||'Normal');
+                    fd.append('frequency',t.repeat||'One-time');
+                    fd.append('weightage',String(Number(t.weightage)||10));
+                    fd.append('assignedBy',document.getElementById('displayUser')?.innerText||'');
+                    fd.append('sessionToken',sessionToken);
+                    return apiFetchJson_(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(d=>{
+                        if(d.status!=='success')throw new Error((t.taskName||'Template')+': '+(d.message||'Task assignment failed'));
+                        return d;
+                    });
+                });
+                const results=await Promise.all(requests);
+                const assigned=results.reduce((n,d)=>n+Number(d.assigned||d.created||0),0);
+                alert(`${selectedTemplates.length} template${selectedTemplates.length===1?'':'s'} selected employee${selectedEmployees.length===1?'':'s'} ko assign ho gaye.${assigned?`\nAssigned: ${assigned}`:''}`);
+                clearAssignTemplates();
+                clearAssignEmployees();
+                fetchDashboardDataSilently();
+            }catch(e){
+                alert(e.message||'Task assignment failed.');
+            }finally{
+                btn.disabled=false;
+                btn.innerText='Assign Task';
+            }
         }
 
         // ================= EMP LOG DAILY WORK =================
