@@ -2016,7 +2016,7 @@ function parseBreakTimeClient(v){
 
         const QUICK_TEMPLATE_TYPES = {
             'Followup': ['Monthly Report','Event Report','Zimmedaran Details','Weekly Risala','User File','Others'],
-            'File Work': ['Monthly Report','Event Report','Zimmedaran Details','Weekly Risala','User File','Others'],
+            'File Work': ['Monthly Report','Event Report','Zimmedaran Details','Weekly Risala','User File','Master File - Report','Others'],
             'Meeting': ['Online Meeting','Physical Meeting'],
             'Outdoor': ['Qafila','Tarbiyati Ijtima','Others']
         };
