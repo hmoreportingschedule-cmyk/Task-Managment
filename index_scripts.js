@@ -1376,13 +1376,8 @@ function parseBreakTimeClient(v){
 
                     const replacementForToday = getApprovedTaskReplacement(task, new Date());
                     const displayTaskName = replacementForToday || task.taskName;
-                    let taskReplaceHTML = '';
-                    const pendingReplacements = (Array.isArray(task.replaceRequests)?task.replaceRequests:[]).map((r,i)=>({r:r,i:i})).filter(x=>String(x.r.status||'').toLowerCase()==='pending');
-                    if(!isHOD && !isAdmin){
-                        taskReplaceHTML = `<button type="button" onclick="openTaskReplaceModal(window.__taskActionCache[${taskActionKey}])" class="bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 px-3 py-1.5 rounded-lg text-xs font-bold" title="Task Request - Replace"><i class="fas fa-repeat"></i> Replace</button>`;
-                    } else if(isHOD || isAdmin){
-                        if(pendingReplacements.length){ taskReplaceHTML = pendingReplacements.map(x=>`<div class="mb-1"><span class="text-xs font-bold text-orange-700">Replace: ${escapeHtml(x.r.replacementTask)}<br><span class="text-gray-500">${escapeHtml(x.r.date||'')}</span></span><div class="mt-1 flex gap-1"><button type="button" onclick="reviewTaskReplace(${JSON.stringify(task.taskId)},${Number(task.rowIndex)||0},${JSON.stringify(task.assignedTo)},'Approved',${x.i})" class="bg-green-50 text-green-700 border border-green-200 px-2 py-1 rounded text-[11px] font-bold">Approve</button><button type="button" onclick="reviewTaskReplace(${JSON.stringify(task.taskId)},${Number(task.rowIndex)||0},${JSON.stringify(task.assignedTo)},'Rejected',${x.i})" class="bg-red-50 text-red-700 border border-red-200 px-2 py-1 rounded text-[11px] font-bold">Reject</button></div></div>`).join(''); }
-                    }
+                    // Replace option removed from Assigned Tasks UI as requested.
+                    const taskReplaceHTML = '';
                     tr.innerHTML = `
                         <td class="py-4 px-6 font-bold text-[#112a2e]">${escapeHtml(displayTaskName)}${replacementForToday ? '<div class="text-[10px] text-[#0f766e] font-semibold mt-1">Replacement approved</div>' : ''}</td>
                          <td class="py-4 px-6 font-bold text-[#0f766e]">${escapeHtml(task.frequency||'One-time')}</td>
@@ -2109,6 +2104,7 @@ function parseBreakTimeClient(v){
             clearAssignTemplates();
             const details=document.getElementById('selectedTemplateDetails'); if(details)details.innerHTML='Template select karein. Date, frequency aur weightage template se automatically aayega.';
             refreshAssignTemplateData();
+            setTimeout(()=>renderAssignTemplateSelect_(),0);
         }
 
         const QUICK_TEMPLATE_TYPES = {
@@ -2367,6 +2363,13 @@ function parseBreakTimeClient(v){
                         actionHost.style.alignItems='center';
                         actionHost.style.justifyContent='flex-end';
                         actionHost.style.gap='10px';
+
+                        // Keep exactly one Add Template button in the header.
+                        [...modal.querySelectorAll('button')].filter(b=>{
+                            const tx=(b.textContent||'').replace(/\s+/g,' ').trim().toLowerCase();
+                            return tx.includes('add template') && !b.hasAttribute('data-assign-add-template');
+                        }).forEach(b=>b.remove());
+
                         let addBtn=actionHost.querySelector('[data-assign-add-template]');
                         if(!addBtn){
                             addBtn=document.createElement('button');
@@ -2376,6 +2379,18 @@ function parseBreakTimeClient(v){
                             addBtn.textContent='+ Add Template';
                             addBtn.onclick=()=>openQuickTemplateModal();
                             actionHost.appendChild(addBtn);
+                        }
+
+                        // Move the existing bottom Assign Task button into this same
+                        // top-right action area. Do not create a duplicate button.
+                        const assignBtn=document.getElementById('saveTaskBtn');
+                        if(assignBtn){
+                            assignBtn.type='button';
+                            assignBtn.textContent='Assign Task';
+                            assignBtn.className='px-5 py-2 rounded-lg bg-[#159e99] hover:bg-[#11857f] text-white font-bold shadow-sm';
+                            assignBtn.style.margin='0';
+                            assignBtn.onclick=submitNewTask;
+                            actionHost.appendChild(assignBtn);
                         }
                     }
                 }
@@ -2891,27 +2906,55 @@ function parseBreakTimeClient(v){
                 const hs=[...tb.querySelectorAll('thead th')].map(x=>String(x.textContent||'').trim().toLowerCase());
                 return hs.includes('task name') && hs.includes('task frequency') && hs.includes('time spent');
             });
-            if(!table || table.dataset.taskTypeColumnAdded==='1')return;
+            if(!table)return;
+
             const heads=[...table.querySelectorAll('thead th')];
-            const nameIdx=heads.findIndex(h=>String(h.textContent||'').trim().toLowerCase()==='task name');
+            const normalizedHeads=heads.map(h=>String(h.textContent||'').trim().toLowerCase());
+            const nameIdx=normalizedHeads.indexOf('task name');
             if(nameIdx<0)return;
-            const th=document.createElement('th');
-            th.textContent='Task Type';
-            th.className=heads[nameIdx].className||'';
-            heads[nameIdx].parentElement.insertBefore(th,heads[nameIdx]);
+
+            // Header: Task Type must be immediately before Task Name.
+            let typeIdx=normalizedHeads.indexOf('task type');
+            if(typeIdx<0){
+                const th=document.createElement('th');
+                th.textContent='Task Type';
+                th.className=heads[nameIdx].className||'';
+                heads[nameIdx].parentElement.insertBefore(th,heads[nameIdx]);
+                typeIdx=nameIdx;
+            }else if(typeIdx!==nameIdx-1){
+                const th=heads[typeIdx];
+                heads[nameIdx].parentElement.insertBefore(th,heads[nameIdx]);
+                typeIdx=nameIdx-1;
+            }
+
             const rows=[...table.querySelectorAll('tbody tr')];
-            rows.forEach((row,i)=>{
+            rows.forEach(row=>{
                 const cells=[...row.children];
-                if(!cells.length)return;
-                const taskText=String(cells[nameIdx+1]?.textContent||'').trim().split('\n')[0];
-                const assigned=String(cells.find(c=>String(c.textContent||'').trim().toLowerCase().includes('masteradmin'))?.textContent||'').trim();
+                if(!cells.length || cells.length===1)return;
+
+                // After the header has Task Type before Task Name, the expected number
+                // of cells is header count. If the row is short by one, insert Task Type.
+                const headerCount=table.querySelectorAll('thead th').length;
+                const currentNameIdx=[...table.querySelectorAll('thead th')].findIndex(h=>String(h.textContent||'').trim().toLowerCase()==='task name');
+                const expectedNameCell=cells[currentNameIdx];
+
+                if(cells.length===headerCount)return;
+
+                // Legacy row has no Task Type. Read its Task Name from the cell that
+                // currently occupies the Task Name position before inserting.
+                const taskText=String(expectedNameCell?.textContent||'').trim().split('\n')[0];
                 let task=(globalAllTasks||[]).find(t=>String(t.taskName||'').trim()===taskText);
+                if(!task){
+                    const key=taskText.toLowerCase();
+                    task=(globalAllTasks||[]).find(t=>String(t.taskName||'').trim().toLowerCase()===key);
+                }
                 const type=task ? (task.taskType||task.templateTaskType||task.type||'-') : '-';
                 const td=document.createElement('td');
-                td.className=cells[nameIdx+1]?.className||'';
+                td.className=expectedNameCell?.className||'';
                 td.textContent=type;
-                row.insertBefore(td,cells[nameIdx+1]||null);
+                row.insertBefore(td,expectedNameCell||null);
             });
+
             table.dataset.taskTypeColumnAdded='1';
         }
         function observeAssignedTaskTypeColumn_(){
