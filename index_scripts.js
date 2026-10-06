@@ -3360,10 +3360,10 @@ function parseBreakTimeClient(v){
                 const kind=rt.toLowerCase().includes('leave')?'leave':rt.toLowerCase().includes('weekoff')||rt.toLowerCase().includes('adjust')?'adjustment':'adjustment';
                 out.push({key:'schedule|'+r.rowIndex,type:kind,typeLabel:kind==='leave'?'Leave':'Adjustment',employee:r.employee||'',employeeId:r.employeeId||'',task:rt||'Schedule Request',date:r.requestDate||'',details:r.details||r.location||'-',status:status,rowIndex:r.rowIndex,action:'schedule'});
             });
-            (globalPendingWorkLogs||[]).forEach(w=>{
-                const meta=attendanceMetaForUser(w.employee||'')||{};
-                out.push({key:w.key||('worklog|'+(w.employee||'')+'|'+(w.rowIndex||'')),type:'worklog',typeLabel:'Daily Work',employee:w.employee||'',employeeId:w.employeeId||meta.employeeId||'',task:w.task||'Daily Work',date:w.date||'',details:`Daily Work • ${Number(w.minutes)||0} minute(s) • ${w.description||'No description'}${w.submittedAt?' • Submitted: '+w.submittedAt:''}`,status:w.status||'Pending',rowIndex:w.rowIndex,action:'workLogApproval',targetUser:w.employee||'',taskRowIndex:w.taskRowIndex||''});
-            });
+            // Daily Work logs do NOT require HOD/Admin approval.
+            // Their minutes are accumulated directly into the task time spent.
+            // Keep globalPendingWorkLogs available for reports/follow-up, but never
+            // create approval-center items from them.
             (globalAllTasks||[]).forEach(t=>{
                 const empStatus=String(t.empStatus||'').toLowerCase(), hodStatus=String(t.hodStatus||'').toLowerCase();
                 const meta=attendanceMetaForUser(t.assignedTo||t.employee||'')||{};
@@ -3396,6 +3396,8 @@ function parseBreakTimeClient(v){
                 globalTeamMembers=Array.isArray(d.teamMembers)?d.teamMembers:globalTeamMembers;
                 globalTeamMemberMeta=Array.isArray(d.teamMemberMeta)?d.teamMemberMeta:globalTeamMemberMeta;
                 globalPendingWorkLogs=Array.isArray(d.pendingWorkLogs)?d.pendingWorkLogs:[];
+                // Legacy backend may still return pendingWorkLogs. They are intentionally
+                // not approval items in V38; attendance and task completion remain.
                 approvalCenterItems=buildApprovalCenterItems();
                 if(forceRender)renderApprovalAttendanceTaskCenter();
             }).catch(()=>{}).finally(()=>{approvalCenterSyncInProgress=false;});
@@ -3546,6 +3548,9 @@ function parseBreakTimeClient(v){
             const role=(document.getElementById('displayRole')?.innerText||'').toLowerCase(),items=[],tasks=globalAllTasks||[],atts=globalTeamAttendance||[],sched=globalAdvanceScheduleRequests||[],attReqs=globalAttendanceRequests||[],delayReports=window.globalDelayReports||[];
             (window.serverNotifications||[]).forEach(n=>{
                 const title=String(n.title||''), action=String(n.action||'');
+                // Daily Work minutes are auto-recorded; only Attendance and
+                // Before/Complete Task actions require approval.
+                if(/daily work.*approval|approval.*daily work/i.test(title+' '+String(n.text||''))) return;
                 const approvalTitle=/approval required|today urgent task request/i.test(title);
                 const employeeSchedule=/advance schedule request/i.test(title) && !approvalTitle;
                 items.push({type:'server',key:n.id,title:n.title,text:n.text,action:(action==='approval-center'||approvalTitle)?'approval-center':(employeeSchedule?'schedule-form':action),date:n.timestamp,priority:n.priority});
