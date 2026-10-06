@@ -337,7 +337,8 @@ function parseBreakTimeClient(v){
                 }
                 showLoginStatus('Login successful. Dashboard load ho raha hai…','info');
                 document.getElementById('login-section').style.display='none'; document.getElementById('dashboard-section').style.display='flex';
-                sessionToken=data.sessionToken||""; whatsappGroupLink=data.whatsappGroupLink||""; performanceWeights=data.performanceWeights||{attendance:50,task:50}; ramadanLunchFrozen=!!data.ramadanLunchFrozen; attendanceEntryStart=data.attendanceEntryStart||""; attendanceEntryEnd=data.attendanceEntryEnd||"";
+                sessionToken=data.sessionToken||""; whatsappGroupLink=data.whatsappGroupLink||"";
+                persistLoginSession_(data,user); startInactivitySessionTimer_(); performanceWeights=data.performanceWeights||{attendance:50,task:50}; ramadanLunchFrozen=!!data.ramadanLunchFrozen; attendanceEntryStart=data.attendanceEntryStart||""; attendanceEntryEnd=data.attendanceEntryEnd||"";
                 setDateConstraints(); document.getElementById('displayUser').innerText=data.actualName||data.username; window.currentUserContactNumber=data.contactNumber||''; window.currentUserWhatsappNumber=data.whatsappNumber||''; window.currentUserEmployeeId=data.employeeId||'';
                 document.getElementById('displayDept').innerText=data.department||'--'; document.getElementById('displayOfficeTime').innerText=data.officeTime||'--'; window.currentUserWeekoff=data.weekoff||'Sunday'; document.getElementById('displayWeekoff').innerText=data.weekoff||'Sunday';
                 document.getElementById('displayOfficeLocation').innerText=[data.officeLocation,data.officeAddress].filter(Boolean).join(' : ')||'--'; setDisplayedProfilePhoto(data.profilePhotoUrl||'');
@@ -373,7 +374,178 @@ function parseBreakTimeClient(v){
             .finally(()=>clearTimeout(timeoutId));
         }
 
-        function logout() { location.reload(); }
+        const LOGIN_SESSION_STORAGE_KEY_ = 'office_task_login_session_v1';
+        const LOGIN_IDLE_LIMIT_MS_ = 3 * 60 * 1000;
+        const LOGIN_ACTIVITY_WRITE_MS_ = 15000;
+        let loginIdleTimer_ = null;
+        let lastLoginActivityWrite_ = 0;
+
+        function persistLoginSession_(data, fallbackUsername){
+            try{
+                const payload={
+                    sessionToken:String(data.sessionToken||''),
+                    username:String(data.username||fallbackUsername||''),
+                    actualName:String(data.actualName||data.username||fallbackUsername||''),
+                    role:String(data.role||''),
+                    department:String(data.department||''),
+                    contactNumber:String(data.contactNumber||''),
+                    whatsappNumber:String(data.whatsappNumber||''),
+                    employeeId:String(data.employeeId||''),
+                    officeTime:String(data.officeTime||''),
+                    weekoff:String(data.weekoff||'Sunday'),
+                    officeLocation:String(data.officeLocation||''),
+                    officeAddress:String(data.officeAddress||''),
+                    profilePhotoUrl:String(data.profilePhotoUrl||''),
+                    performanceWeights:data.performanceWeights||{attendance:50,task:50},
+                    ramadanLunchFrozen:!!data.ramadanLunchFrozen,
+                    attendanceEntryStart:String(data.attendanceEntryStart||''),
+                    attendanceEntryEnd:String(data.attendanceEntryEnd||''),
+                    whatsappGroupLink:String(data.whatsappGroupLink||''),
+                    lastActivityAt:Date.now()
+                };
+                localStorage.setItem(LOGIN_SESSION_STORAGE_KEY_,JSON.stringify(payload));
+                lastLoginActivityWrite_=Date.now();
+            }catch(e){}
+        }
+        function getPersistedLoginSession_(){
+            try{
+                const raw=localStorage.getItem(LOGIN_SESSION_STORAGE_KEY_);
+                if(!raw)return null;
+                const p=JSON.parse(raw);
+                if(!p||!p.sessionToken||!p.username)return null;
+                if(Date.now()-Number(p.lastActivityAt||0)>=LOGIN_IDLE_LIMIT_MS_){
+                    clearPersistedLoginSession_();
+                    return null;
+                }
+                return p;
+            }catch(e){return null;}
+        }
+        function touchLoginActivity_(){
+            if(!sessionToken)return;
+            const now=Date.now();
+            if(now-lastLoginActivityWrite_<LOGIN_ACTIVITY_WRITE_MS_)return;
+            lastLoginActivityWrite_=now;
+            try{
+                const raw=localStorage.getItem(LOGIN_SESSION_STORAGE_KEY_);
+                const p=raw?JSON.parse(raw):null;
+                if(p&&p.sessionToken===sessionToken){
+                    p.lastActivityAt=now;
+                    localStorage.setItem(LOGIN_SESSION_STORAGE_KEY_,JSON.stringify(p));
+                }
+            }catch(e){}
+        }
+        function clearPersistedLoginSession_(){
+            try{localStorage.removeItem(LOGIN_SESSION_STORAGE_KEY_);}catch(e){}
+        }
+        function stopInactivitySessionTimer_(){
+            if(loginIdleTimer_){clearInterval(loginIdleTimer_);loginIdleTimer_=null;}
+        }
+        function expireInactiveSession_(){
+            clearPersistedLoginSession_();
+            stopInactivitySessionTimer_();
+            sessionToken='';
+            try{localStorage.removeItem('office_task_dashboard_cache_v2_'+String(document.getElementById('displayUser')?.innerText||'').trim().toLowerCase());}catch(e){}
+            alert('3 minutes se koi activity nahi hui. Security ke liye session expire ho gaya hai. Please dobara Login karein.');
+            location.reload();
+        }
+        function startInactivitySessionTimer_(){
+            stopInactivitySessionTimer_();
+            if(!sessionToken)return;
+            loginIdleTimer_=setInterval(()=>{
+                try{
+                    const raw=localStorage.getItem(LOGIN_SESSION_STORAGE_KEY_);
+                    const p=raw?JSON.parse(raw):null;
+                    if(!p||p.sessionToken!==sessionToken||Date.now()-Number(p.lastActivityAt||0)>=LOGIN_IDLE_LIMIT_MS_){
+                        expireInactiveSession_();
+                    }
+                }catch(e){}
+            },10000);
+        }
+        function addRefreshButton_(){
+            if(document.getElementById('appRefreshButton'))return;
+            const btn=document.createElement('button');
+            btn.id='appRefreshButton';
+            btn.type='button';
+            btn.innerHTML='<i class="fas fa-sync-alt"></i><span> Refresh</span>';
+            btn.title='Latest version/data load karein';
+            btn.style.cssText='position:fixed;top:14px;right:18px;z-index:9998;border:0;border-radius:8px;padding:9px 13px;background:#0f766e;color:#fff;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.18);cursor:pointer;';
+            btn.addEventListener('click',function(){
+                touchLoginActivity_();
+                btn.disabled=true;
+                btn.innerHTML='<i class="fas fa-sync-alt fa-spin"></i><span> Refreshing...</span>';
+                setTimeout(()=>location.reload(),120);
+            });
+            document.body.appendChild(btn);
+        }
+        function applyRestoredSession_(p){
+            sessionToken=p.sessionToken||'';
+            whatsappGroupLink=p.whatsappGroupLink||'';
+            performanceWeights=p.performanceWeights||{attendance:50,task:50};
+            ramadanLunchFrozen=!!p.ramadanLunchFrozen;
+            attendanceEntryStart=p.attendanceEntryStart||'';
+            attendanceEntryEnd=p.attendanceEntryEnd||'';
+            document.getElementById('login-section').style.display='none';
+            document.getElementById('dashboard-section').style.display='flex';
+            document.getElementById('displayUser').innerText=p.actualName||p.username;
+            document.getElementById('displayDept').innerText=p.department||'--';
+            document.getElementById('displayOfficeTime').innerText=p.officeTime||'--';
+            document.getElementById('displayWeekoff').innerText=p.weekoff||'Sunday';
+            document.getElementById('displayOfficeLocation').innerText=[p.officeLocation,p.officeAddress].filter(Boolean).join(' : ')||'--';
+            document.getElementById('displayRole').innerText=String(p.role||'').toLowerCase();
+            window.currentUserContactNumber=p.contactNumber||'';
+            window.currentUserWhatsappNumber=p.whatsappNumber||'';
+            window.currentUserEmployeeId=p.employeeId||'';
+            window.currentUserWeekoff=p.weekoff||'Sunday';
+            setDisplayedProfilePhoto(p.profilePhotoUrl||'');
+            const role=String(p.role||'').toLowerCase();
+            document.body.classList.remove('employee-mode','manager-mode','admin-mode');
+            if(isFullAdminRole(role)){
+                document.body.classList.add('admin-mode');
+                document.querySelectorAll('.admin-only').forEach(el=>el.style.setProperty('display','flex','important'));
+                document.querySelectorAll('.hod-only').forEach(el=>el.style.setProperty('display','flex','important'));
+                const h=document.getElementById('taskActionHeader');if(h)h.style.display='table-cell';
+                document.getElementById('hodNoticeBox').style.display='block';
+                document.getElementById('teamAttendanceSection').style.display='block';
+                document.getElementById('taskTableTitle').innerText='System Overview';
+                document.querySelectorAll('.hod-only-col').forEach(el=>el.classList.remove('hidden'));
+                document.querySelectorAll('.emp-only').forEach(el=>el.style.setProperty('display','none','important'));
+            }else if(isTaskAssistantRole(role)||role.indexOf('hod')>-1){
+                document.body.classList.add('manager-mode');
+                document.querySelectorAll('.hod-only').forEach(el=>el.style.setProperty('display','flex','important'));
+                document.querySelectorAll('.admin-only').forEach(el=>el.style.setProperty('display','none','important'));
+                const h=document.getElementById('taskActionHeader');if(h)h.style.display='none';
+                document.getElementById('hodNoticeBox').style.display='block';
+                document.getElementById('teamAttendanceSection').style.display='block';
+                document.getElementById('taskTableTitle').innerText=role.indexOf('hod')>-1?'Department Tasks Overview':'System Overview';
+                document.querySelectorAll('.hod-only-col').forEach(el=>el.classList.remove('hidden'));
+                document.querySelectorAll('.emp-only').forEach(el=>el.style.setProperty('display','none','important'));
+                document.querySelectorAll('.admin-only').forEach(el=>el.style.setProperty('display','none','important'));
+            }else{
+                document.body.classList.add('employee-mode');
+                document.querySelectorAll('.hod-only').forEach(el=>el.style.setProperty('display','none','important'));
+                document.querySelectorAll('.admin-only').forEach(el=>el.style.setProperty('display','none','important'));
+                document.querySelectorAll('.emp-only').forEach(el=>el.style.setProperty('display','block','important'));
+                document.getElementById('empTimeTracker').style.display='flex';
+            }
+            v4CurrentWeekoff=p.weekoff||'Sunday';
+            ensureAttendanceLockAdminUI();
+            addRefreshButton_();
+            startInactivitySessionTimer_();
+            requestAnimationFrame(()=>fetchDashboardData(p.username||'',role,p.department||''));
+            setTimeout(v4UpdateAttendanceAvailability,100);
+        }
+        function restorePersistedSession_(){
+            const p=getPersistedLoginSession_();
+            if(!p)return;
+            applyRestoredSession_(p);
+        }
+
+        function logout() {
+            clearPersistedLoginSession_();
+            stopInactivitySessionTimer_();
+            sessionToken='';
+            location.reload();
+        }
 
 
         // V4: display non-working day before a network request; server also validates.
@@ -4121,7 +4293,13 @@ function parseBreakTimeClient(v){
 
 
 
+        ['pointerdown','keydown','touchstart','scroll'].forEach(ev=>{
+            document.addEventListener(ev,function(){touchLoginActivity_();},{passive:true});
+        });
+        document.addEventListener('visibilitychange',function(){if(!document.hidden)touchLoginActivity_();});
         document.addEventListener('DOMContentLoaded',function(){
+            addRefreshButton_();
+            restorePersistedSession_();
             setTimeout(observeAssignedTaskTypeColumn_,500);
             setTimeout(observeAssignedTaskTypeColumn_,1500);
         });
