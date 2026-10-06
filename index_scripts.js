@@ -2333,6 +2333,11 @@ function parseBreakTimeClient(v){
             const tSel=document.getElementById('assignTemplateSelect');
             if(!tSel)return;
             const parent=tSel.parentElement;
+            if(parent){
+                parent.style.width='100%';
+                parent.style.maxWidth='100%';
+                parent.style.flex='1 1 100%';
+            }
             tSel.innerHTML='<option value="">-- Select Task Template --</option>';
             (assignTemplateCache||[]).filter(x=>x.active!==false).forEach(t=>{
                 tSel.innerHTML+=`<option value="${String(t.templateId).replace(/"/g,'&quot;')}">${escapeHtml(t.taskName||'Task')} — ${escapeHtml(t.taskType||'')} — ${escapeHtml(t.category||'')}</option>`;
@@ -2345,10 +2350,39 @@ function parseBreakTimeClient(v){
                 box=document.createElement('div');
                 box.id='assignTemplateMultiBox';
                 box.className='mt-2 border border-gray-200 rounded-lg bg-white';
+            box.style.width='100%';
+            box.style.maxWidth='100%';
+            box.style.boxSizing='border-box';
                 tSel.insertAdjacentElement('afterend',box);
             }
+            // Put the template actions in the top-right area of the Assign New Task
+            // modal. The existing Refresh button is retained; Add Template sits beside it.
+            const modal=document.getElementById('assignTaskModal');
+            if(modal){
+                const refreshBtn=[...modal.querySelectorAll('button')].find(b=>/refresh/i.test((b.textContent||'').trim()));
+                if(refreshBtn){
+                    const actionHost=refreshBtn.parentElement;
+                    if(actionHost){
+                        actionHost.style.display='flex';
+                        actionHost.style.alignItems='center';
+                        actionHost.style.justifyContent='flex-end';
+                        actionHost.style.gap='10px';
+                        let addBtn=actionHost.querySelector('[data-assign-add-template]');
+                        if(!addBtn){
+                            addBtn=document.createElement('button');
+                            addBtn.type='button';
+                            addBtn.setAttribute('data-assign-add-template','1');
+                            addBtn.className='px-4 py-2 rounded-lg bg-[#7c3aed] text-white font-bold';
+                            addBtn.textContent='+ Add Template';
+                            addBtn.onclick=()=>openQuickTemplateModal();
+                            actionHost.appendChild(addBtn);
+                        }
+                    }
+                }
+            }
+
             box.innerHTML=`
-                <div class="flex items-center justify-between gap-2 px-3 py-2 border-b bg-gray-50">
+                <div class="flex items-center justify-between gap-2 px-3 py-2 border-b bg-gray-50 w-full">
                     <div class="text-sm font-bold text-[#112a2e]">Select Templates</div>
                     <div class="flex gap-2">
                         <button type="button" onclick="selectAllAssignTemplates()" class="px-3 py-1 rounded bg-[#159e99] text-white text-xs font-bold">Select All</button>
