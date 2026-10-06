@@ -1057,10 +1057,40 @@ function parseBreakTimeClient(v){
         }
 
 
+        function ensureLogTaskTypeSelector_(){
+            const taskSel=document.getElementById('logTaskSelect'); if(!taskSel)return null;
+            let typeSel=document.getElementById('logTaskTypeSelect');
+            if(typeSel)return typeSel;
+            typeSel=document.createElement('select');
+            typeSel.id='logTaskTypeSelect';
+            typeSel.className=taskSel.className||'w-full border rounded-lg p-2';
+            typeSel.disabled=true;
+            typeSel.innerHTML='<option value="">-- Task Type --</option>';
+
+            const label=document.createElement('label');
+            label.htmlFor='logTaskTypeSelect';
+            label.textContent='Task Type';
+            label.className='block text-sm font-semibold mb-1';
+
+            const wrap=document.createElement('div');
+            wrap.id='logTaskTypeWrap';
+            wrap.className='mb-3';
+            wrap.appendChild(label);
+            wrap.appendChild(typeSel);
+
+            const taskWrap=taskSel.parentElement;
+            if(taskWrap && taskWrap.parentElement) taskWrap.insertAdjacentElement('afterend',wrap);
+            else if(taskSel.parentElement) taskSel.parentElement.appendChild(wrap);
+            return typeSel;
+        }
+
         function ensureLogWorkCategorySelector_(){
             const taskSel=document.getElementById('logTaskSelect'); if(!taskSel)return null;
+            const typeSel=ensureLogTaskTypeSelector_();
+
             let catSel=document.getElementById('logTaskCategorySelect');
             if(catSel)return catSel;
+
             catSel=document.createElement('select');
             catSel.id='logTaskCategorySelect';
             catSel.className=taskSel.className||'w-full border rounded-lg p-2';
@@ -1071,102 +1101,91 @@ function parseBreakTimeClient(v){
             label.htmlFor='logTaskCategorySelect';
             label.textContent='Task Category';
             label.className='block text-sm font-semibold mb-1';
+
             const wrap=document.createElement('div');
             wrap.id='logTaskCategoryWrap';
             wrap.className='mb-3';
-
             wrap.appendChild(label);
             wrap.appendChild(catSel);
 
-            // IMPORTANT: Task comes first. Category is shown immediately BELOW
-            // the Select Task field, matching the requested order.
-            const taskWrap=taskSel.parentElement;
-            if(taskWrap && taskWrap.parentElement){
-                taskWrap.insertAdjacentElement('afterend',wrap);
-            }else if(taskSel.parentElement){
-                taskSel.parentElement.appendChild(wrap);
-            }
+            // Task Type first, then Task Category.
+            const typeWrap=document.getElementById('logTaskTypeWrap');
+            if(typeWrap && typeWrap.parentElement) typeWrap.insertAdjacentElement('afterend',wrap);
+            else if(typeSel?.parentElement) typeSel.parentElement.appendChild(wrap);
+            else if(taskSel.parentElement) taskSel.parentElement.appendChild(wrap);
 
             catSel.addEventListener('change',function(){
-                // Category is a value belonging to the selected task/template.
-                // Keep the task selection intact; do not re-filter the task list.
+                // Selecting a category must never reset/unselect the selected task.
                 updateLogTaskTemplateMeta();
             });
             return catSel;
         }
+
         function findSourceTemplateForTask_(task){
             if(!task)return null;
             const tid=String(task.templateId||task.TemplateId||task.taskTemplateId||task.templateID||'').trim();
             const name=String(task.taskName||task.TaskName||task.name||'').trim().toLowerCase();
-            const pools=[...(Array.isArray(assignTemplateCache)?assignTemplateCache:[]),
-                         ...(Array.isArray(quickTemplateDataCache?.templates)?quickTemplateDataCache.templates:[])];
-            return pools.find(t=>tid && String(t.templateId||t.TemplateId||'')===tid) ||
-                   pools.find(t=>name && String(t.taskName||t.TaskName||t.name||'').trim().toLowerCase()===name) || null;
+            const pools=[
+                ...(Array.isArray(assignTemplateCache)?assignTemplateCache:[]),
+                ...(Array.isArray(quickTemplateDataCache?.templates)?quickTemplateDataCache.templates:[])
+            ];
+            return pools.find(t=>tid && String(t.templateId||t.TemplateId||'').trim()===tid) ||
+                   pools.find(t=>name && String(t.taskName||t.TaskName||t.name||'').trim().toLowerCase()===name) ||
+                   null;
         }
+
+        function getTaskType_(task){
+            const direct=[task?.taskType,task?.TaskType,task?.templateTaskType,task?.type]
+                .map(v=>String(v||'').trim()).find(Boolean);
+            if(direct)return direct;
+            const tpl=findSourceTemplateForTask_(task);
+            return String(tpl?.taskType||tpl?.TaskType||tpl?.templateTaskType||tpl?.type||'').trim();
+        }
+
         function getTaskCategories_(task){
+            // Category must follow the selected task/template rule.
             const direct=[task?.category,task?.Category,task?.taskCategory,task?.TaskCategory]
                 .map(v=>String(v||'').trim()).filter(Boolean);
-            const workCats=(Array.isArray(task?.works)?task.works:[]).map(w=>String(w?.category||w?.Category||'').trim()).filter(Boolean);
             const tpl=findSourceTemplateForTask_(task);
-            const templateCats=[tpl?.category,tpl?.taskCategory,tpl?.Category]
+            const templateCats=[tpl?.category,tpl?.Category,tpl?.taskCategory,tpl?.TaskCategory]
                 .map(v=>String(v||'').trim()).filter(Boolean);
-            const all=[...direct,...workCats,...templateCats];
+
+            // Prefer the template rule. Fall back to assigned-task data for older records.
+            const all=templateCats.length ? templateCats : direct;
             return [...new Set(all)];
         }
-        function setLogTaskCategoryFromSelectedTask_(){
+
+        function setLogTaskMetaFromSelectedTask_(){
             const taskSel=document.getElementById('logTaskSelect');
+            const typeSel=ensureLogTaskTypeSelector_();
             const catSel=ensureLogWorkCategorySelector_();
-            if(!taskSel||!catSel)return;
-            const task=(globalAllTasks||[]).find(t=>String(t.rowIndex)===String(taskSel.value));
+            if(!taskSel||!typeSel||!catSel)return;
+
+            const selectedTaskValue=String(taskSel.value||'');
+            const task=(globalAllTasks||[]).find(t=>String(t.rowIndex)===selectedTaskValue);
+            const taskType=getTaskType_(task);
             const categories=getTaskCategories_(task);
+
+            // Keep the selected Task untouched. Only update dependent fields.
+            typeSel.innerHTML=taskType
+                ? `<option value="${escapeHtml(taskType)}">${escapeHtml(taskType)}</option>`
+                : '<option value="">-- Task Type --</option>';
+            typeSel.value=taskType||'';
+            typeSel.disabled=true;
+
+            const previousCategory=String(catSel.value||'');
             catSel.innerHTML='<option value="">-- Select Task Category --</option>'+
                 categories.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+            catSel.disabled=!categories.length;
             if(categories.length){
-                catSel.value=categories[0];
-                catSel.disabled=false;
+                catSel.value=categories.includes(previousCategory) ? previousCategory : categories[0];
             }else{
                 catSel.value='';
-                catSel.disabled=true;
             }
         }
+
         function populateLogWorkCategories_(tasks){
-            const catSel=ensureLogWorkCategorySelector_(); if(!catSel)return;
-            const taskSel=document.getElementById('logTaskSelect');
-            const task=(tasks||[]).find(t=>String(t.rowIndex)===String(taskSel?.value||''));
-            const cats=getTaskCategories_(task);
-            catSel.innerHTML='<option value="">-- Select Task Category --</option>'+
-                cats.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
-            catSel.disabled=!cats.length;
-            if(cats.length)catSel.value=cats[0];
-        }
-        function findSourceTemplateForTask_(task){
-            if(!task)return null;
-            const tid=String(task.templateId||task.TemplateId||task.taskTemplateId||task.templateID||'').trim();
-            const name=String(task.taskName||task.TaskName||task.name||'').trim().toLowerCase();
-            const pools=[...(Array.isArray(assignTemplateCache)?assignTemplateCache:[]),
-                         ...(Array.isArray(quickTemplateDataCache?.templates)?quickTemplateDataCache.templates:[])];
-            return pools.find(t=>tid && String(t.templateId||t.TemplateId||'')===tid) ||
-                   pools.find(t=>name && String(t.taskName||t.TaskName||t.name||'').trim().toLowerCase()===name) || null;
-        }
-        function getTaskCategories_(task){
-            const direct=[task?.category,task?.Category,task?.taskCategory,task?.TaskCategory]
-                .map(v=>String(v||'').trim()).filter(Boolean);
-            const workCats=(Array.isArray(task?.works)?task.works:[]).map(w=>String(w?.category||w?.Category||'').trim()).filter(Boolean);
-            const tpl=findSourceTemplateForTask_(task);
-            const templateCats=[tpl?.category,tpl?.taskCategory,tpl?.Category]
-                .map(v=>String(v||'').trim()).filter(Boolean);
-            const all=[...direct,...workCats,...templateCats];
-            return [...new Set(all)];
-        }
-        function populateLogWorkCategories_(tasks){
-            const catSel=ensureLogWorkCategorySelector_(); if(!catSel)return;
-            const taskSel=document.getElementById('logTaskSelect');
-            const task=(tasks||[]).find(t=>String(t.rowIndex)===String(taskSel?.value||''));
-            const cats=getTaskCategories_(task);
-            catSel.innerHTML='<option value="">-- Select Task Category --</option>'+
-                cats.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
-            catSel.disabled=!cats.length;
-            if(cats.length)catSel.value=cats[0];
+            setLogTaskMetaFromSelectedTask_();
         }
 
         function populateLogTaskDropdown(tasks, dateKey, categoryFilter){
@@ -1188,7 +1207,7 @@ function parseBreakTimeClient(v){
                 }
             });
             if(select.options.length===1)select.innerHTML='<option value="">-- No task available for selected date --</option>';
-            setLogTaskCategoryFromSelectedTask_();
+            setLogTaskMetaFromSelectedTask_();
             updateCompletionCheckboxState(); updateLogTaskTemplateMeta();
         }
 
@@ -2505,7 +2524,9 @@ function parseBreakTimeClient(v){
                 updateLogWorkDateUI();
             }
             if(e.target?.id==='logTaskSelect'){
-                setLogTaskCategoryFromSelectedTask_();
+                // Selecting a task populates Task Type + Task Category without
+                // rebuilding/resetting the Task dropdown.
+                setLogTaskMetaFromSelectedTask_();
                 updateCompletionCheckboxState();
                 updateLogTaskTemplateMeta();
             }
@@ -2602,8 +2623,9 @@ function parseBreakTimeClient(v){
             if(!allowed){ alert('Log Daily Work 01-Oct-2026 se aaj tak available hai. Future date allowed nahi hai. Admin Lock/Unlock rules apply honge.'); if(btn)btn.disabled=true; return; }
             if(btn)btn.disabled=false;
             modal.style.display='block';
+            ensureLogTaskTypeSelector_();
             ensureLogWorkCategorySelector_();
-            ensureWorkLogsLoaded(true).catch(()=>{}).finally(()=>{populateLogWorkCategories_(globalAllTasks);populateLogTaskDropdown(globalAllTasks,dateKey);updateCompletionCheckboxState();});
+            ensureWorkLogsLoaded(true).catch(()=>{}).finally(()=>{populateLogTaskDropdown(globalAllTasks,dateKey);setLogTaskMetaFromSelectedTask_();updateCompletionCheckboxState();});
             if(document.getElementById('delayReason'))document.getElementById('delayReason').value='';
             const before=document.getElementById('requestBeforeCompletion'); if(before)before.checked=false;
             const done=document.getElementById('markTaskCompleted'); if(done)done.checked=false;
