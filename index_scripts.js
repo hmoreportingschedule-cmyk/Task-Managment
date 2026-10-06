@@ -1378,11 +1378,13 @@ function parseBreakTimeClient(v){
                     const displayTaskName = replacementForToday || task.taskName;
                     // Replace option removed from Assigned Tasks UI as requested.
                     const taskReplaceHTML = '';
+                    const displayTaskType = task.taskType || task.templateTaskType || task.type || '-';
                     tr.innerHTML = `
+                        <td class="py-4 px-6 font-bold text-[#112a2e]">${escapeHtml(displayTaskType)}</td>
                         <td class="py-4 px-6 font-bold text-[#112a2e]">${escapeHtml(displayTaskName)}${replacementForToday ? '<div class="text-[10px] text-[#0f766e] font-semibold mt-1">Replacement approved</div>' : ''}</td>
                          <td class="py-4 px-6 font-bold text-[#0f766e]">${escapeHtml(task.frequency||'One-time')}</td>
-                         ${isHOD ? `<td class="py-4 px-6 text-[#259b94] font-bold">${task.assignedTo}</td>` : ''}
-                         <td class="py-4 px-6 text-[#4b6d70] font-semibold">${task.assignedBy || '-'}</td>
+                         <td class="py-4 px-6 text-[#259b94] font-bold ${isHOD ? '' : 'hidden'}">${isHOD ? escapeHtml(task.assignedTo || '-') : ''}</td>
+                         <td class="py-4 px-6 text-[#4b6d70] font-semibold">${escapeHtml(task.assignedBy || '-')}</td>
                          <td class="py-4 px-6 font-bold text-[#2a4d53]">${isHOD ? `<input type="number" min="0" max="85" value="${Number(task.weightage)||0}" onchange="updateTaskWeightage(${task.rowIndex}, this.value, ${JSON.stringify(task.assignedTo)})" class="w-20 border border-[#b2d8d8] rounded-md px-2 py-1 text-sm font-bold" title="Task weightage (%)">` : `${Number(task.weightage)||0}%`}</td>
                          <td class="py-4 px-6 text-xs text-[#4b6d70] font-semibold leading-tight"><i class="far fa-calendar text-[#7db0b1]"></i> ${task.startDate} <br><span class="text-[#7db0b1]">to</span><br> <i class="far fa-calendar-check text-[#7db0b1]"></i> ${task.endDate}</td>
                         <td class="py-4 px-6">${deadlineHTML}</td>
@@ -2932,27 +2934,38 @@ function parseBreakTimeClient(v){
                 const cells=[...row.children];
                 if(!cells.length || cells.length===1)return;
 
-                // After the header has Task Type before Task Name, the expected number
-                // of cells is header count. If the row is short by one, insert Task Type.
+                // The renderer now always creates a Task Type cell AND an Employee
+                // placeholder cell (hidden for employees). Do not shift an already
+                // correct row again. This repair is only for genuinely legacy rows.
                 const headerCount=table.querySelectorAll('thead th').length;
-                const currentNameIdx=[...table.querySelectorAll('thead th')].findIndex(h=>String(h.textContent||'').trim().toLowerCase()==='task name');
-                const expectedNameCell=cells[currentNameIdx];
+                const headerCells=[...table.querySelectorAll('thead th')];
+                const currentNameIdx=headerCells.findIndex(h=>String(h.textContent||'').trim().toLowerCase()==='task name');
+                if(currentNameIdx<0)return;
 
                 if(cells.length===headerCount)return;
 
-                // Legacy row has no Task Type. Read its Task Name from the cell that
-                // currently occupies the Task Name position before inserting.
-                const taskText=String(expectedNameCell?.textContent||'').trim().split('\n')[0];
-                let task=(globalAllTasks||[]).find(t=>String(t.taskName||'').trim()===taskText);
-                if(!task){
-                    const key=taskText.toLowerCase();
-                    task=(globalAllTasks||[]).find(t=>String(t.taskName||'').trim().toLowerCase()===key);
+                const textOf=(cell)=>String(cell?.textContent||'').trim().split('\n')[0].trim();
+                const firstText=textOf(cells[0]);
+                const nameAtExpected=textOf(cells[currentNameIdx]);
+
+                // If the row is already aligned (including Task Type), never mutate it.
+                // This specifically prevents Task Name/Frequency/Assigned By from shifting.
+                const knownTasks=Array.isArray(globalAllTasks)?globalAllTasks:[];
+                const matchesTaskName=(txt)=>{
+                    if(!txt)return false;
+                    const key=txt.toLowerCase();
+                    return knownTasks.some(t=>String(t.taskName||'').trim().toLowerCase()===key);
+                };
+
+                // Legacy row without Task Type: its first cell is the Task Name.
+                if(cells.length===headerCount-1 && matchesTaskName(firstText)){
+                    const task=knownTasks.find(t=>String(t.taskName||'').trim().toLowerCase()===firstText.toLowerCase());
+                    const type=task ? (task.taskType||task.templateTaskType||task.type||'-') : '-';
+                    const td=document.createElement('td');
+                    td.className=cells[0]?.className||'';
+                    td.textContent=type;
+                    row.insertBefore(td,cells[0]);
                 }
-                const type=task ? (task.taskType||task.templateTaskType||task.type||'-') : '-';
-                const td=document.createElement('td');
-                td.className=expectedNameCell?.className||'';
-                td.textContent=type;
-                row.insertBefore(td,expectedNameCell||null);
             });
 
             table.dataset.taskTypeColumnAdded='1';
