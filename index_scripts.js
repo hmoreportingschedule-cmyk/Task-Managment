@@ -1094,11 +1094,24 @@ function parseBreakTimeClient(v){
             });
             return catSel;
         }
+        function findSourceTemplateForTask_(task){
+            if(!task)return null;
+            const tid=String(task.templateId||task.TemplateId||task.taskTemplateId||task.templateID||'').trim();
+            const name=String(task.taskName||task.TaskName||task.name||'').trim().toLowerCase();
+            const pools=[...(Array.isArray(assignTemplateCache)?assignTemplateCache:[]),
+                         ...(Array.isArray(quickTemplateDataCache?.templates)?quickTemplateDataCache.templates:[])];
+            return pools.find(t=>tid && String(t.templateId||t.TemplateId||'')===tid) ||
+                   pools.find(t=>name && String(t.taskName||t.TaskName||t.name||'').trim().toLowerCase()===name) || null;
+        }
         function getTaskCategories_(task){
-            const direct=String(task?.category||task?.Category||'').trim();
-            if(direct)return [direct];
-            const workCats=(task?.works||[]).map(w=>String(w.category||w.Category||'').trim()).filter(Boolean);
-            return [...new Set(workCats)];
+            const direct=[task?.category,task?.Category,task?.taskCategory,task?.TaskCategory]
+                .map(v=>String(v||'').trim()).filter(Boolean);
+            const workCats=(Array.isArray(task?.works)?task.works:[]).map(w=>String(w?.category||w?.Category||'').trim()).filter(Boolean);
+            const tpl=findSourceTemplateForTask_(task);
+            const templateCats=[tpl?.category,tpl?.taskCategory,tpl?.Category]
+                .map(v=>String(v||'').trim()).filter(Boolean);
+            const all=[...direct,...workCats,...templateCats];
+            return [...new Set(all)];
         }
         function setLogTaskCategoryFromSelectedTask_(){
             const taskSel=document.getElementById('logTaskSelect');
@@ -1117,26 +1130,43 @@ function parseBreakTimeClient(v){
             }
         }
         function populateLogWorkCategories_(tasks){
-            // Category is dependent on the selected Task now.
-            const catSel=ensureLogWorkCategorySelector_();
-            if(!catSel)return;
+            const catSel=ensureLogWorkCategorySelector_(); if(!catSel)return;
             const taskSel=document.getElementById('logTaskSelect');
             const task=(tasks||[]).find(t=>String(t.rowIndex)===String(taskSel?.value||''));
-            const categories=getTaskCategories_(task);
+            const cats=getTaskCategories_(task);
             catSel.innerHTML='<option value="">-- Select Task Category --</option>'+
-                categories.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
-            catSel.disabled=!categories.length;
-            if(categories.length)catSel.value=categories[0];
+                cats.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+            catSel.disabled=!cats.length;
+            if(cats.length)catSel.value=cats[0];
+        }
+        function findSourceTemplateForTask_(task){
+            if(!task)return null;
+            const tid=String(task.templateId||task.TemplateId||task.taskTemplateId||task.templateID||'').trim();
+            const name=String(task.taskName||task.TaskName||task.name||'').trim().toLowerCase();
+            const pools=[...(Array.isArray(assignTemplateCache)?assignTemplateCache:[]),
+                         ...(Array.isArray(quickTemplateDataCache?.templates)?quickTemplateDataCache.templates:[])];
+            return pools.find(t=>tid && String(t.templateId||t.TemplateId||'')===tid) ||
+                   pools.find(t=>name && String(t.taskName||t.TaskName||t.name||'').trim().toLowerCase()===name) || null;
         }
         function getTaskCategories_(task){
-            return [...new Set([String(task?.category||'').trim(),...(task?.works||[]).map(w=>String(w.category||'').trim())].filter(Boolean))];
+            const direct=[task?.category,task?.Category,task?.taskCategory,task?.TaskCategory]
+                .map(v=>String(v||'').trim()).filter(Boolean);
+            const workCats=(Array.isArray(task?.works)?task.works:[]).map(w=>String(w?.category||w?.Category||'').trim()).filter(Boolean);
+            const tpl=findSourceTemplateForTask_(task);
+            const templateCats=[tpl?.category,tpl?.taskCategory,tpl?.Category]
+                .map(v=>String(v||'').trim()).filter(Boolean);
+            const all=[...direct,...workCats,...templateCats];
+            return [...new Set(all)];
         }
         function populateLogWorkCategories_(tasks){
             const catSel=ensureLogWorkCategorySelector_(); if(!catSel)return;
-            const current=catSel.value;
-            const cats=[...new Set((tasks||[]).flatMap(getTaskCategories_))].sort((a,b)=>a.localeCompare(b));
-            catSel.innerHTML='<option value="">-- Select Task Category --</option>'+cats.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
-            if(cats.includes(current))catSel.value=current;
+            const taskSel=document.getElementById('logTaskSelect');
+            const task=(tasks||[]).find(t=>String(t.rowIndex)===String(taskSel?.value||''));
+            const cats=getTaskCategories_(task);
+            catSel.innerHTML='<option value="">-- Select Task Category --</option>'+
+                cats.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+            catSel.disabled=!cats.length;
+            if(cats.length)catSel.value=cats[0];
         }
 
         function populateLogTaskDropdown(tasks, dateKey, categoryFilter){
@@ -2440,6 +2470,9 @@ function parseBreakTimeClient(v){
                     fd.append('endDate',endDate);
                     fd.append('priority',t.priority||'Normal');
                     fd.append('frequency',t.repeat||'One-time');
+                    fd.append('taskType',t.taskType||'');
+                    fd.append('category',t.category||'');
+                    fd.append('taskCategory',t.category||'');
                     fd.append('weightage',String(Number(t.weightage)||10));
                     fd.append('assignedBy',document.getElementById('displayUser')?.innerText||'');
                     fd.append('sessionToken',sessionToken);
