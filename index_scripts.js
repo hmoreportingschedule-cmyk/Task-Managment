@@ -804,17 +804,17 @@ function parseBreakTimeClient(v){
             const hasCache = restoreDashboardCache(username);
             const tbody = document.getElementById('taskTableBody');
             if(!hasCache) tbody.innerHTML = '<tr><td colspan="7" class="py-6 text-center text-gray-500 font-semibold animate-pulse">Loading workspace data...</td></tr>';
-            fetchDataAPI(username, role, dept, !!hasCache, 0);
+            fetchDataAPI(username, role, dept, !!hasCache, 0, false);
         }
 
-        function fetchDashboardDataSilently() {
+        function fetchDashboardDataSilently(forceSync = false) {
             const syncIcon = document.getElementById('syncIcon');
             if(syncIcon) syncIcon.classList.add('fa-spin');
             
             const username = document.getElementById('displayUser').innerText;
             const role = document.getElementById('displayRole').innerText;
             const dept = document.getElementById('displayDept').innerText;
-            fetchDataAPI(username, role, dept, true, 0);
+            fetchDataAPI(username, role, dept, true, 0, false);
         }
 
         // Fast dashboard cache: show the last successful dashboard immediately, then sync in background.
@@ -832,7 +832,7 @@ function parseBreakTimeClient(v){
                 globalWorkLogs=[]; window.globalDelayReports=[];
                 globalTeamAttendance=Array.isArray(data.teamAttendance)?data.teamAttendance:[];
                 globalAdvanceScheduleRequests=Array.isArray(data.advanceScheduleRequests)?data.advanceScheduleRequests:[];
-                globalAttendanceRequests=Array.isArray(data.attendanceRequests)?data.attendanceRequests:[]; globalOfficeEvents=Array.isArray(data.officeEvents)?data.officeEvents:[];globalAttendanceDateLocks=Array.isArray(data.attendanceDateLocks)?data.attendanceDateLocks:[];updateAttendanceNonWorkingDay();updateAttendanceNonWorkingDay();v4UpdateAttendanceAvailability();updateTodayUrgentTaskButtonState(); window.serverNotifications=Array.isArray(data.serverNotifications)?data.serverNotifications:[]; window.serverDashboardSummary=Array.isArray(data.dashboardSummary)?data.dashboardSummary:[];
+                globalAttendanceRequests=Array.isArray(data.attendanceRequests)?data.attendanceRequests:[]; globalOfficeEvents=Array.isArray(data.officeEvents)?data.officeEvents:[];globalAttendanceDateLocks=Array.isArray(data.attendanceDateLocks)?data.attendanceDateLocks:[];updateAttendanceNonWorkingDay();v4UpdateAttendanceAvailability();updateTodayUrgentTaskButtonState(); window.serverNotifications=Array.isArray(data.serverNotifications)?data.serverNotifications:[]; window.serverDashboardSummary=Array.isArray(data.dashboardSummary)?data.dashboardSummary:[];
                 attendanceEntryStart=data.todayAttendanceEntryStart||attendanceEntryStart;
                 attendanceEntryEnd=data.todayAttendanceEntryEnd||attendanceEntryEnd;
                 setDateConstraints();
@@ -867,7 +867,7 @@ function parseBreakTimeClient(v){
 
         // Dashboard sync: never leave the table stuck on "Loading".
         // Cached data is rendered first for instant display; Apps Script refreshes it in the background.
-        function fetchDataAPI(username, role, dept, silent = false, retryCount = 0) {
+        function fetchDataAPI(username, role, dept, silent = false, retryCount = 0, forceSync = false) {
             if(retryCount===0) restoreDashboardCache(username);
             if(dashboardSyncInProgress) return;
             if(!sessionToken) {
@@ -885,10 +885,10 @@ function parseBreakTimeClient(v){
             formData.append('role', role);
             formData.append('department', dept);
             formData.append('sessionToken', sessionToken);
-            formData.append('forceSync', '1');
+            if(forceSync) formData.append('forceSync', '1');
 
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 25000);
+            const timeoutId = setTimeout(() => controller.abort(), 60000);
 
             fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: formData, signal: controller.signal, cache: 'no-store' })
             .then(res => {
@@ -931,7 +931,7 @@ function parseBreakTimeClient(v){
                 setDateConstraints();
                 globalTeamAttendance = Array.isArray(data.teamAttendance) ? data.teamAttendance : [];
                 globalAdvanceScheduleRequests = Array.isArray(data.advanceScheduleRequests) ? data.advanceScheduleRequests : [];
-                globalAttendanceRequests = Array.isArray(data.attendanceRequests) ? data.attendanceRequests : []; globalOfficeEvents = Array.isArray(data.officeEvents) ? data.officeEvents : []; globalAttendanceDateLocks = Array.isArray(data.attendanceDateLocks) ? data.attendanceDateLocks : [];updateAttendanceNonWorkingDay();updateAttendanceNonWorkingDay();v4UpdateAttendanceAvailability();updateTodayUrgentTaskButtonState(); window.serverNotifications=Array.isArray(data.serverNotifications)?data.serverNotifications:[]; window.serverDashboardSummary=Array.isArray(data.dashboardSummary)?data.dashboardSummary:[];
+                globalAttendanceRequests = Array.isArray(data.attendanceRequests) ? data.attendanceRequests : []; globalOfficeEvents = Array.isArray(data.officeEvents) ? data.officeEvents : []; globalAttendanceDateLocks = Array.isArray(data.attendanceDateLocks) ? data.attendanceDateLocks : [];updateAttendanceNonWorkingDay();v4UpdateAttendanceAvailability();updateTodayUrgentTaskButtonState(); window.serverNotifications=Array.isArray(data.serverNotifications)?data.serverNotifications:[]; window.serverDashboardSummary=Array.isArray(data.dashboardSummary)?data.dashboardSummary:[];
 
                 // Keep the latest successful result locally so the next page/login opens instantly.
                 try {
@@ -953,7 +953,7 @@ function parseBreakTimeClient(v){
             .catch(err => {
                 console.error('Dashboard sync error:', err);
                 if(retryCount < 1) {
-                    setTimeout(() => fetchDataAPI(username, role, dept, silent, retryCount + 1), 800);
+                    setTimeout(() => fetchDataAPI(username, role, dept, silent, retryCount + 1, forceSync), 800);
                     return;
                 }
 
@@ -961,7 +961,7 @@ function parseBreakTimeClient(v){
                     const message = err && err.name === 'AbortError'
                         ? 'Dashboard loading timed out. Please check the Google Apps Script Web App deployment and try Sync again.'
                         : (err.message || 'Unable to load dashboard data.');
-                    document.getElementById('taskTableBody').innerHTML = `<tr><td colspan="7" class="py-8 text-center text-red-600 font-semibold">${message}<br><button onclick="fetchDashboardDataSilently()" class="mt-3 bg-[#259b94] hover:bg-[#1f827c] text-white px-4 py-2 rounded-lg text-sm">Retry Sync</button></td></tr>`;
+                    document.getElementById('taskTableBody').innerHTML = `<tr><td colspan="7" class="py-8 text-center text-red-600 font-semibold">${message}<br><button onclick="fetchDashboardDataSilently(true)" class="mt-3 bg-[#259b94] hover:bg-[#1f827c] text-white px-4 py-2 rounded-lg text-sm">Retry Sync</button></td></tr>`;
                 }
             })
             .finally(() => {
