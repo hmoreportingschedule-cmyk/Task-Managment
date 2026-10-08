@@ -1777,7 +1777,7 @@ function parseBreakTimeClient(v){
                 const body=document.getElementById('adminUsersBody'); body.innerHTML='';
                 (data.users||[]).forEach(u=>{
                     const safe=encodeURIComponent(u.username);
-                    const self=String(u.username||'').trim().toLowerCase()===String(document.getElementById('displayUser').innerText||'').trim().toLowerCase();
+                    const currentDisplayUser=document.getElementById('displayUser')?.innerText||''; const self=String(u.username||'').trim().toLowerCase()===String(currentDisplayUser).trim().toLowerCase();
                     const action=self ? '<span class="text-xs text-gray-400 font-semibold">Protected</span>' : `<div class="flex flex-wrap gap-1"><button onclick="openEditUserModal(decodeURIComponent('${safe}'))" class="text-xs bg-[#e6fcf5] text-[#1f827c] border border-[#b2d8d8] px-2 py-1 rounded-md font-bold"><i class="fas fa-pen"></i> Edit</button><button onclick="toggleUserAccount('${safe}',${u.accountEnabled!==false})" class="text-xs ${u.accountEnabled!==false?'bg-amber-50 text-amber-700 border-amber-200':'bg-green-50 text-green-700 border-green-200'} border px-2 py-1 rounded-md font-bold">${u.accountEnabled!==false?'OFF':'ON'}</button><button onclick="deleteAdminUser('${safe}')" class="text-xs bg-red-50 text-red-600 border border-red-200 px-2 py-1 rounded-md font-bold"><i class="fas fa-trash"></i> Delete</button></div>`;
                     const webToggle=self ? `<span class="text-xs text-gray-400 font-semibold">Current Admin</span>` : `<label class="web-switch" title="Turn user Web Link ON/OFF"><input type="checkbox" ${u.webLinkEnabled!==false?'checked':''} onchange="toggleUserWebLink('${safe}',this.checked)"><span class="web-slider"></span></label>`;
                     body.innerHTML+=`<tr class="border-t"><td class="p-2 font-semibold">${u.username}</td><td class="p-2">${u.role}</td><td class="p-2">${u.department||'-'}</td><td class="p-2">${u.hod||'-'}</td><td class="p-2 text-xs">${u.emailAddress?`<a href="mailto:${u.emailAddress}" class="text-[#259b94] font-bold">${u.emailAddress}</a>`:'-'}</td><td class="p-2 text-xs">${u.contactNumber?`<a href="tel:${u.contactNumber}" class="text-[#259b94] font-bold">${u.contactNumber}</a>`:'-'}</td><td class="p-2 text-xs">${u.whatsappNumber?`<a target="_blank" href="https://wa.me/${String(u.whatsappNumber).replace(/\D/g,'')}" class="text-green-600 font-bold">${u.whatsappNumber}</a>`:'-'}</td><td class="p-2">${webToggle}</td><td class="p-2"><span class="font-bold ${u.accountEnabled!==false?'text-green-600':'text-red-600'}">${u.accountEnabled!==false?'ON':'OFF'}</span></td><td class="p-2 text-xs">${u.accessPermissions||'All / Not Set'}${u.attendanceEntryStart&&u.attendanceEntryEnd?`<br><span class="text-[#259b94]">Att: ${u.attendanceEntryStart} → ${u.attendanceEntryEnd}</span>`:''}</td><td class="p-2">${action}</td></tr>`;
@@ -2173,7 +2173,7 @@ function parseBreakTimeClient(v){
         }
         function openQuickTemplateModal(){
             const role=String(document.getElementById('displayRole')?.innerText||'').toLowerCase(); if(!isFullAdminRole(role)){alert('Task Template add karne ka access sirf Admin ko hai.');return;}
-            resetQuickTemplateForm();updateQuickTemplateTaskTypes();document.getElementById('quickTemplateModal').style.display='block';setTimeout(renderQuickTemplateList,50);
+            resetQuickTemplateForm();updateQuickTemplateTaskTypes();document.getElementById('quickTemplateModal').style.display='block';refreshAssignTemplateData(true,true);setTimeout(renderQuickTemplateList,80);
         }
         function closeQuickTemplateModal(){const m=document.getElementById('quickTemplateModal');if(m)m.style.display='none';}
         function setQuickTemplateFieldLabels_(){
@@ -2334,21 +2334,39 @@ function parseBreakTimeClient(v){
                 const fd2=new FormData();fd2.append('action','getCommonTaskEmployees');fd2.append('sessionToken',sessionToken);
                 reqs.push(apiFetchJson_(GOOGLE_SCRIPT_URL,{method:'POST',body:fd2}));
             }
-            Promise.all(reqs).then(results=>{
-                const td=results[0],ed=results[1]||null;
-                if(td.status!=='success')throw new Error(td.message||'Template load failed');
-                quickTemplateDataCache.templates=Array.isArray(td.templates)?td.templates:[];
-                assignTemplateCache=quickTemplateDataCache.templates.slice();
-                if(ed){
-                    if(ed.status!=='success')throw new Error(ed.message||'Employee load failed');
-                    quickTemplateDataCache.employees=(ed.employees||[]).filter(x=>x&&x.active!==false&&x.accountEnabled!==false);
-                    assignEmployeeCache=quickTemplateDataCache.employees.slice();
+            Promise.allSettled(reqs).then(results=>{
+                const tr=results[0];
+                let templateError=null, employeeError=null;
+                if(tr.status!=='fulfilled'){templateError=tr.reason||new Error('Template request failed');}
+                else if(tr.value.status!=='success'){templateError=new Error(tr.value.message||'Template load failed');}
+                if(!templateError){
+                    const td=tr.value;
+                    quickTemplateDataCache.templates=Array.isArray(td.templates)?td.templates:[];
+                    assignTemplateCache=quickTemplateDataCache.templates.slice();
+                    renderAssignTemplateSelect_();
+                    renderQuickTemplateList();
+                }
+                if(!templatesOnly && results[1]){
+                    const er=results[1];
+                    if(er.status!=='fulfilled'){employeeError=er.reason||new Error('Employee request failed');}
+                    else if(er.value.status!=='success'){employeeError=new Error(er.value.message||'Employee load failed');}
+                    else {
+                        quickTemplateDataCache.employees=(er.value.employees||[]).filter(x=>x&&x.active!==false&&x.accountEnabled!==false);
+                        assignEmployeeCache=quickTemplateDataCache.employees.slice();
+                        renderAssignEmployees();
+                    }
                 }
                 quickTemplateDataCache.loadedAt=Date.now();
-                renderAssignTemplateSelect_();renderAssignEmployees();renderQuickTemplateList();
-            }).catch(err=>{
-                if(tSel&&!haveTemplates)tSel.innerHTML='<option value="">-- Select Task Template --</option>';
-                if(eList&&!templatesOnly&&!haveEmployees)eList.innerHTML='<div class="text-sm text-red-500 p-2">Employee/Template list load nahi ho saki. Refresh karein.</div>';
+                if(templateError){
+                    if(tSel)tSel.innerHTML='<option value="">-- Select Task Template --</option>';
+                    console.error('Template load failed',templateError);
+                }
+                if(employeeError && eList){
+                    eList.innerHTML='<div class="text-sm text-red-500 p-2">'+escapeHtml(employeeError.message||'Employee list load nahi ho saki.')+'</div>';
+                    console.error('Employee load failed',employeeError);
+                }
+                if(!templateError)renderAssignTemplateSelect_();
+                if(!employeeError&&!templatesOnly)renderAssignEmployees();
             });
         }
         function renderAssignTemplateSelect_(){
