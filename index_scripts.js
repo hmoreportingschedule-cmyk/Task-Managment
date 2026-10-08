@@ -3940,7 +3940,7 @@ function parseBreakTimeClient(v){
             if(a.length<6)return alert('Password kam az kam 6 characters ka hona chahiye.');
             if(a!==b)return alert('New password aur confirm password same nahi hain.');
             const fd=new FormData();fd.append('action','changeOwnPassword');fd.append('oldPassword',old);fd.append('newPassword',a);fd.append('confirmPassword',b);fd.append('sessionToken',sessionToken);
-            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(d=>{alert(d.message||'Password update result');if(d.status==='success')location.reload();}).catch(()=>alert('Password change failed.'));
+            apiFetchJson_(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(d=>{alert(d.message||'Password update result');if(d.status==='success'){sessionToken='';location.reload();}}).catch(e=>alert(e.message||'Password change failed.'));
         }
 
         // ================= PROFESSIONAL PROGRESS REPORT =================
