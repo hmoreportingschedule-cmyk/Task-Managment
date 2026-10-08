@@ -887,6 +887,23 @@ function parseBreakTimeClient(v){
                 globalAllTasks = Array.isArray(data.tasks) ? data.tasks : [];
                 globalTeamMembers = Array.isArray(data.teamMembers) ? data.teamMembers : [];
                 globalTeamMemberMeta = Array.isArray(data.teamMemberMeta) ? data.teamMemberMeta : [];
+                // Use the dashboard payload as the first source for Admin/HOD panels.
+                // This keeps Employee Details and Task Templates visible even when a
+                // separate modal API call is delayed or temporarily unavailable.
+                if (isManagerRole(role)) {
+                    if (Array.isArray(data.employeeDetails)) {
+                        quickTemplateDataCache.employees = data.employeeDetails.slice();
+                        assignEmployeeCache = data.employeeDetails.slice();
+                    }
+                    if (Array.isArray(data.taskTemplates)) {
+                        quickTemplateDataCache.templates = data.taskTemplates.slice();
+                        assignTemplateCache = data.taskTemplates.slice();
+                        quickTemplateDataCache.loadedAt = Date.now();
+                        renderAssignTemplateSelect_();
+                        renderAssignEmployees();
+                        renderQuickTemplateList();
+                    }
+                }
                 globalMonthlyFullAttendance = Array.isArray(data.monthlyFullAttendance) ? data.monthlyFullAttendance : [];
                 globalWorkLogs = []; window.globalDelayReports=[];
                 attendanceEntryStart = data.todayAttendanceEntryStart || attendanceEntryStart;
