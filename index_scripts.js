@@ -3638,7 +3638,7 @@ function parseBreakTimeClient(v){
             if(item.action==='workLogApproval'){fd.append('action','reviewWorkLog');fd.append('targetUser',item.targetUser||item.employee||'');fd.append('rowIndex',item.rowIndex);fd.append('status',status);if(rejectionReason)fd.append('rejectionReason',rejectionReason);}
             else if(item.action==='attendance'){fd.append('action','reviewAttendanceRequest');fd.append('rowIndex',item.rowIndex);fd.append('status',status);if(rejectionReason)fd.append('rejectionReason',rejectionReason);}
             else if(item.action==='attendanceRecord'){fd.append('action','reviewAttendanceRecord');fd.append('targetUser',item.targetUser||item.employee||'');fd.append('rowIndex',item.rowIndex);fd.append('status',status);if(rejectionReason)fd.append('rejectionReason',rejectionReason);}
-            else if(item.action==='schedule' || item.action==='scheduleEmergency'){fd.append('action','updateAdvanceScheduleRequest');fd.append('rowIndex',item.rowIndex);fd.append('status',status);if(item.action==='scheduleEmergency' && extra.durationDays)fd.append('durationDays',String(extra.durationDays));}
+            else if(item.action==='schedule' || item.action==='scheduleEmergency'){fd.append('action','updateAdvanceScheduleRequest');fd.append('rowIndex',item.rowIndex);fd.append('status',status);if(false){}}
             else {fd.append('action','updateTaskStatus');fd.append('targetUser',item.targetUser||'');fd.append('rowIndex',item.rowIndex);fd.append('type','hod');fd.append('status',status);if(rejectionReason)fd.append('rejectionReason',rejectionReason);if(rejectionReasonOther)fd.append('rejectionReasonOther',rejectionReasonOther);}
             return fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json());
         }
@@ -3678,7 +3678,7 @@ function parseBreakTimeClient(v){
                 const types=new Set(items.map(x=>x.type)); if(types.size>1){alert('Bulk Reject mein ek hi type (Task ya Attendance) select karein.');return;}
                 approvalRejectContext={mode:'bulk',items:items}; const first=items[0]; document.getElementById('approvalRejectTitle').textContent=first.type==='attendance'?'Attendance Reject Reason':(first.type==='worklog'?'Daily Work Reject Reason':'Task Reject Reason'); document.getElementById('taskRejectReasonBox').style.display=first.type==='task'?'block':'none'; document.getElementById('attendanceRejectReasonBox').style.display=first.type==='attendance'?'block':'none'; document.getElementById('taskRejectOtherBox').style.display='none'; document.getElementById('taskRejectReason').value=''; document.getElementById('attendanceRejectReason').value=''; document.getElementById('taskRejectReasonOther').value=''; document.getElementById('approvalRejectModal').style.display='block'; return;
             }
-            if(items.some(x=>x.action==='scheduleEmergency')){alert('Today Urgent Task ko individual Approve karein, kyunki approval ke waqt Working Days select karne honge.');return;}
+            if(items.some(x=>x.action==='scheduleEmergency')){alert('Today Urgent Task ko individual Approve karein. Iski From/To Date request mein already saved hai.');return;}
             if(!confirm(`${items.length} item(s) ko Approve karna hai?`))return;
             const buttons=document.querySelectorAll('#approvalCenterBody .approval-center-check:checked'); buttons.forEach(c=>{const b=c.closest('tr')?.querySelector('button');if(b){b.disabled=true;b.textContent='Saving...';} c.closest('tr')?.remove();});
             const results=await Promise.all(items.map(item=>approvalCenterPost(item,status).catch(()=>({status:'error'}))));
@@ -4654,23 +4654,44 @@ function parseBreakTimeClient(v){
             document.getElementById('onlineDurationBox').classList.toggle('hidden',!show);
         }
         let emergencyTaskTemplateCache=[];
+        const SELF_URGENT_TASK_TEMPLATES=['FollowUp','File Work','Outdoor','Meeting'];
+        function ensureUrgentTaskDateFields_(){
+            const modal=document.getElementById('emergencyTaskModal'); if(!modal)return;
+            const details=document.getElementById('emergencyTaskDetails');
+            const oldCat=document.getElementById('emergencyTaskCategory');
+            const oldFreq=oldCat?.parentElement?.parentElement?.querySelector('select');
+            // Category and Frequency are intentionally not part of self-assigned urgent tasks.
+            if(oldCat){ const row=oldCat.closest('.grid')||oldCat.parentElement; if(row)row.style.display='none'; }
+            if(oldFreq && oldFreq.id!=='emergencyTaskAssignBy'){
+                const row=oldFreq.closest('.grid')||oldFreq.parentElement; if(row && row!==oldCat?.closest('.grid')) row.style.display='none';
+            }
+            if(document.getElementById('emergencyTaskFromDate') && document.getElementById('emergencyTaskToDate'))return;
+            const box=document.createElement('div'); box.id='emergencyTaskDateRangeBox'; box.className='grid grid-cols-1 md:grid-cols-2 gap-3 mb-4';
+            box.innerHTML=`<div><label class="block text-sm font-semibold mb-1">From Date</label><input id="emergencyTaskFromDate" type="date" class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white" readonly></div><div><label class="block text-sm font-semibold mb-1">To Date</label><input id="emergencyTaskToDate" type="date" class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white"></div>`;
+            const target=details?.closest('.mb-')||details?.parentElement;
+            if(target?.parentElement)target.parentElement.insertBefore(box,target); else modal.querySelector('textarea')?.parentElement?.before(box);
+            const from=document.getElementById('emergencyTaskFromDate'),to=document.getElementById('emergencyTaskToDate');
+            const today=localDateKey(); if(from){from.value=today;from.min=today;from.max=today;} if(to){to.value=today;to.min=today;}
+            to?.addEventListener('change',()=>{if(to.value<today)to.value=today;});
+        }
         function openEmergencyTaskModal(){
             const todayKey=localDateKey();
             const selectedKey=document.getElementById('attendanceDate')?.value||todayKey;
             if(selectedKey!==todayKey){ alert('Today Urgent Task sirf current date ke liye available hai. Previous date par yeh freeze rahega.'); updateTodayUrgentTaskButtonState(); return; }
             const nonWorking=isLogWorkNonWorkingDate(todayKey);
             if(nonWorking){ alert(`Today Urgent Task frozen: ${nonWorking}. Office closed hai, is din urgent task request nahi ki ja sakti.`); updateTodayUrgentTaskButtonState(); return; }
-            const today=new Date(); const key=today.toISOString().split('T')[0];
+            const today=new Date();
             const label=document.getElementById('emergencyTaskToday');if(label)label.textContent=today.toLocaleDateString('en-IN',{day:'2-digit',month:'2-digit',year:'numeric'});
-            const sel=document.getElementById('emergencyTaskTemplate');if(sel)sel.innerHTML='<option value="">Loading templates...</option>';
+            ensureUrgentTaskDateFields_();
+            const sel=document.getElementById('emergencyTaskTemplate');if(sel)sel.innerHTML='<option value="">-- Select Task Template --</option>'+SELF_URGENT_TASK_TEMPLATES.map(x=>`<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join('');
             const cat=document.getElementById('emergencyTaskCategory');if(cat)cat.value='';
             const ab=document.getElementById('emergencyTaskAssignBy');if(ab)ab.value='';
+            const from=document.getElementById('emergencyTaskFromDate'),to=document.getElementById('emergencyTaskToDate');if(from)from.value=todayKey;if(to){to.value=todayKey;to.min=todayKey;}
             document.getElementById('emergencyTaskDetails').value='';
             document.getElementById('emergencyTaskModal').style.display='block';
-            const fd=new FormData();fd.append('action','getTodayUrgentTaskTemplates');fd.append('sessionToken',sessionToken);
-            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(d=>{if(d.status!=='success')throw new Error(d.message||'Templates load failed');emergencyTaskTemplateCache=Array.isArray(d.templates)?d.templates:[];if(sel){sel.innerHTML='<option value="">-- Select Task Template --</option>'+emergencyTaskTemplateCache.map(t=>`<option value="${escapeHtml(t.templateId)}">${escapeHtml(t.taskName)} — ${escapeHtml(t.category||'-')}</option>`).join('');}}).catch(e=>{if(sel)sel.innerHTML='<option value="">Templates load nahi hue</option>';alert(e.message||'Templates load failed.');});
+            emergencyTaskTemplateCache=SELF_URGENT_TASK_TEMPLATES.map(x=>({templateId:x,taskName:x,category:''}));
         }
-        function applyEmergencyTaskTemplate(){const id=document.getElementById('emergencyTaskTemplate')?.value||'',t=emergencyTaskTemplateCache.find(x=>String(x.templateId)===String(id));const cat=document.getElementById('emergencyTaskCategory');if(cat)cat.value=t?.category||'';}
+        function applyEmergencyTaskTemplate(){ const id=document.getElementById('emergencyTaskTemplate')?.value||''; const cat=document.getElementById('emergencyTaskCategory');if(cat)cat.value=''; }
         function closeEmergencyTaskModal(){document.getElementById('emergencyTaskModal').style.display='none';}
         function submitEmergencyTaskRequest(){
             const todayKey=localDateKey();
@@ -4678,12 +4699,14 @@ function parseBreakTimeClient(v){
             if(selectedKey!==todayKey){ alert('Today Urgent Task sirf current date ke liye available hai.'); updateTodayUrgentTaskButtonState(); return; }
             const nonWorking=isLogWorkNonWorkingDate(todayKey);
             if(nonWorking){ alert(`Today Urgent Task frozen: ${nonWorking}.`); updateTodayUrgentTaskButtonState(); return; }
-            const templateId=document.getElementById('emergencyTaskTemplate')?.value||'',assignBy=document.getElementById('emergencyTaskAssignBy')?.value||'',details=document.getElementById('emergencyTaskDetails')?.value.trim()||'',today=todayKey;
-            if(!templateId){alert('Task Template select karein.');return;} if(!assignBy){alert('Assign By select karein.');return;}
-            const t=emergencyTaskTemplateCache.find(x=>String(x.templateId)===String(templateId));if(!t){alert('Selected template nahi mila.');return;}
-            const fd=new FormData();fd.append('action','emergencyTaskRequest');fd.append('templateId',templateId);fd.append('requestDate',today);fd.append('assignBy',assignBy);fd.append('details',details);fd.append('sessionToken',sessionToken);
+            const templateId=document.getElementById('emergencyTaskTemplate')?.value||'',assignBy=document.getElementById('emergencyTaskAssignBy')?.value||'',details=document.getElementById('emergencyTaskDetails')?.value.trim()||'',fromDate=document.getElementById('emergencyTaskFromDate')?.value||todayKey,toDate=document.getElementById('emergencyTaskToDate')?.value||todayKey;
+            if(!SELF_URGENT_TASK_TEMPLATES.includes(templateId)){alert('Task Template select karein.');return;}
+            if(fromDate!==todayKey){alert('From Date sirf current date ho sakti hai.');return;}
+            if(!toDate||toDate<todayKey){alert('To Date current date ya uske baad select karein.');return;}
+            if(!assignBy){alert('Assign By select karein.');return;}
+            const fd=new FormData();fd.append('action','emergencyTaskRequest');fd.append('taskTemplate',templateId);fd.append('requestDate',fromDate);fd.append('endDate',toDate);fd.append('assignBy',assignBy);fd.append('details',details);fd.append('sessionToken',sessionToken);
             const b=document.getElementById('emergencyTaskBtn');b.disabled=true;b.innerText='Sending...';
-            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(d=>{alert(d.message||'Request sent');if(d.status==='success'){closeEmergencyTaskModal();fetchDashboardDataSilently();}}).catch(()=>alert('Today Urgent Task request failed.')).finally(()=>{b.disabled=false;b.innerText='Send Request';});
+            apiFetchJson_(GOOGLE_SCRIPT_URL,{method:'POST',body:fd,timeoutMs:60000}).then(d=>{if(!d||d.status!=='success')throw new Error(d?.message||'Task Request failed.');alert(d.message||'Task Request sent');closeEmergencyTaskModal();fetchDashboardDataSilently();}).catch(e=>alert(e.message||'Task Request failed.')).finally(()=>{b.disabled=false;b.innerText='Send Request';});
         }
         function submitAdvanceScheduleRequest(){
             const date=document.getElementById('advanceScheduleDate').value;
@@ -4746,9 +4769,8 @@ function parseBreakTimeClient(v){
         }
         function confirmUrgentTaskApproval(){
             const item=urgentTaskApprovalContext;if(!item)return;
-            const days=Number(document.getElementById('urgentTaskApprovalDays')?.value||0);if(!Number.isInteger(days)||days<1||days>31){alert('Working Days 1 se 31 ke beech dein.');return;}
             const btn=document.getElementById('urgentTaskApprovalBtn');if(btn){btn.disabled=true;btn.textContent='Saving...';}
-            approvalCenterPost(item,'Approved','','',{durationDays:days}).then(d=>{if(d.status!=='success')throw new Error(d.message||'Approval update failed.');closeUrgentTaskApprovalModal();closeAdvanceScheduleApprovalModal();fetchDashboardDataSilently();setTimeout(loadApprovalAttendanceTaskCenter,200);alert(d.message||'Today Urgent Task approved.');}).catch(e=>alert(e.message||'Approval update failed.')).finally(()=>{if(btn){btn.disabled=false;btn.textContent='Approve & Add Task';}});
+            approvalCenterPost(item,'Approved').then(d=>{if(d.status!=='success')throw new Error(d.message||'Approval update failed.');closeUrgentTaskApprovalModal();closeAdvanceScheduleApprovalModal();fetchDashboardDataSilently();setTimeout(loadApprovalAttendanceTaskCenter,200);alert(d.message||'Task approved aur employee ko assign ho gaya.');}).catch(e=>alert(e.message||'Approval update failed.')).finally(()=>{if(btn){btn.disabled=false;btn.textContent='Approve & Add Task';}});
         }
         function approveAdvanceSchedule(rowIndex){updateAdvanceScheduleRequest(rowIndex,'Approved').then(d=>{alert(d.message||'Approved');if(d.status==='success'){closeAdvanceScheduleApprovalModal();setTimeout(fetchDashboardDataSilently,250);}}).catch(()=>alert('Update failed.'));}
         function rejectAdvanceSchedule(rowIndex){updateAdvanceScheduleRequest(rowIndex,'Rejected').then(d=>{alert(d.message||'Rejected');if(d.status==='success'){closeAdvanceScheduleApprovalModal();setTimeout(fetchDashboardDataSilently,250);}}).catch(()=>alert('Update failed.'));}
