@@ -2142,7 +2142,7 @@ function parseBreakTimeClient(v){
         const QUICK_TEMPLATE_TYPE_OPTIONS = Object.keys(QUICK_TEMPLATE_TYPES);
         const QUICK_TEMPLATE_PRIORITY_OPTIONS = ['Medium','Normal','High','Urgent'];
         let quickTemplateDataCache = {templates:null, employees:null, loadedAt:0};
-        const QUICK_TEMPLATE_CACHE_MS = 60000;
+        const QUICK_TEMPLATE_CACHE_MS = 0;
         function ensureQuickTemplatePriorityField(){
             const weight=document.getElementById('qtWeightage');
             if(!weight || document.getElementById('qtPriority')) return;
