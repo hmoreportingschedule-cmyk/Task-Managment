@@ -1039,41 +1039,7 @@ function parseBreakTimeClient(v){
             const rec=getAttendanceForLogDate(workDate);
             return !!rec && String(rec.InTime||rec.inTime||'').trim()!=='';
         }
-        function cleanupLogDailyWorkFields_(){
-            const taskSel=document.getElementById('logTaskSelect');
-            if(!taskSel)return;
-            // Only Task Name is selectable. Remove/hide the old Task Type and
-            // Task Category controls if they exist in the older HTML.
-            const taskWrap=taskSel.parentElement;
-            if(taskWrap){
-                const label=taskWrap.querySelector('label');
-                if(label) label.textContent='Task Name';
-            }
-            ['logTaskTypeWrap','logTaskCategoryWrap'].forEach(id=>{
-                const el=document.getElementById(id);
-                if(el) el.remove();
-            });
-            ['logTaskTypeSelect','logTaskCategorySelect'].forEach(id=>{
-                const el=document.getElementById(id);
-                if(el) el.remove();
-            });
-            document.querySelectorAll('#logWorkModal label').forEach(label=>{
-                const t=String(label.textContent||'').trim().toLowerCase();
-                if(t==='select task:'||t==='select task') label.textContent='Task Name';
-            });
-            // Hide any legacy Task Type / Task Category blocks which came from
-            // the original modal HTML rather than the dynamic selectors.
-            document.querySelectorAll('#logWorkModal label').forEach(label=>{
-                const t=String(label.textContent||'').trim().toLowerCase();
-                if(t==='task type'||t==='task category'){
-                    const wrap=label.closest('.mb-3')||label.parentElement;
-                    if(wrap) wrap.style.display='none';
-                }
-            });
-        }
-
         function updateLogTaskTemplateMeta(){
-            cleanupLogDailyWorkFields_();
             const sel=document.getElementById('logTaskSelect'); if(!sel)return;
             let box=document.getElementById('logTaskTemplateMeta');
             if(!box){
@@ -1083,35 +1049,76 @@ function parseBreakTimeClient(v){
             }
             const task=(globalAllTasks||[]).find(t=>String(t.rowIndex)===String(sel.value));
             if(!task){box.classList.add('hidden');box.innerHTML='';return;}
-            const freq=String(task.frequency||task.Frequency||'One-time');
-            const taskType=getTaskType_(task)||'';
-            box.innerHTML=`<div class="flex flex-wrap gap-3"><span><b>Task Frequency:</b> ${escapeHtml(freq)}</span><span><b>Task Type:</b> ${escapeHtml(taskType||'-')}</span></div>`;
+            const cats=[...new Set([String(task.category||'').trim(),...(task.works||[]).map(w=>String(w.category||'').trim())].filter(Boolean))];
+            const freq=String(task.frequency||'One-time');
+            const priority=String(task.priority||task.Priority||'Normal');
+            box.innerHTML=`<div class="flex flex-wrap gap-3"><span><b>Frequency:</b> ${escapeHtml(freq)}</span><span><b>Priority:</b> ${escapeHtml(priority)}</span></div>`;
             box.classList.remove('hidden');
-
-            // Show the already accumulated time without changing the new
-            // minutes input. Each new entry is added to this total on save.
-            const minsInput=document.getElementById('logTimeMins');
-            if(minsInput){
-                let totalBox=document.getElementById('logCurrentTimeSpent');
-                if(!totalBox){
-                    totalBox=document.createElement('div');
-                    totalBox.id='logCurrentTimeSpent';
-                    totalBox.className='mt-1 text-xs font-semibold text-[#2a4d53]';
-                    minsInput.parentElement?.appendChild(totalBox);
-                }
-                const total=Number(task.timeSpent)||0;
-                totalBox.textContent=`Current Time Spent: ${total} mins`;
-            }
         }
 
+
         function ensureLogTaskTypeSelector_(){
-            cleanupLogDailyWorkFields_();
-            return null;
+            const taskSel=document.getElementById('logTaskSelect'); if(!taskSel)return null;
+            let typeSel=document.getElementById('logTaskTypeSelect');
+            if(typeSel)return typeSel;
+            typeSel=document.createElement('select');
+            typeSel.id='logTaskTypeSelect';
+            typeSel.className=taskSel.className||'w-full border rounded-lg p-2';
+            typeSel.disabled=true;
+            typeSel.innerHTML='<option value="">-- Task Type --</option>';
+
+            const label=document.createElement('label');
+            label.htmlFor='logTaskTypeSelect';
+            label.textContent='Task Type';
+            label.className='block text-sm font-semibold mb-1';
+
+            const wrap=document.createElement('div');
+            wrap.id='logTaskTypeWrap';
+            wrap.className='mb-3';
+            wrap.appendChild(label);
+            wrap.appendChild(typeSel);
+
+            const taskWrap=taskSel.parentElement;
+            if(taskWrap && taskWrap.parentElement) taskWrap.insertAdjacentElement('afterend',wrap);
+            else if(taskSel.parentElement) taskSel.parentElement.appendChild(wrap);
+            return typeSel;
         }
 
         function ensureLogWorkCategorySelector_(){
-            cleanupLogDailyWorkFields_();
-            return null;
+            const taskSel=document.getElementById('logTaskSelect'); if(!taskSel)return null;
+            const typeSel=ensureLogTaskTypeSelector_();
+
+            let catSel=document.getElementById('logTaskCategorySelect');
+            if(catSel)return catSel;
+
+            catSel=document.createElement('select');
+            catSel.id='logTaskCategorySelect';
+            catSel.className=taskSel.className||'w-full border rounded-lg p-2';
+            catSel.innerHTML='<option value="">-- Select Task Category --</option>';
+            catSel.disabled=true;
+
+            const label=document.createElement('label');
+            label.htmlFor='logTaskCategorySelect';
+            label.textContent='Task Category';
+            label.className='block text-sm font-semibold mb-1';
+
+            const wrap=document.createElement('div');
+            wrap.id='logTaskCategoryWrap';
+            wrap.className='mb-3';
+            wrap.appendChild(label);
+            wrap.appendChild(catSel);
+
+            // Task Type first, then Task Category.
+            const typeWrap=document.getElementById('logTaskTypeWrap');
+            if(typeWrap && typeWrap.parentElement) typeWrap.insertAdjacentElement('afterend',wrap);
+            else if(typeSel?.parentElement) typeSel.parentElement.appendChild(wrap);
+            else if(taskSel.parentElement) taskSel.parentElement.appendChild(wrap);
+
+            catSel.addEventListener('change',function(){
+                // Selecting a category must never reset/unselect the selected task.
+                updateLogTaskTemplateMeta();
+            });
+            return catSel;
         }
 
         function findSourceTemplateForTask_(task){
@@ -1332,7 +1339,7 @@ function parseBreakTimeClient(v){
 
                     let empStatusHTML = '';
                     let hodStatusHTML = '';
-                    let timeSpentHTML = `<span class="font-bold text-[#2a4d53]">${Number(task.timeSpent) || 0} mins</span>`;
+                    let timeSpentHTML = `<span class="font-bold text-[#2a4d53]">${task.timeSpent ? task.timeSpent + ' mins' : '-'}</span>`;
                     let deadlineHTML = getDeadlineHTML(task.endDate, task.empStatus, task.completedAt);
 
                     let empLocked = (task.empStatus.toLowerCase() === 'completed' && !isAdmin) ? 'disabled' : '';
