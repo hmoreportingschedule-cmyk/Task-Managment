@@ -865,6 +865,7 @@ function parseBreakTimeClient(v){
             formData.append('role', role);
             formData.append('department', dept);
             formData.append('sessionToken', sessionToken);
+            formData.append('forceSync', '1');
 
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 25000);
