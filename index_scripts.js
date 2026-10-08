@@ -868,10 +868,10 @@ function parseBreakTimeClient(v){
             formData.append('role', role);
             formData.append('department', dept);
             formData.append('sessionToken', sessionToken);
-            formData.append('forceSync', '1');
+            formData.append('forceSync', silent ? '0' : '1');
 
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 25000);
+            const timeoutId = setTimeout(() => controller.abort(), 45000);
 
             fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: formData, signal: controller.signal, cache: 'no-store' })
             .then(res => {
