@@ -1056,8 +1056,8 @@ function parseBreakTimeClient(v){
             return '';
         }
         function isLogWorkDateAllowed(dateKey){
-            // Temporary baseline: Daily Work is available from 01-Oct-2026 through today.
-            // Future dates are blocked and Admin Lock/Unlock remains authoritative.
+            // Daily Work is available from 01-Oct-2026 through today.
+            // Previous dates are allowed; future dates remain blocked. Admin Lock/Unlock remains authoritative.
             const d=parseLocalDateKey(dateKey), today=parseLocalDateKey(localDateKey()); if(!d||!today)return false;
             if(d>today || String(dateKey)<ENTRY_BASELINE_DATE)return false;
             if(isDateLockedClient(dateKey))return false;
@@ -2721,7 +2721,7 @@ function parseBreakTimeClient(v){
             if(isDateLockedClient(dateKey)){alert('Is date par Admin ne Work/Attendance LOCK kiya hua hai. Pehle Admin se UNLOCK karwayein.');return;}
             const btn=document.querySelector('button[onclick="openLogWorkModal()"]');
             if(nonWorking){ alert(`Log Daily Work frozen: ${nonWorking}.`); if(btn)btn.disabled=true; return; }
-            if(!allowed){ alert('Log Daily Work 01-Oct-2026 se aaj tak available hai. Future date allowed nahi hai. Admin Lock/Unlock rules apply honge.'); if(btn)btn.disabled=true; return; }
+            if(!allowed){ alert('Log Daily Work 01-Oct-2026 se aaj tak available hai. Future date allowed nahi hai. Previous date allowed hai. Admin Lock/Unlock rules apply honge.'); if(btn)btn.disabled=true; return; }
             if(btn)btn.disabled=false;
             modal.style.display='block';
             removeLegacyLogTaskMetaSelectors_();
@@ -2763,7 +2763,7 @@ function parseBreakTimeClient(v){
         function submitWorkLog() {
             const taskSel=document.getElementById('logTaskSelect'), tIdx=taskSel.value, tName=taskSel.options[taskSel.selectedIndex]?.text||'', mins=document.getElementById('logTimeMins').value, desc=document.getElementById('logDesc').value, workDate=document.getElementById('logWorkDate')?.value||localDateKey(), username=document.getElementById('displayUser').innerText;
             const nonWorking=isLogWorkNonWorkingDate(workDate);
-            if(!isLogWorkDateAllowed(workDate)){alert('Log Daily Work 01-Oct-2026 se aaj tak available hai. Future date allowed nahi hai. Admin Lock/Unlock rules apply honge.');return;}
+            if(!isLogWorkDateAllowed(workDate)){alert('Log Daily Work 01-Oct-2026 se aaj tak available hai. Future date allowed nahi hai. Previous date allowed hai. Admin Lock/Unlock rules apply honge.');return;}
             if(nonWorking){alert(`Log Daily Work frozen: ${nonWorking}.`);return;}
             if(!tIdx||!mins){alert('Please select task and enter time!');return;}
             const duplicateAlreadyLogged=(globalWorkLogs||[]).some(w=>{
