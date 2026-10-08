@@ -328,11 +328,8 @@ function parseBreakTimeClient(v){
             showLoginStatus('<span class="login-spinner"></span>Secure login check ho raha hai…','info'); btn.innerHTML='<span class="login-spinner"></span>Authenticating…'; btn.disabled=true;
             const formData=new FormData(); formData.append('action','login'); formData.append('username',user); formData.append('password',pass);
             const controller=new AbortController(), timeoutId=setTimeout(()=>controller.abort(),30000);
-            // Use the normal POST first. If Apps Script/Cloudflare returns a
-            // non-JSON response or the POST path fails, apiFetchJson_ retries
-            // the same request through GET. The backend V.51 supports that
-            // login fallback explicitly.
-            apiFetchJson_(GOOGLE_SCRIPT_URL,{method:'POST',body:formData,cache:'no-store',signal:controller.signal,credentials:'omit'})
+            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:formData,cache:'no-store',signal:controller.signal,credentials:'omit'})
+            .then(res=>{if(!res.ok)throw new Error('HTTP '+res.status);return res.json();})
             .then(data=>{
                 if(data.status!=='success'){
                     const msg=data.code==='WEB_LINK_OFF' ? '🔒 '+(data.message||'Aapka Web Link access abhi OFF hai.') : '❌ '+(data.message||'Aap ne galat User ID ya Password add kiya hai.');
@@ -868,10 +865,9 @@ function parseBreakTimeClient(v){
             formData.append('role', role);
             formData.append('department', dept);
             formData.append('sessionToken', sessionToken);
-            formData.append('forceSync', silent ? '0' : '1');
 
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 45000);
+            const timeoutId = setTimeout(() => controller.abort(), 25000);
 
             fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: formData, signal: controller.signal, cache: 'no-store' })
             .then(res => {
@@ -1043,26 +1039,8 @@ function parseBreakTimeClient(v){
             const rec=getAttendanceForLogDate(workDate);
             return !!rec && String(rec.InTime||rec.inTime||'').trim()!=='';
         }
-        function removeLegacyLogTaskMetaSelectors_(){
-            ['logTaskTypeWrap','logTaskCategoryWrap'].forEach(id=>{
-                const el=document.getElementById(id);
-                if(el)el.remove();
-            });
-            ['logTaskTypeSelect','logTaskCategorySelect'].forEach(id=>{
-                const el=document.getElementById(id);
-                if(el)el.remove();
-            });
-        }
-
         function updateLogTaskTemplateMeta(){
             const sel=document.getElementById('logTaskSelect'); if(!sel)return;
-            removeLegacyLogTaskMetaSelectors_();
-
-            // Rename the task selector to the final UI wording requested.
-            const label=sel.parentElement?.querySelector('label');
-            if(label)label.textContent='Task Name';
-            if(sel.options.length && !sel.options[0].value)sel.options[0].textContent='-- Select Task Name --';
-
             let box=document.getElementById('logTaskTemplateMeta');
             if(!box){
                 box=document.createElement('div'); box.id='logTaskTemplateMeta';
@@ -1070,24 +1048,21 @@ function parseBreakTimeClient(v){
                 sel.parentElement?.appendChild(box);
             }
             const task=(globalAllTasks||[]).find(t=>String(t.rowIndex)===String(sel.value));
-            if(!task){box.classList.add('hidden');box.innerHTML='';return;}
-            const freq=String(task.frequency||task.Frequency||'One-time').trim() || 'One-time';
-            const taskType=getTaskType_(task) || '—';
+            if(!task){box.classList.add('hidden');box.innerHTML='';updateLogTaskTimeSpentMeta_(null);return;}
+            const freq=String(task.frequency||'One-time');
+            const taskType=getTaskType_(task)||'-';
             box.innerHTML=`<div class="flex flex-wrap gap-4"><span><b>Task Frequency:</b> ${escapeHtml(freq)}</span><span><b>Task Type:</b> ${escapeHtml(taskType)}</span></div>`;
             box.classList.remove('hidden');
+            updateLogTaskTimeSpentMeta_(task);
         }
 
-        // Kept as compatibility no-ops for older callers. The Log Daily Work
-        // screen now shows only Task Name plus read-only Frequency/Type text.
-        function ensureLogTaskTypeSelector_(){
-            removeLegacyLogTaskMetaSelectors_();
-            return null;
+        function removeLegacyLogTaskMetaSelectors_(){
+            ['logTaskTypeWrap','logTaskCategoryWrap','logTaskTypeSelect','logTaskCategorySelect'].forEach(id=>{
+                const el=document.getElementById(id); if(el) el.remove();
+            });
         }
-
-        function ensureLogWorkCategorySelector_(){
-            removeLegacyLogTaskMetaSelectors_();
-            return null;
-        }
+        function ensureLogTaskTypeSelector_(){ removeLegacyLogTaskMetaSelectors_(); return null; }
+        function ensureLogWorkCategorySelector_(){ removeLegacyLogTaskMetaSelectors_(); return null; }
 
         function findSourceTemplateForTask_(task){
             if(!task)return null;
@@ -1124,42 +1099,49 @@ function parseBreakTimeClient(v){
         }
 
         function setLogTaskMetaFromSelectedTask_(){
-            const taskSel=document.getElementById('logTaskSelect');
-            const typeSel=ensureLogTaskTypeSelector_();
-            const catSel=ensureLogWorkCategorySelector_();
-            if(!taskSel||!typeSel||!catSel)return;
-
-            const selectedTaskValue=String(taskSel.value||'');
-            const task=(globalAllTasks||[]).find(t=>String(t.rowIndex)===selectedTaskValue);
-            const taskType=getTaskType_(task);
-            const categories=getTaskCategories_(task);
-
-            // Keep the selected Task untouched. Only update dependent fields.
-            typeSel.innerHTML=taskType
-                ? `<option value="${escapeHtml(taskType)}">${escapeHtml(taskType)}</option>`
-                : '<option value="">-- Task Type --</option>';
-            typeSel.value=taskType||'';
-            typeSel.disabled=true;
-
-            const previousCategory=String(catSel.value||'');
-            catSel.innerHTML='<option value="">-- Select Task Category --</option>'+
-                categories.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
-            catSel.disabled=!categories.length;
-            if(categories.length){
-                catSel.value=categories.includes(previousCategory) ? previousCategory : categories[0];
-            }else{
-                catSel.value='';
-            }
+            removeLegacyLogTaskMetaSelectors_();
+            updateLogTaskTemplateMeta();
+            updateCompletionCheckboxState();
         }
 
         function populateLogWorkCategories_(tasks){
             setLogTaskMetaFromSelectedTask_();
         }
 
+        function getTaskTotalMinutes_(task){
+            if(!task)return 0;
+            const stableId=String(task.taskId||task.TaskID||'').trim();
+            const row=String(task.rowIndex||'').trim();
+            const name=String(task.taskName||task.TaskName||'').trim().toLowerCase();
+            let total=0;
+            (globalWorkLogs||[]).forEach(w=>{
+                const wid=String(w.TaskID||w.taskId||'').trim();
+                const wrow=String(w.TaskRowIndex||w.taskRowIndex||'').trim();
+                const wname=String(w.Task||w.TaskName||w.taskName||'').trim().toLowerCase();
+                const match=(stableId&&wid===stableId)||(row&&wrow===row)||(!stableId&&!row&&name&&wname===name);
+                if(match) total+=Number(w.TimeSpentMins||w.timeSpentMins||w.TimeSpent||w.timeSpent||0)||0;
+            });
+            return total>0 ? total : (Number(task.timeSpent)||0);
+        }
+        function updateLogTaskTimeSpentMeta_(task){
+            const input=document.getElementById('logTimeMins'); if(!input)return;
+            let box=document.getElementById('logTaskTimeSpentMeta');
+            if(!box){
+                box=document.createElement('div'); box.id='logTaskTimeSpentMeta';
+                box.className='mt-1 text-xs font-semibold text-[#2a4d53]';
+                input.parentElement?.appendChild(box);
+            }
+            box.textContent=`Current Time Spent: ${getTaskTotalMinutes_(task)} mins`;
+        }
+        function syncAllTaskTimeSpentFromLogs_(){
+            if(!Array.isArray(globalWorkLogs)||!globalWorkLogs.length)return;
+            (globalAllTasks||[]).forEach(t=>{ t.timeSpent=getTaskTotalMinutes_(t); });
+        }
+
         function populateLogTaskDropdown(tasks, dateKey, categoryFilter){
             const select=document.getElementById('logTaskSelect'); if(!select)return;
             const workDate=dateKey||document.getElementById('logWorkDate')?.value||localDateKey();
-            select.innerHTML='<option value="">-- Select Task Name --</option>';
+            select.innerHTML='<option value="">-- Select Active Task --</option>';
             const loggedForDate=new Set((globalWorkLogs||[]).filter(w=>{
                 const d=String(w.WorkDate||w.workDate||'');
                 const st=String(w.ApprovalStatus||w.approvalStatus||'Approved').toLowerCase();
@@ -1174,7 +1156,7 @@ function parseBreakTimeClient(v){
                     select.innerHTML+=`<option value="${t.rowIndex}">${escapeHtml(t.taskName||'Task')}</option>`;
                 }
             });
-            if(select.options.length===1)select.innerHTML='<option value="">-- No Task Name Available for Selected Date --</option>';
+            if(select.options.length===1)select.innerHTML='<option value="">-- No task available for selected date --</option>';
             setLogTaskMetaFromSelectedTask_();
             updateCompletionCheckboxState(); updateLogTaskTemplateMeta();
         }
@@ -1307,7 +1289,8 @@ function parseBreakTimeClient(v){
 
                     let empStatusHTML = '';
                     let hodStatusHTML = '';
-                    let timeSpentHTML = `<span class="font-bold text-[#2a4d53]">${formatMinsForReport(Number(task.timeSpent) || 0)}</span>`;
+                    const renderedTaskMinutes = getTaskTotalMinutes_(task);
+                    let timeSpentHTML = `<span class="font-bold text-[#2a4d53]">${renderedTaskMinutes} mins</span>`;
                     let deadlineHTML = getDeadlineHTML(task.endDate, task.empStatus, task.completedAt);
 
                     let empLocked = (task.empStatus.toLowerCase() === 'completed' && !isAdmin) ? 'disabled' : '';
@@ -2643,10 +2626,7 @@ function parseBreakTimeClient(v){
             if(btn)btn.disabled=false;
             modal.style.display='block';
             removeLegacyLogTaskMetaSelectors_();
-            const taskSel=document.getElementById('logTaskSelect');
-            const taskLabel=taskSel?.parentElement?.querySelector('label');
-            if(taskLabel)taskLabel.textContent='Task Name';
-            ensureWorkLogsLoaded(true).catch(()=>{}).finally(()=>{populateLogTaskDropdown(globalAllTasks,dateKey);setLogTaskMetaFromSelectedTask_();updateLogTaskTemplateMeta();updateCompletionCheckboxState();});
+            ensureWorkLogsLoaded(true).catch(()=>{}).finally(()=>{syncAllTaskTimeSpentFromLogs_();populateLogTaskDropdown(globalAllTasks,dateKey);setLogTaskMetaFromSelectedTask_();updateCompletionCheckboxState();});
             if(document.getElementById('delayReason'))document.getElementById('delayReason').value='';
             const before=document.getElementById('requestBeforeCompletion'); if(before)before.checked=false;
             const done=document.getElementById('markTaskCompleted'); if(done)done.checked=false;
@@ -2700,7 +2680,11 @@ function parseBreakTimeClient(v){
             if(before&&done){alert('Before Completion aur Closing Request ek saath select nahi kar sakte.');return;}
             const btn=document.getElementById('saveLogBtn');btn.innerText='Saving...';btn.disabled=true;
             const formData=new FormData();formData.append('action','logWork');formData.append('username',username);formData.append('rowIndex',tIdx);formData.append('taskName',tName);formData.append('timeSpent',mins);formData.append('description',desc);formData.append('workDate',workDate);formData.append('delayReason',document.getElementById('delayReason')?.value.trim()||'');formData.append('markCompleted',done?'true':'false');formData.append('beforeCompletion',before?'true':'false');formData.append('clientTodayKey',localDateKey());formData.append('sessionToken',sessionToken);
-            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:formData,cache:'no-store'}).then(async res=>{const text=await res.text();let data;try{data=JSON.parse(text);}catch(_){throw new Error('Backend response valid nahi hai. Google Apps Script Web App deployment check karein.');}return data;}).then(async data=>{alert(data.message||'Work log processed.');if(data.status==='success'){const savedTask=globalAllTasks.find(t=>String(t.rowIndex)===String(tIdx)||String(t.taskId||'')===String(data.taskId||''));if(savedTask&&Number.isFinite(Number(data.timeSpent))){savedTask.timeSpent=Number(data.timeSpent);}btn.innerText='Save Log';btn.disabled=false;document.getElementById('logTimeMins').value='';document.getElementById('logDesc').value='';if(document.getElementById('delayReason'))document.getElementById('delayReason').value='';if(document.getElementById('delayReasonWrap'))document.getElementById('delayReasonWrap').classList.add('hidden');document.getElementById('markTaskCompleted').checked=false;if(document.getElementById('requestBeforeCompletion'))document.getElementById('requestBeforeCompletion').checked=false;closeLogWorkModal();await ensureWorkLogsLoaded(true).catch(()=>{});fetchDashboardDataSilently();}else{btn.innerText='Save Log';btn.disabled=false;}}).catch(e=>{alert(e.message||'Unable to save work log. Please try again.');btn.innerText='Save Log';btn.disabled=false;});
+            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:formData,cache:'no-store'}).then(async res=>{const text=await res.text();let data;try{data=JSON.parse(text);}catch(_){throw new Error('Backend response valid nahi hai. Google Apps Script Web App deployment check karein.');}return data;}).then(async data=>{alert(data.message||'Work log processed.');if(data.status==='success'){const savedTask=(globalAllTasks||[]).find(t=>String(t.rowIndex)===String(tIdx));if(savedTask&&data.timeSpentMins!==undefined)savedTask.timeSpent=Number(data.timeSpentMins)||0;btn.innerText='Save Log';btn.disabled=false;document.getElementById('logTimeMins').value='';document.getElementById('logDesc').value='';if(document.getElementById('delayReason'))document.getElementById('delayReason').value='';if(document.getElementById('delayReasonWrap'))document.getElementById('delayReasonWrap').classList.add('hidden');document.getElementById('markTaskCompleted').checked=false;if(document.getElementById('requestBeforeCompletion'))document.getElementById('requestBeforeCompletion').checked=false;await ensureWorkLogsLoaded(true).catch(()=>{});
+                syncAllTaskTimeSpentFromLogs_();
+                closeLogWorkModal();
+                filterTasksByEmp();
+                fetchDashboardDataSilently();}else{btn.innerText='Save Log';btn.disabled=false;}}).catch(e=>{alert(e.message||'Unable to save work log. Please try again.');btn.innerText='Save Log';btn.disabled=false;});
         }
 
         // ================= COMPREHENSIVE MONTHLY GRADE =================
@@ -3392,7 +3376,7 @@ function parseBreakTimeClient(v){
 
         document.addEventListener('change', function(e) {
             if(e.target && (e.target.id === 'whatsappReportDate' || e.target.id === 'whatsappReportMonth')) generateWhatsAppReportPreview();
-            if(e.target && e.target.id === 'logTaskSelect'){ setLogTaskMetaFromSelectedTask_(); updateLogTaskTemplateMeta(); updateCompletionCheckboxState(); }
+            if(e.target && e.target.id === 'logTaskSelect') updateCompletionCheckboxState();
         });
 
         async function shareWhatsAppReport() {
