@@ -1,10 +1,6 @@
-
-
-
-
         // YAHAN APNA NAYA GOOGLE SCRIPT URL DAALEIN
         // GOOGLE SHEET / APPS SCRIPT URL: Is URL ko change karein agar Web App deployment URL badle.
-        const DEFAULT_GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw9x_CwQz3CAQFSZENxZ6tFwTETOv-vol39dGDR5-A0cFj-pvbgd5_HI_1vLLm5yOxG4Q/exec";
+        const DEFAULT_GOOGLE_SCRIPT_URL = "https://script.google.com/macros/library/d/1V5gUSVlI11G9mMRyWTGx7hZ6ZomycO4TFyh1WydsyGj77dgN0p5EMN7e/57";
         // Hosting-neutral configuration: the same frontend works on Vercel, Cloudflare Pages,
         // GitHub Pages/static hosting, etc. Optionally override the API URL via:
         // window.__TASK_APP_CONFIG = { googleScriptUrl: "https://.../exec" };
