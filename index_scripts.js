@@ -1746,10 +1746,32 @@ function parseBreakTimeClient(v){
             hod.disabled = role !== 'emp';
             if(role !== 'emp') hod.value='';
         }
-        function loadAdminUsers() {
-            const fd=new FormData(); fd.append('action','adminListUsers'); fd.append('sessionToken',sessionToken);
-            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(data=>{
-                if(data.status!=='success'){ alert(data.message||'Unable to load users.'); return; }
+        async function loadAdminUsers() {
+            const base=String(GOOGLE_SCRIPT_URL||'').replace(/\/$/,'');
+            const payload={action:'adminListUsers',sessionToken:sessionToken};
+            let lastError=null, data=null;
+            // POST first, then GET fallback for Cloudflare/Vercel edge/network cases.
+            for(let attempt=0;attempt<2;attempt++){
+                try{
+                    const controller=new AbortController();
+                    const timer=setTimeout(()=>controller.abort(),20000);
+                    let response;
+                    if(attempt===0){
+                        const fd=new FormData(); fd.append('action',payload.action); fd.append('sessionToken',payload.sessionToken);
+                        response=await fetch(base,{method:'POST',body:fd,cache:'no-store',signal:controller.signal});
+                    }else{
+                        const qs=new URLSearchParams(payload);
+                        response=await fetch(base+'?'+qs.toString()+'&_='+Date.now(),{method:'GET',cache:'no-store',signal:controller.signal});
+                    }
+                    clearTimeout(timer);
+                    const raw=await response.text();
+                    try{data=JSON.parse(raw);}catch(e){throw new Error('Invalid response from Google Apps Script.');}
+                    if(data.status!=='success') throw new Error(data.message||'Unable to load users.');
+                    lastError=null; break;
+                }catch(e){ lastError=e; data=null; if(attempt===0) await new Promise(r=>setTimeout(r,700)); }
+            }
+            if(!data){ alert((lastError&&lastError.message)||'Unable to load users. Please try again.'); return; }
+            {
                 const hod=document.getElementById('adminNewHod'); hod.innerHTML='<option value="">-- Select HOD --</option>';
                 (data.hods||[]).forEach(n=>hod.innerHTML+=`<option value="${n}">${n}</option>`);
                 const body=document.getElementById('adminUsersBody'); body.innerHTML='';
@@ -1761,7 +1783,7 @@ function parseBreakTimeClient(v){
                     body.innerHTML+=`<tr class="border-t"><td class="p-2 font-semibold">${u.username}</td><td class="p-2">${u.role}</td><td class="p-2">${u.department||'-'}</td><td class="p-2">${u.hod||'-'}</td><td class="p-2 text-xs">${u.emailAddress?`<a href="mailto:${u.emailAddress}" class="text-[#259b94] font-bold">${u.emailAddress}</a>`:'-'}</td><td class="p-2 text-xs">${u.contactNumber?`<a href="tel:${u.contactNumber}" class="text-[#259b94] font-bold">${u.contactNumber}</a>`:'-'}</td><td class="p-2 text-xs">${u.whatsappNumber?`<a target="_blank" href="https://wa.me/${String(u.whatsappNumber).replace(/\D/g,'')}" class="text-green-600 font-bold">${u.whatsappNumber}</a>`:'-'}</td><td class="p-2">${webToggle}</td><td class="p-2"><span class="font-bold ${u.accountEnabled!==false?'text-green-600':'text-red-600'}">${u.accountEnabled!==false?'ON':'OFF'}</span></td><td class="p-2 text-xs">${u.accessPermissions||'All / Not Set'}${u.attendanceEntryStart&&u.attendanceEntryEnd?`<br><span class="text-[#259b94]">Att: ${u.attendanceEntryStart} → ${u.attendanceEntryEnd}</span>`:''}</td><td class="p-2">${action}</td></tr>`;
                 });
                 toggleAdminUserHod();
-            }).catch(()=>alert('Unable to load users.'));
+            }
         }
         function toggleUserWebLink(encodedUsername, enabled){
             const username=decodeURIComponent(encodedUsername);
