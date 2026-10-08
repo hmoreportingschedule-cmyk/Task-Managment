@@ -328,8 +328,11 @@ function parseBreakTimeClient(v){
             showLoginStatus('<span class="login-spinner"></span>Secure login check ho raha hai…','info'); btn.innerHTML='<span class="login-spinner"></span>Authenticating…'; btn.disabled=true;
             const formData=new FormData(); formData.append('action','login'); formData.append('username',user); formData.append('password',pass);
             const controller=new AbortController(), timeoutId=setTimeout(()=>controller.abort(),30000);
-            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:formData,cache:'no-store',signal:controller.signal,credentials:'omit'})
-            .then(res=>{if(!res.ok)throw new Error('HTTP '+res.status);return res.json();})
+            // Use the normal POST first. If Apps Script/Cloudflare returns a
+            // non-JSON response or the POST path fails, apiFetchJson_ retries
+            // the same request through GET. The backend V.51 supports that
+            // login fallback explicitly.
+            apiFetchJson_(GOOGLE_SCRIPT_URL,{method:'POST',body:formData,cache:'no-store',signal:controller.signal,credentials:'omit'})
             .then(data=>{
                 if(data.status!=='success'){
                     const msg=data.code==='WEB_LINK_OFF' ? '🔒 '+(data.message||'Aapka Web Link access abhi OFF hai.') : '❌ '+(data.message||'Aap ne galat User ID ya Password add kiya hai.');
