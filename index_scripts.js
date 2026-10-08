@@ -1039,8 +1039,26 @@ function parseBreakTimeClient(v){
             const rec=getAttendanceForLogDate(workDate);
             return !!rec && String(rec.InTime||rec.inTime||'').trim()!=='';
         }
+        function removeLegacyLogTaskMetaSelectors_(){
+            ['logTaskTypeWrap','logTaskCategoryWrap'].forEach(id=>{
+                const el=document.getElementById(id);
+                if(el)el.remove();
+            });
+            ['logTaskTypeSelect','logTaskCategorySelect'].forEach(id=>{
+                const el=document.getElementById(id);
+                if(el)el.remove();
+            });
+        }
+
         function updateLogTaskTemplateMeta(){
             const sel=document.getElementById('logTaskSelect'); if(!sel)return;
+            removeLegacyLogTaskMetaSelectors_();
+
+            // Rename the task selector to the final UI wording requested.
+            const label=sel.parentElement?.querySelector('label');
+            if(label)label.textContent='Task Name';
+            if(sel.options.length && !sel.options[0].value)sel.options[0].textContent='-- Select Task Name --';
+
             let box=document.getElementById('logTaskTemplateMeta');
             if(!box){
                 box=document.createElement('div'); box.id='logTaskTemplateMeta';
@@ -1049,76 +1067,22 @@ function parseBreakTimeClient(v){
             }
             const task=(globalAllTasks||[]).find(t=>String(t.rowIndex)===String(sel.value));
             if(!task){box.classList.add('hidden');box.innerHTML='';return;}
-            const cats=[...new Set([String(task.category||'').trim(),...(task.works||[]).map(w=>String(w.category||'').trim())].filter(Boolean))];
-            const freq=String(task.frequency||'One-time');
-            const priority=String(task.priority||task.Priority||'Normal');
-            box.innerHTML=`<div class="flex flex-wrap gap-3"><span><b>Frequency:</b> ${escapeHtml(freq)}</span><span><b>Priority:</b> ${escapeHtml(priority)}</span></div>`;
+            const freq=String(task.frequency||task.Frequency||'One-time').trim() || 'One-time';
+            const taskType=getTaskType_(task) || '—';
+            box.innerHTML=`<div class="flex flex-wrap gap-4"><span><b>Task Frequency:</b> ${escapeHtml(freq)}</span><span><b>Task Type:</b> ${escapeHtml(taskType)}</span></div>`;
             box.classList.remove('hidden');
         }
 
-
+        // Kept as compatibility no-ops for older callers. The Log Daily Work
+        // screen now shows only Task Name plus read-only Frequency/Type text.
         function ensureLogTaskTypeSelector_(){
-            const taskSel=document.getElementById('logTaskSelect'); if(!taskSel)return null;
-            let typeSel=document.getElementById('logTaskTypeSelect');
-            if(typeSel)return typeSel;
-            typeSel=document.createElement('select');
-            typeSel.id='logTaskTypeSelect';
-            typeSel.className=taskSel.className||'w-full border rounded-lg p-2';
-            typeSel.disabled=true;
-            typeSel.innerHTML='<option value="">-- Task Type --</option>';
-
-            const label=document.createElement('label');
-            label.htmlFor='logTaskTypeSelect';
-            label.textContent='Task Type';
-            label.className='block text-sm font-semibold mb-1';
-
-            const wrap=document.createElement('div');
-            wrap.id='logTaskTypeWrap';
-            wrap.className='mb-3';
-            wrap.appendChild(label);
-            wrap.appendChild(typeSel);
-
-            const taskWrap=taskSel.parentElement;
-            if(taskWrap && taskWrap.parentElement) taskWrap.insertAdjacentElement('afterend',wrap);
-            else if(taskSel.parentElement) taskSel.parentElement.appendChild(wrap);
-            return typeSel;
+            removeLegacyLogTaskMetaSelectors_();
+            return null;
         }
 
         function ensureLogWorkCategorySelector_(){
-            const taskSel=document.getElementById('logTaskSelect'); if(!taskSel)return null;
-            const typeSel=ensureLogTaskTypeSelector_();
-
-            let catSel=document.getElementById('logTaskCategorySelect');
-            if(catSel)return catSel;
-
-            catSel=document.createElement('select');
-            catSel.id='logTaskCategorySelect';
-            catSel.className=taskSel.className||'w-full border rounded-lg p-2';
-            catSel.innerHTML='<option value="">-- Select Task Category --</option>';
-            catSel.disabled=true;
-
-            const label=document.createElement('label');
-            label.htmlFor='logTaskCategorySelect';
-            label.textContent='Task Category';
-            label.className='block text-sm font-semibold mb-1';
-
-            const wrap=document.createElement('div');
-            wrap.id='logTaskCategoryWrap';
-            wrap.className='mb-3';
-            wrap.appendChild(label);
-            wrap.appendChild(catSel);
-
-            // Task Type first, then Task Category.
-            const typeWrap=document.getElementById('logTaskTypeWrap');
-            if(typeWrap && typeWrap.parentElement) typeWrap.insertAdjacentElement('afterend',wrap);
-            else if(typeSel?.parentElement) typeSel.parentElement.appendChild(wrap);
-            else if(taskSel.parentElement) taskSel.parentElement.appendChild(wrap);
-
-            catSel.addEventListener('change',function(){
-                // Selecting a category must never reset/unselect the selected task.
-                updateLogTaskTemplateMeta();
-            });
-            return catSel;
+            removeLegacyLogTaskMetaSelectors_();
+            return null;
         }
 
         function findSourceTemplateForTask_(task){
@@ -1191,7 +1155,7 @@ function parseBreakTimeClient(v){
         function populateLogTaskDropdown(tasks, dateKey, categoryFilter){
             const select=document.getElementById('logTaskSelect'); if(!select)return;
             const workDate=dateKey||document.getElementById('logWorkDate')?.value||localDateKey();
-            select.innerHTML='<option value="">-- Select Active Task --</option>';
+            select.innerHTML='<option value="">-- Select Task Name --</option>';
             const loggedForDate=new Set((globalWorkLogs||[]).filter(w=>{
                 const d=String(w.WorkDate||w.workDate||'');
                 const st=String(w.ApprovalStatus||w.approvalStatus||'Approved').toLowerCase();
@@ -1206,7 +1170,7 @@ function parseBreakTimeClient(v){
                     select.innerHTML+=`<option value="${t.rowIndex}">${escapeHtml(t.taskName||'Task')}</option>`;
                 }
             });
-            if(select.options.length===1)select.innerHTML='<option value="">-- No task available for selected date --</option>';
+            if(select.options.length===1)select.innerHTML='<option value="">-- No Task Name Available for Selected Date --</option>';
             setLogTaskMetaFromSelectedTask_();
             updateCompletionCheckboxState(); updateLogTaskTemplateMeta();
         }
@@ -1339,7 +1303,7 @@ function parseBreakTimeClient(v){
 
                     let empStatusHTML = '';
                     let hodStatusHTML = '';
-                    let timeSpentHTML = `<span class="font-bold text-[#2a4d53]">${task.timeSpent ? task.timeSpent + ' mins' : '-'}</span>`;
+                    let timeSpentHTML = `<span class="font-bold text-[#2a4d53]">${formatMinsForReport(Number(task.timeSpent) || 0)}</span>`;
                     let deadlineHTML = getDeadlineHTML(task.endDate, task.empStatus, task.completedAt);
 
                     let empLocked = (task.empStatus.toLowerCase() === 'completed' && !isAdmin) ? 'disabled' : '';
@@ -2674,9 +2638,11 @@ function parseBreakTimeClient(v){
             if(!allowed){ alert('Log Daily Work 01-Oct-2026 se aaj tak available hai. Future date allowed nahi hai. Admin Lock/Unlock rules apply honge.'); if(btn)btn.disabled=true; return; }
             if(btn)btn.disabled=false;
             modal.style.display='block';
-            ensureLogTaskTypeSelector_();
-            ensureLogWorkCategorySelector_();
-            ensureWorkLogsLoaded(true).catch(()=>{}).finally(()=>{populateLogTaskDropdown(globalAllTasks,dateKey);setLogTaskMetaFromSelectedTask_();updateCompletionCheckboxState();});
+            removeLegacyLogTaskMetaSelectors_();
+            const taskSel=document.getElementById('logTaskSelect');
+            const taskLabel=taskSel?.parentElement?.querySelector('label');
+            if(taskLabel)taskLabel.textContent='Task Name';
+            ensureWorkLogsLoaded(true).catch(()=>{}).finally(()=>{populateLogTaskDropdown(globalAllTasks,dateKey);setLogTaskMetaFromSelectedTask_();updateLogTaskTemplateMeta();updateCompletionCheckboxState();});
             if(document.getElementById('delayReason'))document.getElementById('delayReason').value='';
             const before=document.getElementById('requestBeforeCompletion'); if(before)before.checked=false;
             const done=document.getElementById('markTaskCompleted'); if(done)done.checked=false;
@@ -3422,7 +3388,7 @@ function parseBreakTimeClient(v){
 
         document.addEventListener('change', function(e) {
             if(e.target && (e.target.id === 'whatsappReportDate' || e.target.id === 'whatsappReportMonth')) generateWhatsAppReportPreview();
-            if(e.target && e.target.id === 'logTaskSelect') updateCompletionCheckboxState();
+            if(e.target && e.target.id === 'logTaskSelect'){ setLogTaskMetaFromSelectedTask_(); updateLogTaskTemplateMeta(); updateCompletionCheckboxState(); }
         });
 
         async function shareWhatsAppReport() {
