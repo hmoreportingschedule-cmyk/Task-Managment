@@ -327,7 +327,7 @@ function parseBreakTimeClient(v){
                 const fd=new FormData();
                 fd.append('action','login'); fd.append('username',user); fd.append('password',pass);
                 const controller=new AbortController();
-                const timeoutId=setTimeout(()=>controller.abort(),20000);
+                const timeoutId=setTimeout(()=>controller.abort(),60000);
                 return fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd,cache:'no-store',signal:controller.signal,credentials:'omit'})
                     .then(res=>{if(!res.ok)throw new Error('HTTP '+res.status);return res.text();})
                     .then(raw=>{try{return JSON.parse(raw);}catch(e){throw new Error('Invalid response from Google Apps Script.');}})
@@ -685,28 +685,41 @@ function parseBreakTimeClient(v){
 
         async function apiFetchJson_(url, options){
             const opts=options||{};
+            const requestTimeout=Number(opts.timeoutMs)||60000;
             const parseResponse=async(res)=>{
                 const text=await res.text();
                 const trimmed=String(text||'').trim();
                 try{return JSON.parse(trimmed);}
                 catch(_jsonErr){
                     const title=(trimmed.match(/<title[^>]*>([\s\S]*?)<\/title>/i)||[])[1]||'';
-                    const body=(trimmed.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim()).slice(0,220);
-                    throw new Error('Backend ne JSON ke bajaye HTML response diya. '+(title||body||('HTTP '+res.status)));
+                    const body=(trimmed.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim()).slice(0,300);
+                    throw new Error('Backend response valid nahi hai. Google Apps Script Web App deployment check karein. '+(title||body||('HTTP '+res.status)));
                 }
             };
-            let res=await fetch(url,opts);
-            try{return await parseResponse(res);}
-            catch(firstErr){
-                // Google Apps Script deployments and some Cloudflare proxies can
-                // return an HTML redirect/error page for POST. The backend also
-                // supports action-based GET, so retry the same parameters via GET.
-                if(opts.method==='POST' && opts.body instanceof FormData){
+            const doRequest=async(methodUrl, method, body)=>{
+                const controller=new AbortController();
+                const timer=setTimeout(()=>controller.abort('request-timeout'),requestTimeout);
+                try{
+                    const req={method:method,cache:'no-store',credentials:'omit',signal:controller.signal};
+                    if(body!==undefined)req.body=body;
+                    const res=await fetch(methodUrl,req);
+                    if(!res.ok)throw new Error('HTTP '+res.status);
+                    return await parseResponse(res);
+                }catch(err){
+                    if(err && err.name==='AbortError') throw new Error('Google Apps Script response timeout ho gaya. Deployment/server response check karein.');
+                    throw err;
+                }finally{clearTimeout(timer);}
+            };
+            try{
+                return await doRequest(url,opts.method||'GET',opts.body);
+            }catch(firstErr){
+                // For POST FormData, retry through GET. This also handles Apps Script
+                // redirect/proxy cases where POST response is interrupted.
+                if((opts.method||'GET').toUpperCase()==='POST' && opts.body instanceof FormData){
                     const params=new URLSearchParams();
-                    opts.body.forEach((v,k)=>{ if(typeof v==='string')params.append(k,v); });
+                    opts.body.forEach((v,k)=>{if(typeof v==='string')params.append(k,v);});
                     const sep=url.includes('?')?'&':'?';
-                    const retry=await fetch(url+sep+params.toString(),{method:'GET',credentials:opts.credentials||'same-origin'});
-                    return await parseResponse(retry);
+                    return await doRequest(url+sep+params.toString()+'&_='+Date.now(),'GET');
                 }
                 throw firstErr;
             }
