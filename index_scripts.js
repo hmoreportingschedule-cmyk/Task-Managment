@@ -326,11 +326,27 @@ function parseBreakTimeClient(v){
             if(GOOGLE_SCRIPT_URL === "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE"){ showLoginStatus('Please update the Google Apps Script Web App URL first.','error'); return; }
             const user=document.getElementById('username').value.trim(), pass=document.getElementById('password').value, btn=document.getElementById('loginBtn');
             showLoginStatus('<span class="login-spinner"></span>Secure login check ho raha hai…','info'); btn.innerHTML='<span class="login-spinner"></span>Authenticating…'; btn.disabled=true;
-            const formData=new FormData(); formData.append('action','login'); formData.append('username',user); formData.append('password',pass);
-            const controller=new AbortController(), timeoutId=setTimeout(()=>controller.abort(),30000);
-            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:formData,cache:'no-store',signal:controller.signal,credentials:'omit'})
-            .then(res=>{if(!res.ok)throw new Error('HTTP '+res.status);return res.json();})
-            .then(data=>{
+            // Fresh request body on every attempt; retry only transient network/timeout errors.
+            // This avoids treating a slow Apps Script cold-start as an incorrect password.
+            const sendLoginRequest_ = (retryNo) => {
+                const fd=new FormData();
+                fd.append('action','login'); fd.append('username',user); fd.append('password',pass);
+                const controller=new AbortController();
+                const timeoutId=setTimeout(()=>controller.abort(),20000);
+                return fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd,cache:'no-store',signal:controller.signal,credentials:'omit'})
+                    .then(res=>{if(!res.ok)throw new Error('HTTP '+res.status);return res.text();})
+                    .then(raw=>{try{return JSON.parse(raw);}catch(e){throw new Error('Invalid response from Google Apps Script.');}})
+                    .catch(err=>{
+                        if(retryNo<1){
+                            showLoginStatus('<span class="login-spinner"></span>Server response slow hai, dobara connect ho raha hai…','info');
+                            return new Promise(resolve=>setTimeout(resolve,900)).then(()=>sendLoginRequest_(retryNo+1));
+                        }
+                        throw err;
+                    })
+                    .finally(()=>clearTimeout(timeoutId));
+            };
+
+            sendLoginRequest_(0).then(data=>{
                 if(data.status!=='success'){
                     const msg=data.code==='WEB_LINK_OFF' ? '🔒 '+(data.message||'Aapka Web Link access abhi OFF hai.') : '❌ '+(data.message||'Aap ne galat User ID ya Password add kiya hai.');
                     showLoginStatus(msg,'error');btn.innerHTML='Login to Dashboard <i class="fas fa-arrow-right ml-2"></i>';btn.disabled=false;return;
@@ -370,8 +386,12 @@ function parseBreakTimeClient(v){
                 }
                 v4CurrentWeekoff=data.weekoff||'Sunday';ensureAttendanceLockAdminUI();addRefreshButton_();requestAnimationFrame(()=>fetchDashboardData(data.username||user,role,data.department||''));setTimeout(v4UpdateAttendanceAvailability,100);
             })
-            .catch(err=>{showLoginStatus(err&&err.name==='AbortError'?'⏱️ Server response mein zyada time lag raha hai. Please 10–15 seconds baad dobara try karein.':'⚠️ Server se connection nahi ho pa raha. Please connection check karke dobara try karein.','error');btn.innerHTML='Login to Dashboard <i class="fas fa-arrow-right ml-2"></i>';btn.disabled=false;})
-            .finally(()=>clearTimeout(timeoutId));
+ 
+            .catch(err=>{
+                showLoginStatus(err&&err.name==='AbortError' ? '⏱️ Server response mein zyada time lag raha hai. Apps Script Web App deployment check karke dobara try karein.' : '⚠️ '+(err.message||'Server se connection nahi ho pa raha.'),'error');
+                btn.innerHTML='Login to Dashboard <i class="fas fa-arrow-right ml-2"></i>'; btn.disabled=false;
+            });
+
         }
 
         const LOGIN_SESSION_STORAGE_KEY_ = 'office_task_login_session_v1';
