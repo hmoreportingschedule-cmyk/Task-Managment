@@ -1392,9 +1392,10 @@ function parseBreakTimeClient(v){
                     // Replace option removed from Assigned Tasks UI as requested.
                     const taskReplaceHTML = '';
                     const displayTaskType = task.taskType || task.templateTaskType || task.type || '-';
+                    const taskAdminActionsHTML = isAdmin ? `<div class="mt-2 flex flex-wrap gap-1"><button type="button" onclick="openEditTaskModalByKey(${taskActionKey})" class="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-2 py-1 rounded-lg text-xs font-bold" title="Edit Task"><i class="fas fa-pen-to-square"></i> Edit</button><button type="button" onclick="deleteAssignedTaskByKey(${taskActionKey})" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-2 py-1 rounded-lg text-xs font-bold" title="Delete Task"><i class="fas fa-trash"></i> Delete</button></div>` : '';
                     tr.innerHTML = `
                         <td class="py-4 px-6 font-bold text-[#112a2e]">${escapeHtml(displayTaskType)}</td>
-                        <td class="py-4 px-6 font-bold text-[#112a2e]">${escapeHtml(displayTaskName)}${replacementForToday ? '<div class="text-[10px] text-[#0f766e] font-semibold mt-1">Replacement approved</div>' : ''}</td>
+                        <td class="py-4 px-6 font-bold text-[#112a2e]">${escapeHtml(displayTaskName)}${replacementForToday ? '<div class="text-[10px] text-[#0f766e] font-semibold mt-1">Replacement approved</div>' : ''}${taskAdminActionsHTML}</td>
                          <td class="py-4 px-6 font-bold text-[#0f766e]">${escapeHtml(task.frequency||'One-time')}</td>
                          <td class="py-4 px-6 text-[#259b94] font-bold ${isHOD ? '' : 'hidden'}">${isHOD ? escapeHtml(task.assignedTo || '-') : ''}</td>
                          <td class="py-4 px-6 text-[#4b6d70] font-semibold">${escapeHtml(task.assignedBy || '-')}</td>
@@ -1405,7 +1406,6 @@ function parseBreakTimeClient(v){
                         <td class="py-4 px-6">${timeSpentHTML}</td>
                         <td class="py-4 px-6">${empStatusHTML}</td>
                         <td class="py-4 px-6">${hodStatusHTML}</td>
-                        ${(isHOD || isAdmin || (!isHOD && !isAdmin)) ? `<td class="py-4 px-3 whitespace-nowrap">${isAdmin ? `<button type="button" onclick="openEditTaskModalByKey(${taskActionKey})" class="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-2 py-1.5 rounded-lg text-xs font-bold mr-1" title="Edit Task"><i class="fas fa-pen-to-square"></i> Edit</button><button type="button" onclick="deleteAssignedTaskByKey(${taskActionKey})" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-2 py-1.5 rounded-lg text-xs font-bold" title="Delete Task"><i class="fas fa-trash"></i> Delete</button>` : ''}${taskReplaceHTML}</td>` : ''}
                     `;
                     tbody.appendChild(tr);
                 });
