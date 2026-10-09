@@ -2073,7 +2073,7 @@ function parseBreakTimeClient(v){
                 const wb=XLSX.read(new Uint8Array(ev.target.result),{type:'array'}),ws=wb.Sheets[wb.SheetNames[0]],arr=XLSX.utils.sheet_to_json(ws,{defval:''});
                 if(!arr.length){document.getElementById('importPreview').innerHTML='<div class="bg-red-50 border border-red-200 rounded-lg p-3 font-semibold text-red-700">File mein data nahi hai.</div>';return;}
                 if(importCenterType==='attendance'){
-                    importCenterRows=arr.map(r=>({date:importExcelDate(r['Date']||r['date']),employee:String(r['Employee ID']||r['Employee']||r['Username']||r['username']||'').trim(),inTime:importExcelTime(r['In Time']||r['InTime']),outTime:importExcelTime(r['Out Time']||r['OutTime']),breakStart:importExcelTime(r['Break Start']||r['BreakStart']),breakEnd:importExcelTime(r['Break End']||r['BreakEnd']),leave:String(r['Leave/Weekoff']||r['Leave']||'').trim(),reason:String(r['Reason']||'').trim(),status:String(r['Approval Status']||'Approved').trim()})).filter(r=>r.date||r.employee);
+                    importCenterRows=arr.map(r=>({date:importExcelDate(r['Date']||r['date']),employee:String(r['Employee ID']||r['Employee']||r['Username']||r['username']||'').trim(),inTime:importExcelTime(r['In Time']||r['InTime']),outTime:importExcelTime(r['Out Time']||r['OutTime']),breakStart:importExcelTime(r['Break Start']||r['BreakStart']),breakEnd:importExcelTime(r['Break End']||r['BreakEnd']),leave:String(r['Leave/Weekoff']||r['Leave']||'').trim(),reason:String(r['Reason']||'').trim(),status:String(r['Approval Status']??'').trim(),holidayName:String(r['Holiday Name']||r['Holiday']||'').trim(),holidayType:String(r['Holiday Type']||'Holiday').trim()})).filter(r=>r.date&&(r.employee||r.holidayName));
                     if(!importCenterRows.length)throw new Error('Valid attendance rows nahi mili.');
                     importPreviewRows(importCenterRows,'attendance');
                 } else if(importCenterType==='tasks'){
@@ -2155,8 +2155,12 @@ function parseBreakTimeClient(v){
         function downloadImportFormat(){
             const wb=XLSX.utils.book_new();
             if(importCenterType==='attendance'){
-                const ws=XLSX.utils.json_to_sheet([{'Date':'2026-09-22','Employee ID':'EMP001','In Time':'09:30:00 AM','Out Time':'06:30:00 PM','Break Start':'02:00:00 PM','Break End':'02:30:00 PM','Leave/Weekoff':'','Reason':'','Approval Status':'Approved'}]);
-                XLSX.utils.book_append_sheet(wb,ws,'Attendance'); XLSX.writeFile(wb,'Attendance_Import_Format.xlsx');
+                const rows=[
+                    {'Date':'2026-10-09','Employee ID':'EMP001','In Time':'09:30 AM','Out Time':'19:00','Break Start':'14:00','Break End':'14:30','Leave/Weekoff':'','Reason':'Regular duty','Approval Status':'Approved','Holiday Name':'','Holiday Type':''},
+                    {'Date':'2026-10-10','Employee ID':'EMP001','In Time':'','Out Time':'','Break Start':'','Break End':'','Leave/Weekoff':'Leave','Reason':'Leave request','Approval Status':'','Holiday Name':'','Holiday Type':''},
+                    {'Date':'2026-10-12','Employee ID':'','In Time':'','Out Time':'','Break Start':'','Break End':'','Leave/Weekoff':'','Reason':'','Approval Status':'','Holiday Name':'Example Holiday','Holiday Type':'Public Holiday'}
+                ];
+                const ws=XLSX.utils.json_to_sheet(rows); XLSX.utils.book_append_sheet(wb,ws,'Attendance & Holidays'); XLSX.writeFile(wb,'Attendance_Import_Format.xlsx');
             } else if(importCenterType==='tasks'){
                 // Exact Task Template import format. Repeat Template ID for each work row.
                 const rows=[
