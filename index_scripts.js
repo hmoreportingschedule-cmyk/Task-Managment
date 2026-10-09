@@ -4887,7 +4887,8 @@ function parseBreakTimeClient(v){
             if(!date){alert('Please select future date.');return;}
             if(['3 Days Qafila','Tarbiyati Ijtima'].includes(type) && (!endDate||endDate<date)){alert('From Date aur To Date sahi select karein.');return;}
             if(type==='Meeting'&&mode==='Online'&&(!meetingFrom||!meetingTo)){alert('Online Meeting ke liye From aur To time select karein.');return;}
-            if(type==='Meeting Journey'&&(!journeyStart||!journeyComplete)){alert('Journey Start aur Journey Complete time select karein.');return;}
+            if(type==='Meeting Journey'&&(!journeyStart||!journeyComplete)){alert('Journey Start aur Journey Complete ki date aur time select karein.');return;}
+            if(type==='Meeting Journey'&&journeyStart&&journeyComplete&&new Date(journeyComplete).getTime()<=new Date(journeyStart).getTime()){alert('Journey Complete ka date/time, Journey Start ke baad hona chahiye.');return;}
             const btn=document.getElementById('advanceScheduleBtn'); btn.disabled=true; btn.innerText='Submitting...';
             const fd=new FormData(); fd.append('action','advanceScheduleRequest'); fd.append('requestDate',date); fd.append('endDate',endDate); fd.append('requestType',type); fd.append('reason',reason); fd.append('location',scheduleLocation); fd.append('weekoffDate',weekoffDate); fd.append('meetingMode',mode); fd.append('meetingFrom',meetingFrom); fd.append('meetingTo',meetingTo); fd.append('journeyStart',journeyStart); fd.append('journeyComplete',journeyComplete); fd.append('sessionToken',sessionToken);
             fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(data=>{
