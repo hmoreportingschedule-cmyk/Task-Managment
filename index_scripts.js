@@ -351,7 +351,7 @@ function parseBreakTimeClient(v){
                 document.getElementById('login-section').style.display='none'; document.getElementById('dashboard-section').style.display='flex';
                 sessionToken=data.sessionToken||""; whatsappGroupLink=data.whatsappGroupLink||"";
                 persistLoginSession_(data,user); startInactivitySessionTimer_(); performanceWeights=data.performanceWeights||{attendance:50,task:50}; ramadanLunchFrozen=!!data.ramadanLunchFrozen; attendanceEntryStart=data.attendanceEntryStart||""; attendanceEntryEnd=data.attendanceEntryEnd||"";
-                setDateConstraints(); document.getElementById('displayUser').innerText=data.actualName||data.username; window.currentUserContactNumber=data.contactNumber||''; window.currentUserWhatsappNumber=data.whatsappNumber||''; window.currentUserEmployeeId=data.employeeId||'';
+                setDateConstraints(); window.currentUsername=String(data.username||user||'').trim(); document.getElementById('displayUser').innerText=data.actualName||data.username; window.currentUserContactNumber=data.contactNumber||''; window.currentUserWhatsappNumber=data.whatsappNumber||''; window.currentUserEmployeeId=data.employeeId||'';
                 document.getElementById('displayDept').innerText=data.department||'--'; document.getElementById('displayOfficeTime').innerText=data.officeTime||'--'; window.currentUserWeekoff=data.weekoff||'Sunday'; document.getElementById('displayWeekoff').innerText=data.weekoff||'Sunday';
                 document.getElementById('displayOfficeLocation').innerText=[data.officeLocation,data.officeAddress].filter(Boolean).join(' : ')||'--'; setDisplayedProfilePhoto(data.profilePhotoUrl||'');
                 const role=String(data.role||'').toLowerCase(); document.getElementById('displayRole').innerText=role;
@@ -509,6 +509,7 @@ function parseBreakTimeClient(v){
         }
         function applyRestoredSession_(p){
             sessionToken=p.sessionToken||'';
+            window.currentUsername=String(p.username||'').trim();
             whatsappGroupLink=p.whatsappGroupLink||'';
             performanceWeights=p.performanceWeights||{attendance:50,task:50};
             ramadanLunchFrozen=!!p.ramadanLunchFrozen;
@@ -3946,9 +3947,12 @@ function parseBreakTimeClient(v){
         }
         function parseReportDate(s) {
             if(!s || s === '-') return null;
-            const p=String(s).split('-');
-            if(p.length!==3) return null;
-            const d=new Date(Number(p[2]),Number(p[1])-1,Number(p[0])); d.setHours(0,0,0,0); return d;
+            const raw=String(s).trim();
+            let m=raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+            if(m){const d=new Date(Number(m[1]),Number(m[2])-1,Number(m[3]));d.setHours(0,0,0,0);return isNaN(d.getTime())?null:d;}
+            m=raw.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+            if(!m)return null;
+            const d=new Date(Number(m[3]),Number(m[2])-1,Number(m[1]));d.setHours(0,0,0,0);return isNaN(d.getTime())?null:d;
         }
         function taskDeadlineInfo(t) {
             const due=parseReportDate(t.endDate); if(!due) return {label:'-',className:'text-gray-500'};
@@ -4092,8 +4096,9 @@ function parseBreakTimeClient(v){
         function progressReportEmployees(){
             const role=String(document.getElementById('displayRole')?.innerText||'').toLowerCase();
             const all=Array.isArray(globalTeamMembers)?globalTeamMembers.slice():[];
-            if(role.includes('admin')||role.includes('hod')) return all.length?all:[document.getElementById('displayUser')?.innerText||''];
-            return [document.getElementById('displayUser')?.innerText||''];
+            const self=String(window.currentUsername||'').trim() || String(document.getElementById('displayUser')?.innerText||'').trim();
+            if(role.includes('admin')||role.includes('hod')||role.includes('taskadmin')||role.includes('assistant')) return all.length?all:[self];
+            return [self];
         }
         function progressReportTasksFor(emp, start, end){
             return (globalAllTasks||[]).filter(t=>{
@@ -4103,11 +4108,14 @@ function parseBreakTimeClient(v){
             });
         }
         function progressReportAttendanceFor(emp, start, end){
-            const seen=new Map();
+            const seen=new Map(), meta=attendanceMetaForUser(emp)||{};
+            const aliases=[emp,meta.username,meta.displayName,meta.employeeId,window.currentUsername,document.getElementById('displayUser')?.innerText]
+                .map(v=>String(v||'').trim().toLowerCase()).filter(Boolean);
             (globalMonthlyFullAttendance||[]).forEach(a=>{
-                if(String(a.Employee||'').toLowerCase()!==String(emp||'').toLowerCase()) return;
-                const d=progressReportDateObj(a.Date); if(!d||d<start||d>end)return;
-                const key=d.getTime(); if(!seen.has(key)||(!seen.get(key).InTime&&a.InTime))seen.set(key,a);
+                const owner=String(a.Employee||a.Username||a.username||a.EmployeeId||a['Employee ID']||'').trim().toLowerCase();
+                if(!owner||!aliases.includes(owner)) return;
+                const d=progressReportDateObj(a.Date||a.date||a.AttendanceDate); if(!d||d<start||d>end)return;
+                const key=d.getTime(); if(!seen.has(key)||(!seen.get(key).InTime&&(a.InTime||a['In Time'])))seen.set(key,{...a,Employee:a.Employee||a.Username||a.username||emp,Date:a.Date||a.date||a.AttendanceDate,InTime:a.InTime||a['In Time']||'',OutTime:a.OutTime||a['Out Time']||'',Status:a.Status||a['Approval Status']||'',Leave:a.Leave||a['Leave/Weekoff']||'',ExtraBreakMinutes:a.ExtraBreakMinutes||a['Extra Break Time']||'',BreakTimeForIjara:a.BreakTimeForIjara||a['Break Time For Ijara']||'',Reason:a.Reason||'',Location:a.Location||''});
             });
             return Array.from(seen.values()).sort((a,b)=>(progressReportDateObj(a.Date)||0)-(progressReportDateObj(b.Date)||0));
         }
