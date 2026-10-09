@@ -2,10 +2,11 @@
 
 
 
-        // V.72: Browser calls the same-origin Cloudflare Worker proxy. The Worker forwards
-        // requests only to the approved Apps Script endpoint, avoiding browser CORS failures.
+        // YAHAN APNA NAYA GOOGLE SCRIPT URL DAALEIN
+        // GOOGLE SHEET / APPS SCRIPT URL: Is URL ko change karein agar Web App deployment URL badle.
         const DEFAULT_GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw9x_CwQz3CAQFSZENxZ6tFwTETOv-vol39dGDR5-A0cFj-pvbgd5_HI_1vLLm5yOxG4Q/exec";
-        const GOOGLE_SCRIPT_URL = "/api";
+        // Fixed configuration: this application uses only the approved Google Apps Script endpoint.
+        const GOOGLE_SCRIPT_URL = DEFAULT_GOOGLE_SCRIPT_URL; // Fixed: only the approved Google Apps Script endpoint is allowed.
         
         let globalAllTasks = []; 
         let globalTeamMembers = [];
@@ -30,7 +31,8 @@
         // Admin Lock/Unlock remains the authority for older/current dates.
         const ENTRY_BASELINE_DATE = "2026-10-01";
 
-        // V.72: API requests use same-origin /api. Cloudflare Worker proxies them to Apps Script.
+        // V.14 hosting compatibility: do not use Vercel/Cloudflare-specific APIs.
+        // All backend calls remain standard browser fetch() POST requests to Apps Script.
         const APP_HOSTING_PLATFORM = /(^|\.)vercel\.app$/i.test(location.hostname) ? 'vercel'
             : (/^(pages\.|.*\.)?cloudflarepages\.dev$/i.test(location.hostname) || /\.workers\.dev$/i.test(location.hostname) ? 'cloudflare' : 'static');
 
@@ -4707,19 +4709,7 @@ function parseBreakTimeClient(v){
             if(!assignBy){alert('Assign By select karein.');return;}
             const fd=new FormData();fd.append('action','emergencyTaskRequest');fd.append('taskTemplate',templateId);fd.append('requestDate',fromDate);fd.append('endDate',toDate);fd.append('assignBy',assignBy);fd.append('details',details);fd.append('sessionToken',sessionToken);
             const b=document.getElementById('emergencyTaskBtn');b.disabled=true;b.innerText='Sending...';
-            // Emergency Task requests are submitted directly to the approved Apps Script URL
-            // with no-cors. This avoids Cloudflare/browser CORS + redirect failures that can
-            // surface as the misleading "Failed to fetch" even when the Apps Script accepts POST.
-            // No automatic retry is performed, so one click creates at most one request.
-            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd,mode:'no-cors',cache:'no-store',keepalive:true}).then(()=>{
-                alert('Task Request HOD/Admin ko bhej di gayi hai. Approval ke baad task assign ho jayega.');
-                closeEmergencyTaskModal();
-                setTimeout(()=>fetchDashboardDataSilently(true),1800);
-            }).catch(()=>{
-                // If the direct request itself is blocked, give a clear message instead of
-                // showing the generic JSON/CORS parsing error.
-                alert('Task Request send nahi ho saki. Apps Script Web App deployment check karein.');
-            }).finally(()=>{b.disabled=false;b.innerText='Send Request';});
+            apiFetchJson_(GOOGLE_SCRIPT_URL,{method:'POST',body:fd,timeoutMs:60000}).then(d=>{if(!d||d.status!=='success')throw new Error(d?.message||'Task Request failed.');alert(d.message||'Task Request sent');closeEmergencyTaskModal();fetchDashboardDataSilently();}).catch(e=>alert(e.message||'Task Request failed.')).finally(()=>{b.disabled=false;b.innerText='Send Request';});
         }
         function submitAdvanceScheduleRequest(){
             const date=document.getElementById('advanceScheduleDate').value;
