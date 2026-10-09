@@ -1470,22 +1470,34 @@ function parseBreakTimeClient(v){
             fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd,cache:'no-store'}).then(async r=>{const text=await r.text();let d;try{d=JSON.parse(text);}catch(_){throw new Error('Backend response valid nahi hai. Google Apps Script Web App deployment check karein.');}if(d.status!=='success')throw new Error(d.message||'Task update failed');alert(d.message||'Task update ho gaya.');closeEditTaskModal();await fetchDashboardDataSilently();}).catch(e=>alert(e.message||'Task update nahi ho saka.')).finally(()=>{btn.disabled=false;btn.innerText='Save Task Changes';});
         }
         function clearAllTestingTasks(){
-            const role=String(document.getElementById('displayRole').innerText||'');
-            const currentUser=String(document.getElementById('displayUser')?.innerText||'').trim().toLowerCase().replace(/[^a-z0-9]/g,'');
-            if(!isFullAdminRole(role) || (currentUser!=='masteradmin' && currentUser!=='superadmin')){
-                alert('Testing tasks ka bulk cleanup sirf MasterAdmin/SuperAdmin se kiya ja sakta hai.'); return;
+            const role=String(document.getElementById('displayRole')?.innerText||'');
+            if(!isFullAdminRole(role)){alert('Assigned tasks clear karne ka access sirf Admin/Master Admin ko hai.');return;}
+            const tasks=(Array.isArray(globalAllTasks)?globalAllTasks:[]).filter(t=>t&&t.taskId&&t.assignedTo);
+            if(!tasks.length){alert('Clear karne ke liye koi assigned task load nahi hai. Pehle Dashboard Refresh karein.');return;}
+            let modal=document.getElementById('clearSelectedTasksModal');
+            if(!modal){
+                modal=document.createElement('div');modal.id='clearSelectedTasksModal';modal.className='fixed inset-0 z-[10000] bg-black/50 p-4 overflow-y-auto';
+                modal.innerHTML=`<div class="max-w-4xl mx-auto mt-8 bg-white rounded-2xl shadow-2xl overflow-hidden"><div class="p-5 border-b flex items-center justify-between"><div><h2 class="text-xl font-extrabold text-[#112a2e]">Select Tasks to Clear</h2><p class="text-sm text-gray-500 mt-1">Sirf selected tasks archive karke clear honge. Baaki tasks bilkul change nahi honge.</p></div><button type="button" onclick="closeClearSelectedTasksModal()" class="text-2xl text-gray-500">×</button></div><div class="p-4 flex flex-wrap items-center gap-2"><input id="clearTaskSearch" oninput="filterClearTaskOptions()" placeholder="Search employee or task..." class="border rounded-lg p-2 text-sm flex-1 min-w-[220px]"><button type="button" onclick="toggleClearTaskSelection(true)" class="border rounded-lg px-3 py-2 text-sm font-bold">Select Visible</button><button type="button" onclick="toggleClearTaskSelection(false)" class="border rounded-lg px-3 py-2 text-sm font-bold">Clear Selection</button><span id="clearTaskSelectedCount" class="text-sm font-bold text-[#259b94]">0 selected</span></div><div id="clearTaskOptions" class="px-4 pb-4 max-h-[50vh] overflow-auto divide-y"></div><div class="p-4 border-t flex justify-end gap-2"><button type="button" onclick="closeClearSelectedTasksModal()" class="border rounded-lg px-4 py-2 font-bold">Cancel</button><button id="clearSelectedTasksSubmit" type="button" onclick="submitClearSelectedTasks()" class="bg-red-600 text-white rounded-lg px-4 py-2 font-bold">Archive & Clear Selected</button></div></div>`;
+                document.body.appendChild(modal);
             }
-            const ok=confirm('WARNING: Testing ke SAARE assigned tasks delete honge.\n\nUsers, Attendance, WorkLogs, Departments aur Task Templates delete nahi honge.\n\nKya aap continue karna chahte hain?');
-            if(!ok)return;
-            const btn=document.querySelector('button[onclick="clearAllTestingTasks()"]'); if(btn){btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin mr-1"></i> Clearing...';}
-            const fd=new FormData(); fd.append('action','clearAllTestingTasks'); fd.append('sessionToken',sessionToken);
-            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(d=>{
-                if(d.status!=='success')throw new Error(d.message||'Cleanup failed');
-                alert(d.message||'Testing tasks clear ho gaye.');
-                fetchDashboardDataSilently();
-            }).catch(e=>alert(e.message||'Testing tasks clear nahi ho sake.')).finally(()=>{
-                if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-broom mr-1"></i> Clear Testing Tasks';}
-            });
+            window.clearSelectedTaskCandidates=tasks;
+            const box=document.getElementById('clearTaskOptions');
+            box.innerHTML=tasks.map((t,i)=>`<label class="clear-task-option flex items-start gap-3 p-3 hover:bg-gray-50" data-search="${escapeHtml((t.assignedTo+' '+t.taskName+' '+t.taskId).toLowerCase())}"><input type="checkbox" class="clear-task-check mt-1" data-index="${i}" onchange="updateClearTaskSelectedCount()"><span class="min-w-0 flex-1"><span class="font-bold text-sm text-[#112a2e]">${escapeHtml(t.taskName||'Unnamed Task')}</span><span class="block text-xs text-gray-600 mt-1">Employee: ${escapeHtml(t.assignedTo)} · Task ID: ${escapeHtml(t.taskId)} · Status: ${escapeHtml(t.empStatus||'Pending')}</span><span class="block text-xs text-gray-500">${escapeHtml(t.startDate||'')} → ${escapeHtml(t.endDate||'')}</span></span></label>`).join('');
+            document.getElementById('clearTaskSearch').value='';updateClearTaskSelectedCount();modal.style.display='block';
+        }
+        function closeClearSelectedTasksModal(){const m=document.getElementById('clearSelectedTasksModal');if(m)m.style.display='none';}
+        function updateClearTaskSelectedCount(){const n=document.querySelectorAll('#clearTaskOptions .clear-task-check:checked').length;const el=document.getElementById('clearTaskSelectedCount');if(el)el.textContent=n+' selected';}
+        function toggleClearTaskSelection(checked){document.querySelectorAll('#clearTaskOptions .clear-task-option').forEach(row=>{if(row.style.display==='none')return;const c=row.querySelector('.clear-task-check');if(c)c.checked=!!checked;});updateClearTaskSelectedCount();}
+        function filterClearTaskOptions(){const q=String(document.getElementById('clearTaskSearch')?.value||'').trim().toLowerCase();document.querySelectorAll('#clearTaskOptions .clear-task-option').forEach(row=>{row.style.display=(!q||String(row.dataset.search||'').includes(q))?'':'none';});}
+        async function submitClearSelectedTasks(){
+            const role=String(document.getElementById('displayRole')?.innerText||'');if(!isFullAdminRole(role)){alert('Sirf Admin assigned tasks clear kar sakta hai.');return;}
+            const selected=[...document.querySelectorAll('#clearTaskOptions .clear-task-check:checked')].map(c=>window.clearSelectedTaskCandidates?.[Number(c.dataset.index)]).filter(t=>t&&t.taskId&&t.assignedTo).map(t=>({targetUser:t.assignedTo,taskId:t.taskId}));
+            if(!selected.length){alert('Pehle clear karne ke liye task select karein.');return;}
+            if(!confirm(`${selected.length} selected task(s) archive karke clear honge. Unselected tasks, WorkLogs, Attendance aur Templates change nahi honge. Continue?`))return;
+            const btn=document.getElementById('clearSelectedTasksSubmit');if(btn){btn.disabled=true;btn.textContent='Archiving & Clearing...';}
+            try{const fd=new FormData();fd.append('action','clearSelectedTasks');fd.append('tasksJson',JSON.stringify(selected));fd.append('sessionToken',sessionToken);const r=await fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd,cache:'no-store'});const d=await r.json();if(d.status!=='success'&&d.status!=='partial')throw new Error(d.message||'Selected tasks clear nahi hue.');alert(d.message||'Selected tasks archive karke clear ho gaye.');closeClearSelectedTasksModal();await fetchDashboardDataSilently(true);}
+            catch(e){alert(e.message||'Selected tasks clear karte waqt error aaya.');}
+            finally{if(btn){btn.disabled=false;btn.textContent='Archive & Clear Selected';}}
         }
 
         function deleteAssignedTask(targetUser, taskId, taskName, rowIndex){
@@ -3549,14 +3561,13 @@ function parseBreakTimeClient(v){
                 const status=String(r.status||'Pending');
                 out.push({key:'attendance|'+r.rowIndex,type:'attendance',typeLabel:'Attendance',employee:r.employee||'',employeeId:r.employeeId||'',task:'Attendance Request',date:r.date||'',details:r.reason||'-',status:status,rowIndex:r.rowIndex,action:'attendance'});
             });
+            // Only Attendance and Task approvals belong in this centre.
+            // Emergency Task is a task request; leave, weekoff, schedule and adjustment
+            // requests are intentionally excluded from this approval/reject screen.
             (globalAdvanceScheduleRequests||[]).forEach(r=>{
                 const status=String(r.status||'Pending'), rt=String(r.requestType||'');
-                if(rt==='Emergency Task'){
-                    out.push({key:'urgent|'+r.rowIndex,type:'task',typeLabel:'Task',employee:r.employee||'',employeeId:r.employeeId||'',task:r.taskName||'Today Urgent Task',date:r.requestDate||'',details:(r.category?r.category+' • ':'')+(r.assignBy?'Assign By: '+r.assignBy+' • ':'')+(r.details||'-'),status:status,rowIndex:r.rowIndex,action:'scheduleEmergency',requestId:r.requestId||'',assignBy:r.assignBy||'',approvalOwner:r.approvalOwner||''});
-                    return;
-                }
-                const kind=rt.toLowerCase().includes('leave')?'leave':rt.toLowerCase().includes('weekoff')||rt.toLowerCase().includes('adjust')?'adjustment':'adjustment';
-                out.push({key:'schedule|'+r.rowIndex,type:kind,typeLabel:kind==='leave'?'Leave':'Adjustment',employee:r.employee||'',employeeId:r.employeeId||'',task:rt||'Schedule Request',date:r.requestDate||'',details:r.details||r.location||'-',status:status,rowIndex:r.rowIndex,action:'schedule'});
+                if(!/emergency task|today urgent task/i.test(rt)) return;
+                out.push({key:'urgent|'+r.rowIndex,type:'task',typeLabel:'Task',employee:r.employee||'',employeeId:r.employeeId||'',task:r.taskName||'Today Urgent Task',date:r.requestDate||'',details:(r.assignBy?'Assign By: '+r.assignBy+' • ':'')+(r.details||'-'),status:status,rowIndex:r.rowIndex,action:'scheduleEmergency',requestId:r.requestId||'',assignBy:r.assignBy||'',approvalOwner:r.approvalOwner||''});
             });
             // Daily Work logs do NOT require HOD/Admin approval.
             // Their minutes are accumulated directly into the task time spent.
@@ -3609,7 +3620,7 @@ function parseBreakTimeClient(v){
         function renderApprovalAttendanceTaskCenter(){
             const box=document.getElementById('approvalCenterBody'); if(!box)return;
             const type=document.getElementById('approvalCenterType')?.value||'all', statusFilter=document.getElementById('approvalCenterStatus')?.value||'pending', emp=(document.getElementById('approvalCenterEmployee')?.value||'').toLowerCase(), task=(document.getElementById('approvalCenterTask')?.value||'').toLowerCase().trim(), month=document.getElementById('approvalCenterMonth')?.value||'', from=document.getElementById('approvalCenterFrom')?.value||'', to=document.getElementById('approvalCenterTo')?.value||'';
-            const list=approvalCenterItems.filter(x=>(type==='all'||x.type===type)&&approvalCenterStatusMatches(x,statusFilter)&&(!emp||String(x.employee).toLowerCase()===emp)&&(!task||String(x.task).toLowerCase().includes(task))&&approvalCenterInRange(x.date,month,from,to));
+            const list=approvalCenterItems.filter(x=>['attendance','task'].includes(x.type)&&(type==='all'||x.type===type)&&approvalCenterStatusMatches(x,statusFilter)&&(!emp||String(x.employee).toLowerCase()===emp)&&(!task||String(x.task).toLowerCase().includes(task))&&approvalCenterInRange(x.date,month,from,to));
             const count=document.getElementById('approvalCenterCount');if(count)count.textContent=list.length;
             if(!list.length){box.innerHTML='<tr><td colspan="8" class="p-8 text-center text-gray-500">No approval item found.</td></tr>';return;}
             box.innerHTML=list.map(x=>{
