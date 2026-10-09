@@ -3653,12 +3653,14 @@ function parseBreakTimeClient(v){
         }
         function buildApprovalCenterItems(){
             const out=[];
-            // Direct employee attendance records (Punch In/Out) are approval items too.
+            // Only actual, pending attendance punches should enter Approval Center.
+            // Ordinary daily work minutes are notifications/system-overview updates, not approvals.
             (globalTeamAttendance||[]).forEach(r=>{
-                const status=String(r.status||'Pending');
-                if(!r.employee)return;
+                const status=String(r.status||'Pending').trim().toLowerCase();
+                if(!r.employee || !['pending','pending approval',''].includes(status))return;
+                if(!String(r.inTime||'').trim() && !String(r.outTime||'').trim())return;
                 const meta=attendanceMetaForUser(r.employee)||{};
-                out.push({key:'attendance-record|'+r.rowIndex,type:'attendance',typeLabel:'Attendance',employee:r.user||r.employee||'',employeeId:meta.employeeId||r.employeeId||'',task:'Attendance',date:r.date||'',details:`In: ${r.inTime||'-'} • Out: ${r.outTime||'-'} • ${r.reason||'-'}`,status:status,rowIndex:r.rowIndex,action:'attendanceRecord',targetUser:r.user||r.employee||''});
+                out.push({key:'attendance-record|'+r.rowIndex,type:'attendance',typeLabel:'Attendance',employee:r.user||r.employee||'',employeeId:meta.employeeId||r.employeeId||'',task:'Attendance',date:r.date||'',details:`In: ${r.inTime||'-'} • Out: ${r.outTime||'-'} • ${r.reason||'-'}`,status:'Pending',rowIndex:r.rowIndex,action:'attendanceRecord',targetUser:r.user||r.employee||''});
             });
             (globalAttendanceRequests||[]).forEach(r=>{
                 const status=String(r.status||'Pending');
@@ -3677,10 +3679,12 @@ function parseBreakTimeClient(v){
             // Keep globalPendingWorkLogs available for reports/follow-up, but never
             // create approval-center items from them.
             (globalAllTasks||[]).forEach(t=>{
-                const empStatus=String(t.empStatus||'').toLowerCase(), hodStatus=String(t.hodStatus||'').toLowerCase();
+                const empStatus=String(t.empStatus||'').trim().toLowerCase();
+                const hodStatus=String(t.hodStatus||'pending').trim().toLowerCase();
                 const meta=attendanceMetaForUser(t.assignedTo||t.employee||'')||{};
-                if(empStatus==='completion requested') out.push({key:'task-completion|'+(t.taskId||t.rowIndex),type:'task',typeLabel:'Task',employee:t.assignedTo||t.employee||'',employeeId:meta.employeeId||'',task:t.taskName||'Task',date:t.endDate||t.startDate||'',details:'Final Before/Completion approval required — separate from Daily Work approval',status:t.empStatus||'Completion Requested',rowIndex:t.rowIndex,taskId:t.taskId||'',action:'taskCompletion',targetUser:t.assignedTo||t.employee||'',approvalOwner:t.approvalOwner||''});
-                else if(String(t.assignedBy||'').trim() && ['pending','approved','rejected'].includes(hodStatus)) out.push({key:'task-approval|'+(t.taskId||t.rowIndex),type:'task',typeLabel:'Task',employee:t.assignedTo||t.employee||'',employeeId:meta.employeeId||'',task:t.taskName||'Task',date:t.startDate||'',details:'Task approval',status:t.hodStatus||'Pending',rowIndex:t.rowIndex,taskId:t.taskId||'',action:'taskApproval',targetUser:t.assignedTo||t.employee||'',approvalOwner:t.approvalOwner||''});
+                const isBeforeOrCompletion=/completion requested|before[ -]?completed|before completion/.test(empStatus);
+                const stillNeedsApproval=['pending','pending approval',''].includes(hodStatus) && !['approved','rejected'].includes(empStatus);
+                if(isBeforeOrCompletion && stillNeedsApproval) out.push({key:'task-completion|'+(t.taskId||t.rowIndex),type:'task',typeLabel:'Task',employee:t.assignedTo||t.employee||'',employeeId:meta.employeeId||'',task:t.taskName||'Task',date:t.endDate||t.startDate||'',details:'Before/Completed task approval required — daily work minutes do not require approval',status:'Pending',rowIndex:t.rowIndex,taskId:t.taskId||'',action:'taskCompletion',targetUser:t.assignedTo||t.employee||'',approvalOwner:t.approvalOwner||''});
             });
             return out;
         }
@@ -3865,7 +3869,8 @@ function parseBreakTimeClient(v){
                 if(/daily work.*approval|approval.*daily work/i.test(title+' '+String(n.text||''))) return;
                 const approvalTitle=/approval required|today urgent task request/i.test(title);
                 const employeeSchedule=/advance schedule request/i.test(title) && !approvalTitle;
-                items.push({type:'server',key:n.id,title:n.title,text:n.text,action:(action==='approval-center'||approvalTitle)?'approval-center':(employeeSchedule?'schedule-form':action),date:n.timestamp,priority:n.priority});
+                const minutesOnly=/(daily work|work log|minutes?|time spent)/i.test(title+' '+String(n.text||'')) && !approvalTitle && !/attendance|before[ -]?completed|task completed/i.test(title+' '+String(n.text||''));
+                items.push({type:'server',key:n.id,title:n.title,text:n.text,action:(action==='approval-center'||approvalTitle)?'approval-center':(minutesOnly?'system-overview':(employeeSchedule?'schedule-form':action)),date:n.timestamp,priority:n.priority});
             });
             if(role.includes('hod')||role.includes('admin')){
                 tasks.forEach(t=>{if(String(t.hodStatus||'').toLowerCase()==='pending'&&['completed','completion requested'].includes(String(t.empStatus||'').toLowerCase()))items.push({type:'task',key:t.taskId||t.rowIndex,title:'Task approval required',text:`${t.taskName||'Task'} — ${t.assignedTo||''}`,action:'approval-center',date:t.completedAt||t.endDate||t.startDate});});
@@ -3892,7 +3897,7 @@ function parseBreakTimeClient(v){
             count.innerText=unread.length;count.classList.toggle('hidden',unread.length===0);count.classList.toggle('flex',unread.length>0);if(label)label.innerText=unread.length?`${unread.length} unread`:'All read';
             list.innerHTML='';
             if(!items.length){list.innerHTML='<div class="p-5 text-center text-sm text-gray-500">No notifications.</div>';return;}
-            items.forEach(n=>{const id=notificationId(n),isRead=readIds.includes(id),row=document.createElement('button');row.type='button';row.className=`w-full text-left px-4 py-3 border-b transition ${isRead?'bg-white opacity-70 hover:bg-gray-50':'bg-[#f0fbf9] hover:bg-[#e7f7f4]'}`;const displayTime=isRead&&readMeta[id]?`Read ${formatNotificationDate(readMeta[id])}`:notificationTime(n);row.innerHTML=`<div class="flex items-start gap-2"><i class="fas fa-bell mt-1 ${isRead?'text-gray-400':'text-[#259b94]'}"></i><div class="min-w-0 flex-1"><div class="font-bold text-sm text-[#112a2e]">${n.title}${isRead?'':' <span class="ml-1 inline-block w-2 h-2 rounded-full bg-red-500 align-middle"></span>'}</div><div class="text-xs text-gray-600 mt-1">${n.text}</div><div class="text-[10px] text-gray-400 mt-1">${displayTime}</div></div></div>`;row.onclick=()=>{markNotificationRead(id);closeNotifications();if(n.action==='approval-center'){openApprovalAttendanceTaskModal();}else if(n.action==='task')openTaskReportModal();else if(n.action==='schedule-form'){openAdvanceScheduleModal();}else if(n.action==='schedule')openAdvanceScheduleApprovalModal();else if(n.action==='attendance-request')openAttendanceRequestsModal();else openOneViewModal();};list.appendChild(row);});
+            items.forEach(n=>{const id=notificationId(n),isRead=readIds.includes(id),row=document.createElement('button');row.type='button';row.className=`w-full text-left px-4 py-3 border-b transition ${isRead?'bg-white opacity-70 hover:bg-gray-50':'bg-[#f0fbf9] hover:bg-[#e7f7f4]'}`;const displayTime=isRead&&readMeta[id]?`Read ${formatNotificationDate(readMeta[id])}`:notificationTime(n);row.innerHTML=`<div class="flex items-start gap-2"><i class="fas fa-bell mt-1 ${isRead?'text-gray-400':'text-[#259b94]'}"></i><div class="min-w-0 flex-1"><div class="font-bold text-sm text-[#112a2e]">${n.title}${isRead?'':' <span class="ml-1 inline-block w-2 h-2 rounded-full bg-red-500 align-middle"></span>'}</div><div class="text-xs text-gray-600 mt-1">${n.text}</div><div class="text-[10px] text-gray-400 mt-1">${displayTime}</div></div></div>`;row.onclick=()=>{markNotificationRead(id);closeNotifications();if(n.action==='approval-center'){openApprovalAttendanceTaskModal();}else if(n.action==='system-overview'){const heading=document.getElementById('taskTableTitle');if(heading){heading.scrollIntoView({behavior:'smooth',block:'start'});heading.classList.add('ring-2','ring-teal-300');setTimeout(()=>heading.classList.remove('ring-2','ring-teal-300'),1800);}else if(typeof fetchDashboardDataSilently==='function'){fetchDashboardDataSilently();}}else if(n.action==='task')openTaskReportModal();else if(n.action==='schedule-form'){openAdvanceScheduleModal();}else if(n.action==='schedule')openAdvanceScheduleApprovalModal();else if(n.action==='attendance-request')openAttendanceRequestsModal();else openOneViewModal();};list.appendChild(row);});
         }
         const refreshPositionObserver_=new MutationObserver(()=>{if(document.getElementById('dashboard-section')?.style.display==='flex')addRefreshButton_();});
         refreshPositionObserver_.observe(document.body,{childList:true,subtree:true});
