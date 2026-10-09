@@ -2368,44 +2368,26 @@ function parseBreakTimeClient(v){
                 name=(String(document.getElementById('qtCategory')?.value||'').toLowerCase()==='department optional work'?'Department Optional Work':(String(document.getElementById('qtTaskNameDepartment')?.value||'').trim()||category)),
                 frequency=document.getElementById('qtFrequency')?.value||'',
                 priority=document.getElementById('qtPriority')?.value||'Normal',
-                startDay=Number(document.getElementById('qtStartDay')?.value),
-                endDay=Number(document.getElementById('qtEndDay')?.value),
-                weightage=Number(document.getElementById('qtWeightage')?.value),
+                startField=document.getElementById('qtStartDay'), endField=document.getElementById('qtEndDay'),
+                weightField=document.getElementById('qtWeightage'),
                 departmentName=String(document.getElementById('qtDepartment')?.value||'').trim(),
                 taskNameDepartment=String(document.getElementById('qtTaskNameDepartment')?.value||'').trim();
+            let startDay=Number(startField?.value), endDay=Number(endField?.value), weightage=Number(weightField?.value), savePriority=priority;
             if(!taskType){alert('Task Type select karein.');return;}
             if(!category){alert('Task Category select karein.');return;}
             if(!frequency){alert('Task Frequency select karein.');return;}
             const optionalWork=String(taskType).toLowerCase()==='department optional work';
-            if(optionalWork){startDay=0;endDay=0;weightage=0;priority='Not Set';document.getElementById('qtName').value='Others';document.getElementById('qtName').disabled=true;if(!frequency)frequency='One-time';}
-            else {if(!Number.isInteger(startDay)||startDay<1||startDay>31){alert('From Date mein 1 se 31 tak day digit dein.');return;}
-            if(!Number.isInteger(endDay)||endDay<1||endDay>31||endDay<startDay){alert('To Date mein valid day digit dein.');return;}
-            if(!Number.isFinite(weightage)||weightage<0||weightage>100){alert('Task Weightage 0 se 100% ke beech hona chahiye.');return;}}
-
+            if(optionalWork){startDay=0;endDay=0;weightage=0;savePriority='Not Set';if(startField)startField.value='';if(endField)endField.value='';if(weightField)weightField.value='0';const p=document.getElementById('qtPriority');if(p)p.value='Not Set';}
+            else {
+                if(!Number.isInteger(startDay)||startDay<1||startDay>31){alert('From Date mein 1 se 31 tak day digit dein.');return;}
+                if(!Number.isInteger(endDay)||endDay<1||endDay>31||endDay<startDay){alert('To Date mein valid day digit dein.');return;}
+                if(!Number.isFinite(weightage)||weightage<0||weightage>100){alert('Task Weightage 0 se 100% ke beech hona chahiye.');return;}
+            }
+            if(!taskNameDepartment && !optionalWork){alert('Task Name Department fill karein.');return;}
             const btn=document.getElementById('qtSaveBtn');
             const templateId=document.getElementById('qtTemplateId')?.value||'';
-            const optimisticId=templateId||('local_'+Date.now());
-            const optimistic={
-                templateId:optimisticId,taskName:name,taskType,category,repeat:frequency,
-                priority,weightage,departmentName,taskNameDepartment,startDay,endDay,active:true,_optimistic:!templateId
-            };
-            btn.disabled=true;btn.innerText='Saving...';
-
-            // Update UI immediately. The Apps Script write continues in the background,
-            // so the Admin does not wait for the server round-trip to see the template.
-            const list=Array.isArray(assignTemplateCache)?assignTemplateCache.slice():[];
-            const idx=list.findIndex(x=>String(x.templateId)===String(optimisticId));
-            if(idx>=0)list[idx]=Object.assign({},list[idx],optimistic);
-            else list.unshift(optimistic);
-            assignTemplateCache=list;
-            quickTemplateDataCache.templates=list.slice();
-            quickTemplateDataCache.loadedAt=Date.now();
-            renderAssignTemplateSelect_();
-            renderQuickTemplateList();
-            resetQuickTemplateForm();
-            closeQuickTemplateModal();
-            btn.disabled=false;btn.innerText='Save Template';
-
+            const oldText=btn?.innerText||'Save Template';
+            if(btn){btn.disabled=true;btn.innerText='Saving...';}
             const fd=new FormData();
             fd.append('action','saveCommonTaskTemplate');
             fd.append('templateId',templateId);
@@ -2413,7 +2395,7 @@ function parseBreakTimeClient(v){
             fd.append('taskType',taskType);
             fd.append('category',category);
             fd.append('description','');
-            fd.append('priority',priority);
+            fd.append('priority',savePriority);
             fd.append('weightage',String(weightage));
             fd.append('departmentName',departmentName);
             fd.append('taskNameDepartment',taskNameDepartment);
@@ -2423,23 +2405,26 @@ function parseBreakTimeClient(v){
             fd.append('active','true');
             fd.append('worksJson',JSON.stringify([{frequency,category,workName:name,weightage:100}]));
             fd.append('sessionToken',sessionToken);
-
+            // Do not close/reset the form until the backend confirms the write.
             apiFetchJson_(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(d=>{
-                if(d.status!=='success')throw new Error(d.message||'Template save failed');
-                // Refresh once the backend write is confirmed; the immediate UI above
-                // means the user never waits for this refresh.
+                if(!d || d.status!=='success')throw new Error(d?.message||'Template Google Sheet mein save nahi hua.');
+                const savedId=String(d.templateId||templateId||'');
+                const saved={templateId:savedId,taskName:name,taskType,category,repeat:frequency,priority:savePriority,weightage,departmentName,taskNameDepartment,startDay,endDay,active:true};
+                const list=Array.isArray(assignTemplateCache)?assignTemplateCache.slice():[];
+                const idx=list.findIndex(x=>String(x.templateId)===savedId);
+                if(idx>=0)list[idx]=Object.assign({},list[idx],saved);else list.unshift(saved);
+                assignTemplateCache=list;
+                quickTemplateDataCache.templates=list.slice();
                 quickTemplateDataCache.loadedAt=0;
-                setTimeout(()=>refreshAssignTemplateData(true,true),250);
-            }).catch(e=>{
-                // Roll back only the optimistic item when the server rejects a new save.
-                if(!templateId){
-                    assignTemplateCache=(assignTemplateCache||[]).filter(x=>String(x.templateId)!==String(optimisticId));
-                    quickTemplateDataCache.templates=assignTemplateCache.slice();
-                    renderAssignTemplateSelect_();
+                renderAssignTemplateSelect_();renderQuickTemplateList();
+                resetQuickTemplateForm();closeQuickTemplateModal();
+                return refreshAssignTemplateData(true,true).then(()=>{
                     renderQuickTemplateList();
-                }
-                alert(e.message||'Template save failed.');
-            });
+                    alert(d.message||'Template Google Sheet mein successfully save ho gaya.');
+                });
+            }).catch(e=>{
+                alert((e&&e.message)||'Template save nahi hua. Form ko dobara check karke Save karein.');
+            }).finally(()=>{if(btn){btn.disabled=false;btn.innerText=oldText==='Update Template'?'Update Template':'Save Template';}});
         }
 
         function refreshAssignTemplateData(templatesOnly,forceRefresh){
