@@ -763,6 +763,24 @@
         </div>
     </div>
 
+    <!-- TASK DETAILS POPUP: read-only for employees; admins can open the existing edit panel -->
+    <div id="taskDetailsModal" class="modal" style="z-index:80;" onclick="if(event.target===this)closeTaskDetailsModal()">
+        <div class="modal-content max-w-3xl relative shadow-2xl" style="margin:3vh auto;max-height:94vh;">
+            <button type="button" onclick="closeTaskDetailsModal()" aria-label="Close task details" class="absolute top-4 right-5 text-gray-400 hover:text-red-500 text-2xl">&times;</button>
+            <h3 id="taskDetailsTitle" class="text-xl font-bold text-[#112a2e] pr-8">Task Details</h3>
+            <p class="text-sm text-gray-500 mt-1 mb-4">Task ki details aur employee ke Daily Work updates.</p>
+            <div id="taskDetailsSummary" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
+            <div class="mt-5">
+                <h4 class="font-bold text-[#2a4d53] mb-2">Employee Daily Work Updates</h4>
+                <div id="taskDetailsEmployeeUpdates" class="space-y-2 max-h-72 overflow-y-auto"></div>
+            </div>
+            <div class="mt-5 flex justify-end gap-2">
+                <button type="button" onclick="closeTaskDetailsModal()" class="border border-gray-300 rounded-lg px-4 py-2 text-sm font-semibold">Close</button>
+                <button type="button" id="taskDetailsAdminEdit" style="display:none" class="bg-[#259b94] text-white rounded-lg px-4 py-2 text-sm font-bold"><i class="fas fa-pen-to-square mr-1"></i> Edit Task (Admin)</button>
+            </div>
+        </div>
+    </div>
+
     <!-- TASK REPLACEMENT REQUEST MODAL -->
     <div id="taskReplaceModal" class="modal">
         <div class="modal-content max-w-lg relative shadow-2xl">

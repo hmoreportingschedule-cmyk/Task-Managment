@@ -1395,7 +1395,7 @@ function parseBreakTimeClient(v){
                     const taskAdminActionsHTML = isAdmin ? `<div class="mt-2 flex flex-wrap gap-1"><button type="button" onclick="openEditTaskModalByKey(${taskActionKey})" class="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-2 py-1 rounded-lg text-xs font-bold" title="Edit Task"><i class="fas fa-pen-to-square"></i> Edit</button><button type="button" onclick="deleteAssignedTaskByKey(${taskActionKey})" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-2 py-1 rounded-lg text-xs font-bold" title="Delete Task"><i class="fas fa-trash"></i> Delete</button></div>` : '';
                     tr.innerHTML = `
                         <td class="py-4 px-6 font-bold text-[#112a2e]">${escapeHtml(displayTaskType)}</td>
-                        <td class="py-4 px-6 font-bold text-[#112a2e]">${escapeHtml(displayTaskName)}${replacementForToday ? '<div class="text-[10px] text-[#0f766e] font-semibold mt-1">Replacement approved</div>' : ''}${taskAdminActionsHTML}</td>
+                        <td class="py-4 px-6 font-bold text-[#112a2e]"><button type="button" class="task-name-details text-left font-bold text-[#112a2e] hover:text-[#0f766e] hover:underline underline-offset-4 cursor-pointer" onclick="openTaskDetailsByKey(${taskActionKey})" title="Click to view task details">${escapeHtml(displayTaskName)}</button>${replacementForToday ? '<div class="text-[10px] text-[#0f766e] font-semibold mt-1">Replacement approved</div>' : ''}${taskAdminActionsHTML}</td>
                          <td class="py-4 px-6 font-bold text-[#0f766e]">${escapeHtml(task.frequency||'One-time')}</td>
                          <td class="py-4 px-6 text-[#259b94] font-bold ${isHOD ? '' : 'hidden'}">${isHOD ? escapeHtml(task.assignedTo || '-') : ''}</td>
                          <td class="py-4 px-6 text-[#4b6d70] font-semibold">${escapeHtml(task.assignedBy || '-')}</td>
@@ -1418,6 +1418,46 @@ function parseBreakTimeClient(v){
             const hit = list.slice().reverse().find(r => String(r.status||'').toLowerCase()==='approved' && String(r.date||'').slice(0,10)===ymd && String(r.replacementTask||'').trim());
             return hit ? String(hit.replacementTask).trim() : '';
         }
+        function openTaskDetailsByKey(key){
+            const task=window.__taskActionCache?.[key];
+            if(!task){alert('Task details abhi available nahi hain. Refresh karke dobara try karein.');return;}
+            const role=String(document.getElementById('displayRole')?.innerText||'');
+            const isAdmin=isFullAdminRole(role);
+            const title=document.getElementById('taskDetailsTitle');
+            const summary=document.getElementById('taskDetailsSummary');
+            const logsBox=document.getElementById('taskDetailsEmployeeUpdates');
+            const editBtn=document.getElementById('taskDetailsAdminEdit');
+            if(title)title.textContent=task.taskName||'Task Details';
+            const summaryRows=[
+                ['Employee',task.assignedTo||task.employee||'-'],
+                ['Task Type',task.taskType||task.templateTaskType||task.type||'-'],
+                ['Frequency',task.frequency||'One-time'],
+                ['Timeline',(task.startDate||'-')+' → '+(task.endDate||'-')],
+                ['Assigned By',task.assignedBy||'-'],
+                ['Status',task.empStatus||'Pending'],
+                ['Task Description',task.description||task.details||'No task description added.']
+            ];
+            if(summary)summary.innerHTML=summaryRows.map(([label,value])=>`<div class="rounded-lg border border-gray-100 bg-gray-50 p-3"><div class="text-xs font-semibold text-gray-500 mb-1">${escapeHtml(label)}</div><div class="text-sm text-gray-800 whitespace-pre-wrap break-words">${escapeHtml(value)}</div></div>`).join('');
+            const employee=String(task.assignedTo||task.employee||'').trim().toLowerCase();
+            const taskName=String(task.taskName||'').trim().toLowerCase();
+            const taskId=String(task.taskId||'').trim();
+            const rowIndex=String(task.rowIndex||'').trim();
+            const logs=(Array.isArray(globalWorkLogs)?globalWorkLogs:[]).filter(w=>{
+                const who=String(w.Employee||w.employee||w.Username||w.username||'').trim().toLowerCase();
+                const name=String(w.Task||w.taskName||w.TaskName||w.task||'').trim().toLowerCase();
+                const logTaskId=String(w.TaskID||w.taskId||w.TaskId||'').trim();
+                const logRow=String(w.TaskRowIndex||w.taskRowIndex||'').trim();
+                const sameTask=(taskId&&logTaskId===taskId)||(rowIndex&&logRow===rowIndex)||(!logTaskId&&!logRow&&name===taskName);
+                return (!employee||who===employee)&&sameTask;
+            }).sort((a,b)=>String(b.WorkDate||b.workDate||b.Date||'').localeCompare(String(a.WorkDate||a.workDate||a.Date||'')));
+            if(logsBox){
+                logsBox.innerHTML=logs.length?logs.map(w=>`<article class="rounded-lg border border-[#dcebea] p-3 bg-white"><div class="flex flex-wrap justify-between gap-2 mb-2"><b class="text-sm text-[#2a4d53]">${escapeHtml(w.WorkDate||w.workDate||w.Date||'-')}</b><span class="text-xs font-semibold text-[#0f766e]">${Number(w.TimeSpentMins||w.timeSpent||0)} min</span></div><div class="text-sm whitespace-pre-wrap break-words text-gray-700">${escapeHtml(w.Description||w.description||'No description added.')}</div>${(w.DelayReason||w.delayReason)?`<div class="mt-2 text-xs text-amber-700">Delay reason: ${escapeHtml(w.DelayReason||w.delayReason)}</div>`:''}</article>`).join(''):'<div class="rounded-lg bg-gray-50 p-4 text-sm text-gray-500">Employee ne abhi tak is task ke liye koi Daily Work update add nahi ki.</div>';
+            }
+            if(editBtn){editBtn.style.display=isAdmin?'inline-flex':'none';editBtn.onclick=()=>{closeTaskDetailsModal();openEditTaskModalByKey(key);};}
+            const modal=document.getElementById('taskDetailsModal');if(modal)modal.style.display='block';
+        }
+        function closeTaskDetailsModal(){const modal=document.getElementById('taskDetailsModal');if(modal)modal.style.display='none';}
+
         function openEditTaskModalByKey(key){ const task=window.__taskActionCache?.[key]; if(task) openEditTaskModal(task); }
         function deleteAssignedTaskByKey(key){ const task=window.__taskActionCache?.[key]; if(task) deleteAssignedTask(task.assignedTo,task.taskId,task.taskName,task.rowIndex); }
         function openTaskReplaceModal(task){
