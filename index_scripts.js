@@ -4718,18 +4718,15 @@ function parseBreakTimeClient(v){
             if(!assignBy){alert('Assign By select karein.');return;}
             const fd=new FormData();fd.append('action','emergencyTaskRequest');fd.append('taskTemplate',templateId);fd.append('requestDate',fromDate);fd.append('endDate',toDate);fd.append('assignBy',assignBy);fd.append('details',details);fd.append('sessionToken',sessionToken);
             const b=document.getElementById('emergencyTaskBtn');b.disabled=true;b.innerText='Sending...';
-            // Emergency Task requests are submitted directly to the approved Apps Script URL
-            // with no-cors. This avoids Cloudflare/browser CORS + redirect failures that can
-            // surface as the misleading "Failed to fetch" even when the Apps Script accepts POST.
-            // No automatic retry is performed, so one click creates at most one request.
-            fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd,mode:'no-cors',cache:'no-store',keepalive:true}).then(()=>{
-                alert('Task Request HOD/Admin ko bhej di gayi hai. Approval ke baad task assign ho jayega.');
+            // Use the same-origin Cloudflare /api proxy so we can verify the actual Apps Script result.
+            // Do not show success unless the backend confirms the request was written.
+            apiFetchJson_(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(d=>{
+                if(!d||d.status!=='success') throw new Error(d&&d.message?d.message:'Backend ne request confirm nahi ki.');
+                alert(d.message||'Task Request save ho gayi hai. Approval ke baad task assign hoga.');
                 closeEmergencyTaskModal();
-                setTimeout(()=>fetchDashboardDataSilently(true),1800);
-            }).catch(()=>{
-                // If the direct request itself is blocked, give a clear message instead of
-                // showing the generic JSON/CORS parsing error.
-                alert('Task Request send nahi ho saki. Apps Script Web App deployment check karein.');
+                return fetchDashboardDataSilently(true);
+            }).catch(e=>{
+                alert('Task Request save nahi hui: '+(e&&e.message?e.message:'Connection error')+'. Approval panel mein dikhne se pehle backend save confirm hona zaroori hai.');
             }).finally(()=>{b.disabled=false;b.innerText='Send Request';});
         }
         function submitAdvanceScheduleRequest(){
