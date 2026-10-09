@@ -711,13 +711,18 @@ function parseBreakTimeClient(v){
             try{
                 return await doRequest(url,opts.method||'GET',opts.body);
             }catch(firstErr){
-                // For POST FormData, retry through GET. This also handles Apps Script
-                // redirect/proxy cases where POST response is interrupted.
-                if((opts.method||'GET').toUpperCase()==='POST' && opts.body instanceof FormData){
-                    const params=new URLSearchParams();
-                    opts.body.forEach((v,k)=>{if(typeof v==='string')params.append(k,v);});
+                // Never replay a write as GET: Apps Script may have completed the POST
+                // before the browser lost the response, which can create duplicate attendance/logs.
+                const method=String(opts.method||'GET').toUpperCase();
+                const action=opts.body instanceof FormData?String(opts.body.get('action')||''):'';
+                const readOnlyActions=new Set(['getDashboardData','getDashboardSummary','getWorkLogs','getOneViewAttendance','getCommonTaskTemplates','getCommonTaskEmployees','getTaskDelayAnalytics','getAdvanceScheduleRequests','listAdvanceScheduleRequests','getAuditLog','systemHealth','getServerNotifications']);
+                if(method==='POST' && opts.body instanceof FormData && readOnlyActions.has(action)){
+                    const params=new URLSearchParams();opts.body.forEach((v,k)=>{if(typeof v==='string')params.append(k,v);});
                     const sep=url.includes('?')?'&':'?';
                     return await doRequest(url+sep+params.toString()+'&_='+Date.now(),'GET');
+                }
+                if(method==='POST' && opts.body instanceof FormData && !readOnlyActions.has(action)){
+                    throw new Error('Request ka response confirm nahi ho saka ('+(firstErr?.message||'network error')+'). Duplicate save se bachne ke liye request auto-repeat nahi ki gayi. Refresh karke Google Sheet mein record check karein.');
                 }
                 throw firstErr;
             }
@@ -4023,14 +4028,9 @@ function parseBreakTimeClient(v){
         }
         function openEmployeeProgressDirect(emp){
             const modal=document.getElementById('progressReportModal');
-            if(modal && modal.style.display!=='block') openProgressReportModal();
-            const sel=document.getElementById('progressReportEmployee');
-            if(sel){
-                const match=Array.from(sel.options).find(o=>String(o.value).toLowerCase()===String(emp).toLowerCase());
-                if(match) sel.value=match.value;
-            }
-            renderProgressReport();
-            setTimeout(()=>document.getElementById('progressReportDetails')?.scrollIntoView({behavior:'smooth',block:'start'}),80);
+            if(modal && modal.style.display!=='block'){openProgressReportModal(emp);}
+            else{const sel=document.getElementById('progressReportEmployee');if(sel){const match=Array.from(sel.options).find(o=>String(o.value).toLowerCase()===String(emp).toLowerCase());if(match)sel.value=match.value;}renderProgressReport();}
+            setTimeout(()=>document.getElementById('progressReportDetails')?.scrollIntoView({behavior:'smooth',block:'start'}),160);
         }
         function progressReportRange(){
             const raw=progressReportMonthKey(), p=raw.split('-');
@@ -4084,12 +4084,38 @@ function parseBreakTimeClient(v){
             progressReportRenderDetails(stats);
             window.currentProgressReport={range,stats,aw,tw};
         }
-        function openProgressReportModal(){
+        let progressReportSyncPromise=null;
+        async function refreshProgressReportData_(){
+            if(!sessionToken)return false;
+            if(progressReportSyncPromise)return progressReportSyncPromise;
+            progressReportSyncPromise=(async()=>{
+                const fd=new FormData();fd.append('action','getDashboardData');fd.append('sessionToken',sessionToken);fd.append('forceRefresh','1');
+                const data=await apiFetchJson_(GOOGLE_SCRIPT_URL,{method:'POST',body:fd,timeoutMs:60000});
+                if(!data||data.status!=='success')throw new Error(data?.message||'Progress Report data sync nahi ho saka.');
+                globalAllTasks=Array.isArray(data.tasks)?data.tasks:[];
+                globalTeamMembers=Array.isArray(data.teamMembers)?data.teamMembers:[];
+                globalTeamMemberMeta=Array.isArray(data.teamMemberMeta)?data.teamMemberMeta:[];
+                globalMonthlyFullAttendance=Array.isArray(data.monthlyFullAttendance)?data.monthlyFullAttendance:[];
+                globalTeamAttendance=Array.isArray(data.teamAttendance)?data.teamAttendance:[];
+                try{localStorage.setItem(dashboardCacheKey(document.getElementById('displayUser')?.innerText||''),JSON.stringify(data));}catch(_cacheErr){}
+                return true;
+            })().finally(()=>{progressReportSyncPromise=null;});
+            return progressReportSyncPromise;
+        }
+        function populateProgressReportEmployeeSelect_(preferred){
+            const sel=document.getElementById('progressReportEmployee'), role=String(document.getElementById('displayRole')?.innerText||'').toLowerCase();if(!sel)return;
+            const emps=progressReportEmployees();sel.innerHTML='';
+            if(role.includes('admin')||role.includes('hod'))sel.innerHTML='<option value="__ALL__">All Employees</option>'+emps.map(e=>`<option value="${progressReportEscape(e)}">${progressReportEscape(e)}</option>`).join('');
+            else sel.innerHTML=emps.map(e=>`<option value="${progressReportEscape(e)}">${progressReportEscape(e)}</option>`).join('');
+            if(preferred&&Array.from(sel.options).some(o=>String(o.value).toLowerCase()===String(preferred).toLowerCase()))sel.value=Array.from(sel.options).find(o=>String(o.value).toLowerCase()===String(preferred).toLowerCase()).value;
+        }
+        async function openProgressReportModal(preferredEmployee){
             document.getElementById('progressReportModal').style.display='block';
-            const month=document.getElementById('progressReportMonth'), n=new Date(); month.value=`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`;
-            const sel=document.getElementById('progressReportEmployee'), role=String(document.getElementById('displayRole')?.innerText||'').toLowerCase(); sel.innerHTML='';
-            const emps=progressReportEmployees(); if(role.includes('admin')||role.includes('hod')) sel.innerHTML='<option value="__ALL__">All Employees</option>'+emps.map(e=>`<option value="${progressReportEscape(e)}">${progressReportEscape(e)}</option>`).join(''); else sel.innerHTML=emps.map(e=>`<option value="${progressReportEscape(e)}">${progressReportEscape(e)}</option>`).join('');
-            document.getElementById('progressReportAttWeight').value=performanceWeights.attendance; document.getElementById('progressReportTaskWeight').value=performanceWeights.task; renderProgressReport();
+            const month=document.getElementById('progressReportMonth'), n=new Date(); if(!month.value)month.value=`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`;
+            document.getElementById('progressReportAttWeight').value=performanceWeights.attendance; document.getElementById('progressReportTaskWeight').value=performanceWeights.task;
+            const err=document.getElementById('progressReportError');if(err){err.textContent='Latest employee tasks aur attendance sync ho rahe hain…';err.classList.remove('hidden');}
+            try{await refreshProgressReportData_();populateProgressReportEmployeeSelect_(preferredEmployee);if(err)err.classList.add('hidden');renderProgressReport();}
+            catch(e){if(err){err.textContent=e.message||'Progress Report sync failed. Refresh karke dobara try karein.';err.classList.remove('hidden');}}
         }
         async function loadJsPdfForProgressReport(){
             if(window.jspdf?.jsPDF)return true;
