@@ -10,7 +10,7 @@ function jsonResponse(payload, status, origin) {
       "Access-Control-Allow-Origin": origin || "*",
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type",
-      "X-Task-API": "V74"
+      "X-Task-API": "V75"
     }
   });
 }
@@ -25,7 +25,7 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === "/api/health" || url.pathname === "/api/health/") {
-      return jsonResponse({ status: "success", version: "V.74", proxy: "active", spreadsheetId: MASTER_SPREADSHEET_ID, endpointConfigured: true }, 200, url.origin);
+      return jsonResponse({ status: "success", version: "V.75", proxy: "active", spreadsheetId: MASTER_SPREADSHEET_ID, endpointConfigured: true }, 200, url.origin);
     }
     if (url.pathname === "/api" || url.pathname.startsWith("/api/")) {
       if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: {
@@ -34,7 +34,7 @@ export default {
         "Access-Control-Allow-Headers": "Content-Type",
         "Access-Control-Max-Age": "86400"
       }});
-      if (request.method !== "GET" && request.method !== "POST") return jsonResponse({ status: "error", message: "Method not allowed.", version: "V.74" }, 405, url.origin);
+      if (request.method !== "GET" && request.method !== "POST") return jsonResponse({ status: "error", message: "Method not allowed.", version: "V.75" }, 405, url.origin);
       try {
         let body;
         let contentType = "application/x-www-form-urlencoded;charset=UTF-8";
@@ -72,11 +72,11 @@ export default {
         try { payload = JSON.parse(raw.trim()); }
         catch (_) {
           const preview = raw.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300);
-          return jsonResponse({ status: "error", code: "APPS_SCRIPT_NON_JSON", message: "Google Apps Script ne JSON response nahi diya. Apps Script deployment/access check karein.", upstreamStatus: upstream.status, responsePreview: preview || "Empty response", version: "V.74" }, 502, url.origin);
+          return jsonResponse({ status: "error", code: "APPS_SCRIPT_NON_JSON", message: "Google Apps Script ne JSON response nahi diya. Apps Script deployment/access check karein.", upstreamStatus: upstream.status, responsePreview: preview || "Empty response", version: "V.75" }, 502, url.origin);
         }
         return jsonResponse(payload, upstream.ok ? 200 : upstream.status, url.origin);
       } catch (err) {
-        return jsonResponse({ status: "error", code: "APPS_SCRIPT_PROXY_ERROR", message: "Apps Script proxy request failed.", detail: String(err?.message || err), version: "V.74" }, 502, url.origin);
+        return jsonResponse({ status: "error", code: "APPS_SCRIPT_PROXY_ERROR", message: "Apps Script proxy request failed.", detail: String(err?.message || err), version: "V.75" }, 502, url.origin);
       }
     }
     if (env && env.ASSETS && typeof env.ASSETS.fetch === "function") return env.ASSETS.fetch(request);

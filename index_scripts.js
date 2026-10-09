@@ -4,7 +4,7 @@
 
         // V.72: Browser calls the same-origin Cloudflare Worker proxy. The Worker forwards
         // requests only to the approved Apps Script endpoint, avoiding browser CORS failures.
-        // V.74: The only API endpoint is the same-origin Cloudflare Worker proxy.
+        // V.75: The only API endpoint is the same-origin Cloudflare Worker proxy.
         const GOOGLE_SCRIPT_URL = "/api";
         
         let globalAllTasks = []; 
@@ -30,7 +30,7 @@
         // Admin Lock/Unlock remains the authority for older/current dates.
         const ENTRY_BASELINE_DATE = "2026-10-01";
 
-        // V.74: All app API requests use same-origin /api. Worker forwards to the single approved Apps Script URL.
+        // V.75: All app API requests use same-origin /api. Worker forwards to the single approved Apps Script URL.
         const APP_HOSTING_PLATFORM = /(^|\.)vercel\.app$/i.test(location.hostname) ? 'vercel'
             : (/^(pages\.|.*\.)?cloudflarepages\.dev$/i.test(location.hostname) || /\.workers\.dev$/i.test(location.hostname) ? 'cloudflare' : 'static');
 
