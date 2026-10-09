@@ -2,11 +2,10 @@
 
 
 
-        // YAHAN APNA NAYA GOOGLE SCRIPT URL DAALEIN
-        // GOOGLE SHEET / APPS SCRIPT URL: Is URL ko change karein agar Web App deployment URL badle.
+        // V.72: Browser calls the same-origin Cloudflare Worker proxy. The Worker forwards
+        // requests only to the approved Apps Script endpoint, avoiding browser CORS failures.
         const DEFAULT_GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw9x_CwQz3CAQFSZENxZ6tFwTETOv-vol39dGDR5-A0cFj-pvbgd5_HI_1vLLm5yOxG4Q/exec";
-        // Fixed configuration: this application uses only the approved Google Apps Script endpoint.
-        const GOOGLE_SCRIPT_URL = DEFAULT_GOOGLE_SCRIPT_URL; // Fixed: only the approved Google Apps Script endpoint is allowed.
+        const GOOGLE_SCRIPT_URL = "/api";
         
         let globalAllTasks = []; 
         let globalTeamMembers = [];
@@ -31,8 +30,7 @@
         // Admin Lock/Unlock remains the authority for older/current dates.
         const ENTRY_BASELINE_DATE = "2026-10-01";
 
-        // V.14 hosting compatibility: do not use Vercel/Cloudflare-specific APIs.
-        // All backend calls remain standard browser fetch() POST requests to Apps Script.
+        // V.72: API requests use same-origin /api. Cloudflare Worker proxies them to Apps Script.
         const APP_HOSTING_PLATFORM = /(^|\.)vercel\.app$/i.test(location.hostname) ? 'vercel'
             : (/^(pages\.|.*\.)?cloudflarepages\.dev$/i.test(location.hostname) || /\.workers\.dev$/i.test(location.hostname) ? 'cloudflare' : 'static');
 
