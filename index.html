@@ -713,7 +713,13 @@
                         <div class="font-bold text-[#2a4d53]">Task Template</div>
                         <div class="text-xs text-gray-500">Template select karein aur ek hi baar mein multiple employees ko assign karein.</div>
                     </div>
-                    <button type="button" onclick="refreshAssignTemplateData()" class="text-xs font-bold text-[#259b94]">↻ Refresh</button>
+                    <div class="flex items-center gap-2 flex-wrap justify-end">
+                        <button type="button" onclick="refreshAssignTemplateData()" class="text-xs font-bold text-[#259b94]">↻ Refresh</button>
+                        <label class="text-xs font-semibold text-[#2a4d53]" for="assignDepartmentFilter">Department</label>
+                        <select id="assignDepartmentFilter" onchange="renderAssignTemplateSelect_()" class="border border-gray-300 rounded-lg px-2 py-2 text-sm bg-white min-w-[150px] max-w-full">
+                            <option value="">All Departments</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="flex gap-2 mb-3">
                     <select id="assignTemplateSelect" onchange="applyAssignTemplate()" class="flex-1 border border-gray-300 p-3 rounded-lg">

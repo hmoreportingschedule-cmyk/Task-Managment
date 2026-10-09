@@ -2481,8 +2481,19 @@ function parseBreakTimeClient(v){
                 parent.style.maxWidth='100%';
                 parent.style.flex='1 1 100%';
             }
+            const allTemplates=(assignTemplateCache||[]).filter(x=>x.active!==false);
+            const deptSel=document.getElementById('assignDepartmentFilter');
+            const currentDept=deptSel?String(deptSel.value||''):'';
+            const departments=[...new Set(allTemplates.map(t=>String(t.departmentName||t.department||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+            if(deptSel){
+                const wanted=currentDept;
+                deptSel.innerHTML='<option value="">All Departments</option>'+departments.map(d=>`<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
+                deptSel.value=departments.includes(wanted)?wanted:'';
+            }
+            const chosenDept=deptSel?String(deptSel.value||''):'';
+            const templates=allTemplates.filter(t=>!chosenDept||String(t.departmentName||t.department||'').trim()===chosenDept);
             tSel.innerHTML='<option value="">-- Select Task Template --</option>';
-            (assignTemplateCache||[]).filter(x=>x.active!==false).forEach(t=>{
+            templates.forEach(t=>{
                 tSel.innerHTML+=`<option value="${String(t.templateId).replace(/"/g,'&quot;')}">${escapeHtml(t.taskName||'Task')} — ${escapeHtml(t.taskType||'')} — ${escapeHtml(t.category||'')}</option>`;
             });
 
@@ -2555,20 +2566,27 @@ function parseBreakTimeClient(v){
                 <div id="assignTemplateCount" class="px-3 py-2 text-xs text-gray-500">0 templates selected</div>`;
             const list=document.getElementById('assignTemplateCheckboxList');
             if(!list)return;
-            const templates=(assignTemplateCache||[]).filter(x=>x.active!==false);
-            if(!templates.length){
-                list.innerHTML='<div class="text-sm text-gray-500 p-2">No active templates found.</div>';
+            const filterDeptSel=document.getElementById('assignDepartmentFilter');
+            const filterChosenDept=filterDeptSel?String(filterDeptSel.value||''):'';
+            const filteredTemplates=(assignTemplateCache||[]).filter(t=>t.active!==false&&(!filterChosenDept||String(t.departmentName||t.department||'').trim()===filterChosenDept));
+            if(!filteredTemplates.length){
+                list.innerHTML='<div class="text-sm text-gray-500 p-2">Is Department ke liye koi active template nahi mila.</div>';
                 updateAssignTemplateCount(); return;
             }
-            list.innerHTML=templates.map(t=>`
-                <label class="flex items-center gap-3 p-2 rounded hover:bg-[#f0f8f8] cursor-pointer border-b border-gray-100">
-                    <input type="checkbox" class="assign-template-check w-4 h-4"
+            list.innerHTML=filteredTemplates.map(t=>{
+                const startDay=Number(t.startDay)||1, endDay=Number(t.endDay)||31;
+                const department=String(t.departmentName||t.department||'').trim()||'-';
+                return `<label class="flex items-start gap-3 p-3 rounded hover:bg-[#f0f8f8] cursor-pointer border-b border-gray-100">
+                    <input type="checkbox" class="assign-template-check w-4 h-4 mt-1 shrink-0"
                         value="${escapeHtml(t.templateId||'')}" onchange="updateAssignTemplateCount();updateSelectedTemplateDetails()">
-                    <span class="min-w-0">
+                    <span class="min-w-0 flex-1">
                         <b class="text-sm text-[#112a2e]">${escapeHtml(t.taskName||'Task')}</b>
-                        <span class="block text-xs text-gray-500">${escapeHtml(t.taskType||'-')} • ${escapeHtml(t.category||'-')} • ${escapeHtml(t.repeat||'-')} • ${escapeHtml(t.priority||'Normal')}</span>
+                        <span class="block text-xs text-gray-500 mt-1">Type: ${escapeHtml(t.taskType||'-')} • Category: ${escapeHtml(t.category||'-')} • Frequency: ${escapeHtml(t.repeat||'-')} • Priority: ${escapeHtml(t.priority||'Normal')}</span>
+                        <span class="block text-xs text-gray-500">Date: ${startDay} to ${endDay} • Weightage: ${Number(t.weightage)||0}%</span>
+                        <span class="block text-xs text-gray-500">Department: ${escapeHtml(department)}</span>
                     </span>
-                </label>`).join('');
+                </label>`;
+            }).join('');
             tSel.style.display='none';
             updateAssignTemplateCount();
         }
