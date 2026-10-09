@@ -1327,6 +1327,8 @@ function parseBreakTimeClient(v){
             tbody.innerHTML = ''; 
             const isHOD = (isManagerRole(role));
             const isAdmin = isFullAdminRole(role);
+            const taskAdminActionsHeader = document.getElementById('taskAdminActionsHeader');
+            if (taskAdminActionsHeader) taskAdminActionsHeader.classList.toggle('hidden', !isAdmin);
 
             let compCount = 0, pendCount = 0;
             let dailyTotal = 0, dailyDone = 0;
@@ -1352,7 +1354,8 @@ function parseBreakTimeClient(v){
             }
 
             if (tasksToRender.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="${isHOD?(isAdmin?12:12):11}" class="py-8 text-center text-gray-500 italic">No tasks found.</td></tr>`;
+                const taskTableColumnCount = 11 + (isHOD ? 1 : 0) + (isAdmin ? 1 : 0);
+                tbody.innerHTML = `<tr><td colspan="${taskTableColumnCount}" class="py-8 text-center text-gray-500 italic">No tasks found.</td></tr>`;
             } else {
                 tasksToRender.forEach(task => {
                     const taskActionKey = Object.keys(window.__taskActionCache).length;
@@ -1408,10 +1411,10 @@ function parseBreakTimeClient(v){
                     // Replace option removed from Assigned Tasks UI as requested.
                     const taskReplaceHTML = '';
                     const displayTaskType = task.taskType || task.templateTaskType || task.type || '-';
-                    const taskAdminActionsHTML = isAdmin ? `<div class="mt-2 flex flex-wrap gap-1"><button type="button" onclick="openEditTaskModalByKey(${taskActionKey})" class="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-2 py-1 rounded-lg text-xs font-bold" title="Edit Task"><i class="fas fa-pen-to-square"></i> Edit</button><button type="button" onclick="deleteAssignedTaskByKey(${taskActionKey})" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-2 py-1 rounded-lg text-xs font-bold" title="Delete Task"><i class="fas fa-trash"></i> Delete</button></div>` : '';
+                    const taskAdminActionsHTML = isAdmin ? `<td class="py-4 px-6 admin-task-actions-col"><button type="button" onclick="openTaskAdminActionsByKey(${taskActionKey})" class="bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-300 px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap" title="Edit or delete this task"><i class="fas fa-sliders"></i> Edit / Delete</button></td>` : '';
                     tr.innerHTML = `
                         <td class="py-4 px-6 font-bold text-[#112a2e]">${escapeHtml(displayTaskType)}</td>
-                        <td class="py-4 px-6 font-bold text-[#112a2e]"><button type="button" class="task-name-details text-left font-bold text-[#112a2e] hover:text-[#0f766e] hover:underline underline-offset-4 cursor-pointer" onclick="openTaskDetailsByKey(${taskActionKey})" title="Click to view task details">${escapeHtml(displayTaskName)}</button>${replacementForToday ? '<div class="text-[10px] text-[#0f766e] font-semibold mt-1">Replacement approved</div>' : ''}${taskAdminActionsHTML}</td>
+                        <td class="py-4 px-6 font-bold text-[#112a2e]"><button type="button" class="task-name-details text-left font-bold text-[#112a2e] hover:text-[#0f766e] hover:underline underline-offset-4 cursor-pointer" onclick="openTaskDetailsByKey(${taskActionKey})" title="Click to view task details">${escapeHtml(displayTaskName)}</button>${replacementForToday ? '<div class="text-[10px] text-[#0f766e] font-semibold mt-1">Replacement approved</div>' : ''}</td>
                          <td class="py-4 px-6 font-bold text-[#0f766e]">${escapeHtml(task.frequency||'One-time')}</td>
                          <td class="py-4 px-6 text-[#259b94] font-bold ${isHOD ? '' : 'hidden'}">${isHOD ? escapeHtml(task.assignedTo || '-') : ''}</td>
                          <td class="py-4 px-6 text-[#4b6d70] font-semibold">${escapeHtml(task.assignedBy || '-')}</td>
@@ -1422,6 +1425,7 @@ function parseBreakTimeClient(v){
                         <td class="py-4 px-6">${timeSpentHTML}</td>
                         <td class="py-4 px-6">${empStatusHTML}</td>
                         <td class="py-4 px-6">${hodStatusHTML}</td>
+                        ${taskAdminActionsHTML}
                     `;
                     tbody.appendChild(tr);
                 });
@@ -1474,6 +1478,24 @@ function parseBreakTimeClient(v){
         }
         function closeTaskDetailsModal(){const modal=document.getElementById('taskDetailsModal');if(modal)modal.style.display='none';}
 
+        function openTaskAdminActionsByKey(key){
+            const role=String(document.getElementById('displayRole')?.innerText||'');
+            if(!isFullAdminRole(role)){alert('Task edit/delete ka access sirf Admin/Master Admin ko hai.');return;}
+            const task=window.__taskActionCache?.[key];
+            if(!task){alert('Task details abhi available nahi hain. Dashboard refresh karke dobara try karein.');return;}
+            let modal=document.getElementById('taskAdminActionsModal');
+            if(!modal){
+                modal=document.createElement('div');modal.id='taskAdminActionsModal';modal.className='fixed inset-0 z-[10020] bg-black/50 flex items-center justify-center p-4';
+                modal.innerHTML=`<div class="w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden"><div class="p-4 border-b flex items-center justify-between gap-3"><div><h3 class="font-extrabold text-[#112a2e]">Task Actions</h3><p id="taskAdminActionsName" class="text-xs text-gray-500 mt-1 break-words"></p></div><button type="button" onclick="closeTaskAdminActionsModal()" class="text-2xl text-gray-500" aria-label="Close">×</button></div><div class="p-4 grid grid-cols-1 gap-2"><button type="button" onclick="taskAdminActionEdit()" class="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-4 py-3 rounded-lg text-sm font-bold"><i class="fas fa-pen-to-square mr-2"></i>Edit Task</button><button type="button" onclick="taskAdminActionDelete()" class="w-full bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 px-4 py-3 rounded-lg text-sm font-bold"><i class="fas fa-trash mr-2"></i>Delete Task</button></div></div>`;
+                document.body.appendChild(modal);
+            }
+            window.__activeTaskAdminActionKey=key;
+            const name=document.getElementById('taskAdminActionsName');if(name)name.textContent=(task.taskName||'Task')+' · '+(task.assignedTo||'Employee');
+            modal.style.display='flex';
+        }
+        function closeTaskAdminActionsModal(){const m=document.getElementById('taskAdminActionsModal');if(m)m.style.display='none';}
+        function taskAdminActionEdit(){const key=window.__activeTaskAdminActionKey;closeTaskAdminActionsModal();openEditTaskModalByKey(key);}
+        function taskAdminActionDelete(){const key=window.__activeTaskAdminActionKey;closeTaskAdminActionsModal();deleteAssignedTaskByKey(key);}
         function openEditTaskModalByKey(key){ const task=window.__taskActionCache?.[key]; if(task) openEditTaskModal(task); }
         function deleteAssignedTaskByKey(key){ const task=window.__taskActionCache?.[key]; if(task) deleteAssignedTask(task.assignedTo,task.taskId,task.taskName,task.rowIndex); }
         function openTaskReplaceModal(task){
