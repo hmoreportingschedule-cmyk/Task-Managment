@@ -2284,7 +2284,7 @@ function parseBreakTimeClient(v){
             if(cat){cat.innerHTML='<option value="">-- Select Task Category --</option>';cat.disabled=true;cat.value='';}
             if(other){other.value='';other.classList.add('hidden');}
             setQuickTemplateFieldLabels_();
-            ['qtTemplateId','qtStartDay','qtEndDay','qtDepartment'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+            ['qtTemplateId','qtStartDay','qtEndDay','qtDepartment','qtTaskNameDepartment'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
             const frequency=document.getElementById('qtFrequency');if(frequency)frequency.value='One-time';
             const w=document.getElementById('qtWeightage');if(w)w.value='10';
             const p=document.getElementById('qtPriority');if(p){p.innerHTML=QUICK_TEMPLATE_PRIORITY_OPTIONS.map(v=>`<option value="${v}">${v}</option>`).join('');p.value='Normal';}
@@ -2352,12 +2352,12 @@ function parseBreakTimeClient(v){
             cat.value=(QUICK_TEMPLATE_TYPES[type.value]||[]).includes(taskCategory)?taskCategory:'';
             handleQuickTemplateOtherType();
             ensureQuickTemplatePriorityField();
-            document.getElementById('qtFrequency').value=t.repeat||'Monthly';document.getElementById('qtStartDay').value=Number(t.startDay)||1;document.getElementById('qtEndDay').value=Number(t.endDay)||31;document.getElementById('qtWeightage').value=Number(t.weightage)||10;const dept=document.getElementById('qtDepartment');if(dept)dept.value=String(t.departmentName||'');toggleQuickTemplateFrequencyFields_();
+            document.getElementById('qtFrequency').value=t.repeat||'Monthly';document.getElementById('qtStartDay').value=Number(t.startDay)||1;document.getElementById('qtEndDay').value=Number(t.endDay)||31;document.getElementById('qtWeightage').value=Number(t.weightage)||10;const dept=document.getElementById('qtDepartment');if(dept)dept.value=String(t.departmentName||'');const taskDept=document.getElementById('qtTaskNameDepartment');if(taskDept)taskDept.value=String(t.taskNameDepartment||'');toggleQuickTemplateFrequencyFields_();
             const priority=document.getElementById('qtPriority');if(priority)priority.value=['Medium','Normal','High','Urgent'].includes(String(t.priority||'Normal'))?String(t.priority||'Normal'):'Normal';
             const btn=document.getElementById('qtSaveBtn');btn.innerText='Update Template';btn.dataset.mode='edit';document.getElementById('quickTemplateModal').style.display='block';
         }
         function deleteQuickTaskTemplate(id,name){if(!id)return;if(!confirm(`Template "${name||id}" delete karna hai? Existing assigned tasks delete nahi honge.`))return;const fd=new FormData();fd.append('action','deleteCommonTaskTemplate');fd.append('templateId',id);fd.append('sessionToken',sessionToken);fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(d=>{if(d.status!=='success')throw new Error(d.message||'Delete failed');alert(d.message||'Template deleted.');quickTemplateDataCache.loadedAt=0;refreshAssignTemplateData(false,true);renderQuickTemplateList();}).catch(e=>alert(e.message||'Template delete failed.'));}
-        function renderQuickTemplateList(){const box=document.getElementById('quickTemplateList');if(!box)return;const list=(assignTemplateCache||[]).filter(t=>t.active!==false);if(!list.length){box.innerHTML='<div class="text-sm text-gray-500 p-3 border rounded-lg">No task templates found.</div>';return;}box.innerHTML=list.map(t=>`<div class="border border-gray-200 rounded-lg p-3 bg-gray-50"><div class="flex items-start justify-between gap-3"><div class="min-w-0"><b class="text-sm text-[#112a2e]">${escapeHtml(t.taskName||'Task')}</b><div class="text-xs text-gray-500 mt-1">Type: ${escapeHtml(t.taskType||'-')} • Category: ${escapeHtml(t.category||'-')} • Frequency: ${escapeHtml(t.repeat||'Monthly')} • Priority: ${escapeHtml(t.priority||'Normal')}</div><div class="text-xs text-gray-500">${String(t.taskType||'').toLowerCase()==='department optional work'?'Dates: Not Required • Priority: Urgent on request • Weightage: Admin will set later':`Date: ${Number(t.startDay)||1} to ${Number(t.endDay)||31} • Weightage: ${Number(t.weightage)||0}%`}</div><div class="text-xs text-gray-500">Department: ${escapeHtml(t.departmentName||'-')}</div></div><div class="flex gap-1 shrink-0"><button type="button" data-tpl-edit="${escapeHtml(t.templateId||'')}" class="px-2 py-1 rounded bg-blue-50 text-blue-700 text-xs font-bold">Edit</button><button type="button" data-tpl-delete="${escapeHtml(t.templateId||'')}" class="px-2 py-1 rounded bg-red-50 text-red-700 text-xs font-bold">Delete</button></div></div></div>`).join('');
+        function renderQuickTemplateList(){const box=document.getElementById('quickTemplateList');if(!box)return;const list=(assignTemplateCache||[]).filter(t=>t.active!==false);if(!list.length){box.innerHTML='<div class="text-sm text-gray-500 p-3 border rounded-lg">No task templates found.</div>';return;}box.innerHTML=list.map(t=>`<div class="border border-gray-200 rounded-lg p-3 bg-gray-50"><div class="flex items-start justify-between gap-3"><div class="min-w-0"><b class="text-sm text-[#112a2e]">${escapeHtml(t.taskName||'Task')}</b><div class="text-xs text-gray-500 mt-1">Type: ${escapeHtml(t.taskType||'-')} • Category: ${escapeHtml(t.category||'-')} • Frequency: ${escapeHtml(t.repeat||'Monthly')} • Priority: ${escapeHtml(t.priority||'Normal')}</div><div class="text-xs text-gray-500">${String(t.taskType||'').toLowerCase()==='department optional work'?'Dates: Not Required • Priority: Urgent on request • Weightage: Admin will set later':`Date: ${Number(t.startDay)||1} to ${Number(t.endDay)||31} • Weightage: ${Number(t.weightage)||0}%`}</div><div class="text-xs text-gray-500">Department: ${escapeHtml(t.departmentName||'-')}</div><div class="text-xs text-gray-500">Task Name Department: ${escapeHtml(t.taskNameDepartment||t.taskName||'-')}</div></div><div class="flex gap-1 shrink-0"><button type="button" data-tpl-edit="${escapeHtml(t.templateId||'')}" class="px-2 py-1 rounded bg-blue-50 text-blue-700 text-xs font-bold">Edit</button><button type="button" data-tpl-delete="${escapeHtml(t.templateId||'')}" class="px-2 py-1 rounded bg-red-50 text-red-700 text-xs font-bold">Delete</button></div></div></div>`).join('');
             box.querySelectorAll('[data-tpl-edit]').forEach(b=>b.onclick=()=>{const t=(assignTemplateCache||[]).find(x=>String(x.templateId)===String(b.dataset.tplEdit));if(t)editQuickTaskTemplate(t);});
             box.querySelectorAll('[data-tpl-delete]').forEach(b=>b.onclick=()=>{const t=(assignTemplateCache||[]).find(x=>String(x.templateId)===String(b.dataset.tplDelete));if(t)deleteQuickTaskTemplate(t.templateId,t.taskName);});
         }
@@ -2365,13 +2365,14 @@ function parseBreakTimeClient(v){
             ensureQuickTemplatePriorityField();
             const taskType=document.getElementById('qtCategory')?.value||'',
                 category=document.getElementById('qtName')?.value||'',
-                name=(String(document.getElementById('qtCategory')?.value||'').toLowerCase()==='department optional work'?'Department Optional Work':category),
+                name=(String(document.getElementById('qtCategory')?.value||'').toLowerCase()==='department optional work'?'Department Optional Work':(String(document.getElementById('qtTaskNameDepartment')?.value||'').trim()||category)),
                 frequency=document.getElementById('qtFrequency')?.value||'',
                 priority=document.getElementById('qtPriority')?.value||'Normal',
                 startDay=Number(document.getElementById('qtStartDay')?.value),
                 endDay=Number(document.getElementById('qtEndDay')?.value),
                 weightage=Number(document.getElementById('qtWeightage')?.value),
-                departmentName=String(document.getElementById('qtDepartment')?.value||'').trim();
+                departmentName=String(document.getElementById('qtDepartment')?.value||'').trim(),
+                taskNameDepartment=String(document.getElementById('qtTaskNameDepartment')?.value||'').trim();
             if(!taskType){alert('Task Type select karein.');return;}
             if(!category){alert('Task Category select karein.');return;}
             if(!frequency){alert('Task Frequency select karein.');return;}
@@ -2386,7 +2387,7 @@ function parseBreakTimeClient(v){
             const optimisticId=templateId||('local_'+Date.now());
             const optimistic={
                 templateId:optimisticId,taskName:name,taskType,category,repeat:frequency,
-                priority,weightage,departmentName,startDay,endDay,active:true,_optimistic:!templateId
+                priority,weightage,departmentName,taskNameDepartment,startDay,endDay,active:true,_optimistic:!templateId
             };
             btn.disabled=true;btn.innerText='Saving...';
 
@@ -2415,6 +2416,7 @@ function parseBreakTimeClient(v){
             fd.append('priority',priority);
             fd.append('weightage',String(weightage));
             fd.append('departmentName',departmentName);
+            fd.append('taskNameDepartment',taskNameDepartment);
             fd.append('startDay',String(startDay));
             fd.append('endDay',String(endDay));
             fd.append('frequency',frequency);
