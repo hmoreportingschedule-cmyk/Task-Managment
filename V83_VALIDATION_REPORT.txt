@@ -1,0 +1,10 @@
+V.83 STATIC VALIDATION
+- index_scripts.js: node --check PASS
+- worker.js: node --check PASS
+- Code.gs: copied to .js for parser check; node --check PASS
+- Approved Apps Script URL: only one distinct script.google.com/macros URL found in the project.
+- Approved Master Sheet ID: 1VpJ6AXRYIpGbx9lYgip-evU2lRLm_HoXqEd9FFtMuBc
+- Frontend dashboard sync requests are coalesced while a sync is in progress.
+- Manual forceSync now sends forceRefresh=1, matching the backend handler.
+- Polling loop reduced from every 3 seconds to every 15 seconds; notification requests are throttled to 30 seconds and hidden tabs are skipped.
+- Static checks do not prove live Google Apps Script/Google Sheet end-to-end behavior. Test in the deployed environment before relying on production writes.

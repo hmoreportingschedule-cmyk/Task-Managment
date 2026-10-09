@@ -16,6 +16,9 @@
         let globalTeamAttendance = [];
         let monthlyChartInst = null;
         let dashboardSyncInProgress = false;
+        // V83: coalesce repeated refresh requests while one sync is already running.
+        let dashboardSyncQueued = false;
+        let dashboardSyncQueuedForce = false;
         let sessionToken = "";
         let whatsappGroupLink = "";
         let attendanceEntryStart = "";
@@ -825,7 +828,7 @@ function parseBreakTimeClient(v){
             const username = document.getElementById('displayUser').innerText;
             const role = document.getElementById('displayRole').innerText;
             const dept = document.getElementById('displayDept').innerText;
-            fetchDataAPI(username, role, dept, true, 0, false);
+            fetchDataAPI(username, role, dept, true, 0, !!forceSync);
         }
 
         // Fast dashboard cache: show the last successful dashboard immediately, then sync in background.
@@ -880,7 +883,12 @@ function parseBreakTimeClient(v){
         // Cached data is rendered first for instant display; Apps Script refreshes it in the background.
         function fetchDataAPI(username, role, dept, silent = false, retryCount = 0, forceSync = false) {
             if(retryCount===0) restoreDashboardCache(username);
-            if(dashboardSyncInProgress) return;
+            if(dashboardSyncInProgress) {
+                // Keep only one follow-up refresh; preserve a requested force-sync.
+                dashboardSyncQueued = true;
+                dashboardSyncQueuedForce = dashboardSyncQueuedForce || !!forceSync;
+                return;
+            }
             if(!sessionToken) {
                 dashboardSyncInProgress = false;
                 if(!silent) {
@@ -896,7 +904,7 @@ function parseBreakTimeClient(v){
             formData.append('role', role);
             formData.append('department', dept);
             formData.append('sessionToken', sessionToken);
-            if(forceSync) formData.append('forceSync', '1');
+            if(forceSync) formData.append('forceRefresh', '1');
 
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 60000);
@@ -963,7 +971,7 @@ function parseBreakTimeClient(v){
             })
             .catch(err => {
                 console.error('Dashboard sync error:', err);
-                if(retryCount < 1) {
+                if(retryCount < 1 && !dashboardSyncQueued) {
                     setTimeout(() => fetchDataAPI(username, role, dept, silent, retryCount + 1, forceSync), 800);
                     return;
                 }
@@ -980,6 +988,14 @@ function parseBreakTimeClient(v){
                 dashboardSyncInProgress = false;
                 const syncIcon = document.getElementById('syncIcon');
                 if(syncIcon) syncIcon.classList.remove('fa-spin');
+                // Run one queued refresh after the current request completes instead of
+                // dropping a refresh triggered by a successful save/approval.
+                if(dashboardSyncQueued) {
+                    const queuedForce = dashboardSyncQueuedForce;
+                    dashboardSyncQueued = false;
+                    dashboardSyncQueuedForce = false;
+                    setTimeout(() => fetchDataAPI(username, role, dept, true, 0, queuedForce), 0);
+                }
             });
         }
 
@@ -3839,7 +3855,26 @@ function parseBreakTimeClient(v){
         const refreshPositionObserver_=new MutationObserver(()=>{if(document.getElementById('dashboard-section')?.style.display==='flex')addRefreshButton_();});
         refreshPositionObserver_.observe(document.body,{childList:true,subtree:true});
         document.addEventListener('click',function(e){const b=document.getElementById('notificationBtn'),p=document.getElementById('notificationPanel');if(p&&!p.classList.contains('hidden')&&b&&!b.contains(e.target)&&!p.contains(e.target))closeNotifications();});
-        setInterval(()=>{try{if(typeof renderNotifications==='function')renderNotifications();if(typeof fetchServerNotifications==='function'&&typeof approvalCenterRoleAllowed==='function'&&approvalCenterRoleAllowed())fetchServerNotifications();const m=document.getElementById('approvalAttendanceTaskModal');if(m&&m.style.display!=='none'&&typeof fetchApprovalCenterData==='function')fetchApprovalCenterData(true);}catch(e){}},3000);
+        // V83: reduce unnecessary polling (the previous 3-second loop caused repeated
+        // Apps Script/Sheets reads). Keep the dashboard responsive without hammering sync.
+        let _v83LastNotificationPoll = 0;
+        setInterval(()=>{
+            try {
+                if(document.visibilityState !== 'visible') return;
+                const dashboard=document.getElementById('dashboard-section');
+                if(!dashboard || dashboard.style.display==='none') return;
+                if(typeof renderNotifications==='function') renderNotifications();
+                const now=Date.now();
+                const panel=document.getElementById('notificationPanel');
+                const panelOpen=!!(panel && !panel.classList.contains('hidden'));
+                if(now-_v83LastNotificationPoll>=30000 && (panelOpen || (typeof approvalCenterRoleAllowed==='function' && approvalCenterRoleAllowed()))) {
+                    _v83LastNotificationPoll=now;
+                    if(typeof fetchServerNotifications==='function') fetchServerNotifications();
+                }
+                const modal=document.getElementById('approvalAttendanceTaskModal');
+                if(modal && modal.style.display!=='none' && typeof fetchApprovalCenterData==='function') fetchApprovalCenterData(true);
+            } catch(e) {}
+        },15000);
 
         // ================= TASK REPORT =================
 

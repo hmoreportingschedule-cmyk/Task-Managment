@@ -1,0 +1,21 @@
+TASK MANAGEMENT V.83 — FULL REPLACEMENT PATHS
+
+GOOGLE APPS SCRIPT
+- Source in ZIP: Google-Apps-Script/Code.gs
+- Destination: the existing Apps Script project's Code.gs
+- Action: replace complete file, Save, Deploy > Manage deployments > Edit > New version > Deploy.
+- Keep the existing approved /exec deployment URL. Do not create another master spreadsheet.
+
+GITHUB / CLOUDFLARE PROJECT ROOT
+- Cloudflare-Project/index.html       -> repository root/index.html
+- Cloudflare-Project/index_scripts.js -> repository root/index_scripts.js
+- Cloudflare-Project/worker.js        -> repository root/worker.js
+- Cloudflare-Project/wrangler.toml    -> repository root/wrangler.toml (merge project-specific settings if present)
+
+APPROVED MASTER SHEET ID
+1VpJ6AXRYIpGbx9lYgip-evU2lRLm_HoXqEd9FFtMuBc
+
+APPROVED APPS SCRIPT URL
+https://script.google.com/macros/s/AKfycbw9x_CwQz3CAQFSZENxZ6tFwTETOv-vol39dGDR5-A0cFj-pvbgd5_HI_1vLLm5yOxG4Q/exec
+
+No Google Sheet rows/tabs should be deleted as part of deployment.
