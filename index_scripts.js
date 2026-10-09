@@ -1,7 +1,3 @@
-
-
-
-
         // V.72: Browser calls the same-origin Cloudflare Worker proxy. The Worker forwards
         // requests only to the approved Apps Script endpoint, avoiding browser CORS failures.
         const DEFAULT_GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw9x_CwQz3CAQFSZENxZ6tFwTETOv-vol39dGDR5-A0cFj-pvbgd5_HI_1vLLm5yOxG4Q/exec";
