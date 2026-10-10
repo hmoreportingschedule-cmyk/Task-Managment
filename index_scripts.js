@@ -3669,11 +3669,16 @@ function parseBreakTimeClient(v){
             // Only actual, pending attendance punches should enter Approval Center.
             // Ordinary daily work minutes are notifications/system-overview updates, not approvals.
             (globalTeamAttendance||[]).forEach(r=>{
-                const status=String(r.status||'Pending').trim().toLowerCase();
-                if(!r.employee || !['pending','pending approval',''].includes(status))return;
-                if(!String(r.inTime||'').trim() && !String(r.outTime||'').trim())return;
-                const meta=attendanceMetaForUser(r.employee)||{};
-                out.push({key:'attendance-record|'+r.rowIndex,type:'attendance',typeLabel:'Attendance',employee:r.user||r.employee||'',employeeId:meta.employeeId||r.employeeId||'',task:'Attendance',date:r.date||'',details:`In: ${r.inTime||'-'} • Out: ${r.outTime||'-'} • ${r.reason||'-'}`,status:'Pending',rowIndex:r.rowIndex,action:'attendanceRecord',targetUser:r.user||r.employee||''});
+                // Backend teamAttendance uses `user` and `status`; older UI data may use `employee`.
+                const employee=String(r.employee||r.user||r.username||'').trim();
+                const status=String(r.status??r.approvalStatus??'Pending').trim().toLowerCase();
+                if(!employee || !['pending','pending approval',''].includes(status))return;
+                const inTime=r.inTime||r.InTime||'', outTime=r.outTime||r.OutTime||'';
+                if(!String(inTime).trim() && !String(outTime).trim())return;
+                const meta=attendanceMetaForUser(employee)||{};
+                const rowIndex=Number(r.rowIndex)||0;
+                if(!rowIndex)return;
+                out.push({key:'attendance-record|'+rowIndex,type:'attendance',typeLabel:'Attendance',employee:employee,employeeId:meta.employeeId||r.employeeId||r.EmployeeId||'',task:'Attendance',date:r.date||r.Date||'',details:`In: ${inTime||'-'} • Out: ${outTime||'-'} • ${r.reason||r.Reason||'-'}`,status:'Pending',rowIndex:rowIndex,action:'attendanceRecord',targetUser:employee});
             });
             (globalAttendanceRequests||[]).forEach(r=>{
                 const status=String(r.status||'Pending');
