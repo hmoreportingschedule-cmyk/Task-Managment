@@ -4856,9 +4856,9 @@ function parseBreakTimeClient(v){
             const today=new Date();
             const label=document.getElementById('emergencyTaskToday');if(label)label.textContent=today.toLocaleDateString('en-IN',{day:'2-digit',month:'2-digit',year:'numeric'});
             ensureUrgentTaskDateFields_();
-            const sel=document.getElementById('emergencyTaskTemplate');if(sel)sel.innerHTML='<option value="">Loading Optional Work templates...</option>';
+            const sel=document.getElementById('emergencyTaskTemplate');if(sel)sel.innerHTML='<option value="">Loading assigned templates...</option>';
             const tfd=new FormData();tfd.append('action','getUrgentTaskTemplates');tfd.append('sessionToken',sessionToken);
-            apiFetchJson_(GOOGLE_SCRIPT_URL,{method:'POST',body:tfd}).then(d=>{const templates=Array.isArray(d.templates)?d.templates:[];emergencyTaskTemplateCache=templates;if(sel)sel.innerHTML='<option value="">-- Select Task Template --</option>'+templates.map(x=>`<option value="${escapeHtml(x.taskName)}">${escapeHtml(x.taskName)} — ${escapeHtml(x.departmentName||'All Departments')}</option>`).join('');if(sel&&!templates.length)sel.innerHTML='<option value="">No Optional Work templates found</option>';}).catch(()=>{if(sel)sel.innerHTML='<option value="">Templates load nahi hue</option>';});
+            apiFetchJson_(GOOGLE_SCRIPT_URL,{method:'POST',body:tfd}).then(d=>{const templates=Array.isArray(d.templates)?d.templates:[];emergencyTaskTemplateCache=templates;if(sel)sel.innerHTML='<option value="">-- Select Task Template --</option>'+templates.map(x=>`<option value="${escapeHtml(x.templateId||x.taskName)}">${escapeHtml(x.taskName)} — ${escapeHtml(x.taskType||'Task')} • ${escapeHtml(x.departmentName||'All Departments')}${x.assignedToEmployee?' • Assigned to you':''}</option>`).join('');if(sel&&!templates.length)sel.innerHTML='<option value="">No assigned templates found</option>';}).catch(()=>{if(sel)sel.innerHTML='<option value="">Templates load nahi hue</option>';});
             const cat=document.getElementById('emergencyTaskCategory');if(cat)cat.value='';
             const ab=document.getElementById('emergencyTaskAssignBy');if(ab)ab.value='';
             const from=document.getElementById('emergencyTaskFromDate'),to=document.getElementById('emergencyTaskToDate');if(from)from.value=todayKey;if(to){to.value=todayKey;to.min=todayKey;}
@@ -4875,7 +4875,7 @@ function parseBreakTimeClient(v){
             const nonWorking=isLogWorkNonWorkingDate(todayKey);
             if(nonWorking){ alert(`Today Urgent Task frozen: ${nonWorking}.`); updateTodayUrgentTaskButtonState(); return; }
             const templateId=document.getElementById('emergencyTaskTemplate')?.value||'',assignBy=document.getElementById('emergencyTaskAssignBy')?.value||'',details=document.getElementById('emergencyTaskDetails')?.value.trim()||'',fromDate=document.getElementById('emergencyTaskFromDate')?.value||todayKey,toDate=document.getElementById('emergencyTaskToDate')?.value||todayKey;
-            if(!templateId||!(emergencyTaskTemplateCache||[]).some(x=>String(x.taskName)===String(templateId))){alert('Department Optional Work template select karein.');return;}
+            const chosenTemplate=(emergencyTaskTemplateCache||[]).find(x=>String(x.templateId||x.taskName)===String(templateId));if(!templateId||!chosenTemplate){alert('Apni assigned task template select karein.');return;}
             if(fromDate!==todayKey){alert('From Date sirf current date ho sakti hai.');return;}
             if(!toDate||toDate<todayKey){alert('To Date current date ya uske baad select karein.');return;}
             if(!assignBy){alert('Assign By select karein.');return;}
