@@ -4830,6 +4830,27 @@ function parseBreakTimeClient(v){
         const SELF_URGENT_TASK_TEMPLATES=['FollowUp','File Work','Outdoor','Meeting'];
         function ensureUrgentTaskDateFields_(){
             const modal=document.getElementById('emergencyTaskModal'); if(!modal)return;
+            // V.103: Keep the requested field order in Today Urgent Task only.
+            // Move the complete Assign By field immediately before Task Template.
+            const assignByField=document.getElementById('emergencyTaskAssignBy');
+            const templateField=document.getElementById('emergencyTaskTemplate');
+            if(assignByField && templateField){
+                const fieldRow=(el)=>el.closest('.mb-4')||el.parentElement;
+                const assignRow=fieldRow(assignByField), templateRow=fieldRow(templateField);
+                if(assignRow && templateRow && assignRow!==templateRow && templateRow.parentElement===assignRow.parentElement){
+                    templateRow.parentElement.insertBefore(assignRow,templateRow);
+                } else if(assignRow && templateRow && assignRow!==templateRow){
+                    // Fallback for layouts whose fields have an extra wrapper.
+                    let a=assignRow, t=templateRow, ancestors=new Set();
+                    while(a){ancestors.add(a);a=a.parentElement;}
+                    let common=t;while(common && !ancestors.has(common))common=common.parentElement;
+                    if(common){
+                        let aChild=assignRow;while(aChild.parentElement!==common && aChild.parentElement)aChild=aChild.parentElement;
+                        let tChild=templateRow;while(tChild.parentElement!==common && tChild.parentElement)tChild=tChild.parentElement;
+                        if(aChild!==tChild && aChild.parentElement===common && tChild.parentElement===common)common.insertBefore(aChild,tChild);
+                    }
+                }
+            }
             const details=document.getElementById('emergencyTaskDetails');
             const oldCat=document.getElementById('emergencyTaskCategory');
             const oldFreq=oldCat?.parentElement?.parentElement?.querySelector('select');
