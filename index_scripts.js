@@ -16,6 +16,9 @@
         let globalTeamAttendance = [];
         let monthlyChartInst = null;
         let dashboardSyncInProgress = false;
+        // V83: coalesce repeated refresh requests while one sync is already running.
+        let dashboardSyncQueued = false;
+        let dashboardSyncQueuedForce = false;
         let sessionToken = "";
         let whatsappGroupLink = "";
         let attendanceEntryStart = "";
@@ -711,13 +714,18 @@ function parseBreakTimeClient(v){
             try{
                 return await doRequest(url,opts.method||'GET',opts.body);
             }catch(firstErr){
-                // For POST FormData, retry through GET. This also handles Apps Script
-                // redirect/proxy cases where POST response is interrupted.
-                if((opts.method||'GET').toUpperCase()==='POST' && opts.body instanceof FormData){
-                    const params=new URLSearchParams();
-                    opts.body.forEach((v,k)=>{if(typeof v==='string')params.append(k,v);});
+                // Never replay a write as GET: Apps Script may have completed the POST
+                // before the browser lost the response, which can create duplicate attendance/logs.
+                const method=String(opts.method||'GET').toUpperCase();
+                const action=opts.body instanceof FormData?String(opts.body.get('action')||''):'';
+                const readOnlyActions=new Set(['getDashboardData','getDashboardSummary','getWorkLogs','getOneViewAttendance','getCommonTaskTemplates','getCommonTaskEmployees','getTaskDelayAnalytics','getAdvanceScheduleRequests','listAdvanceScheduleRequests','getAuditLog','systemHealth','getServerNotifications']);
+                if(method==='POST' && opts.body instanceof FormData && readOnlyActions.has(action)){
+                    const params=new URLSearchParams();opts.body.forEach((v,k)=>{if(typeof v==='string')params.append(k,v);});
                     const sep=url.includes('?')?'&':'?';
                     return await doRequest(url+sep+params.toString()+'&_='+Date.now(),'GET');
+                }
+                if(method==='POST' && opts.body instanceof FormData && !readOnlyActions.has(action)){
+                    throw new Error('Request ka response confirm nahi ho saka ('+(firstErr?.message||'network error')+'). Duplicate save se bachne ke liye request auto-repeat nahi ki gayi. Refresh karke Google Sheet mein record check karein.');
                 }
                 throw firstErr;
             }
@@ -820,7 +828,7 @@ function parseBreakTimeClient(v){
             const username = document.getElementById('displayUser').innerText;
             const role = document.getElementById('displayRole').innerText;
             const dept = document.getElementById('displayDept').innerText;
-            fetchDataAPI(username, role, dept, true, 0, false);
+            fetchDataAPI(username, role, dept, true, 0, !!forceSync);
         }
 
         // Fast dashboard cache: show the last successful dashboard immediately, then sync in background.
@@ -875,7 +883,12 @@ function parseBreakTimeClient(v){
         // Cached data is rendered first for instant display; Apps Script refreshes it in the background.
         function fetchDataAPI(username, role, dept, silent = false, retryCount = 0, forceSync = false) {
             if(retryCount===0) restoreDashboardCache(username);
-            if(dashboardSyncInProgress) return;
+            if(dashboardSyncInProgress) {
+                // Keep only one follow-up refresh; preserve a requested force-sync.
+                dashboardSyncQueued = true;
+                dashboardSyncQueuedForce = dashboardSyncQueuedForce || !!forceSync;
+                return;
+            }
             if(!sessionToken) {
                 dashboardSyncInProgress = false;
                 if(!silent) {
@@ -891,7 +904,7 @@ function parseBreakTimeClient(v){
             formData.append('role', role);
             formData.append('department', dept);
             formData.append('sessionToken', sessionToken);
-            if(forceSync) formData.append('forceSync', '1');
+            if(forceSync) formData.append('forceRefresh', '1');
 
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 60000);
@@ -958,7 +971,7 @@ function parseBreakTimeClient(v){
             })
             .catch(err => {
                 console.error('Dashboard sync error:', err);
-                if(retryCount < 1) {
+                if(retryCount < 1 && !dashboardSyncQueued) {
                     setTimeout(() => fetchDataAPI(username, role, dept, silent, retryCount + 1, forceSync), 800);
                     return;
                 }
@@ -975,6 +988,14 @@ function parseBreakTimeClient(v){
                 dashboardSyncInProgress = false;
                 const syncIcon = document.getElementById('syncIcon');
                 if(syncIcon) syncIcon.classList.remove('fa-spin');
+                // Run one queued refresh after the current request completes instead of
+                // dropping a refresh triggered by a successful save/approval.
+                if(dashboardSyncQueued) {
+                    const queuedForce = dashboardSyncQueuedForce;
+                    dashboardSyncQueued = false;
+                    dashboardSyncQueuedForce = false;
+                    setTimeout(() => fetchDataAPI(username, role, dept, true, 0, queuedForce), 0);
+                }
             });
         }
 
@@ -1306,6 +1327,8 @@ function parseBreakTimeClient(v){
             tbody.innerHTML = ''; 
             const isHOD = (isManagerRole(role));
             const isAdmin = isFullAdminRole(role);
+            const taskAdminActionsHeader = document.getElementById('taskAdminActionsHeader');
+            if (taskAdminActionsHeader) taskAdminActionsHeader.classList.toggle('hidden', !isAdmin);
 
             let compCount = 0, pendCount = 0;
             let dailyTotal = 0, dailyDone = 0;
@@ -1331,7 +1354,8 @@ function parseBreakTimeClient(v){
             }
 
             if (tasksToRender.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="${isHOD?(isAdmin?12:12):11}" class="py-8 text-center text-gray-500 italic">No tasks found.</td></tr>`;
+                const taskTableColumnCount = 11 + (isHOD ? 1 : 0) + (isAdmin ? 1 : 0);
+                tbody.innerHTML = `<tr><td colspan="${taskTableColumnCount}" class="py-8 text-center text-gray-500 italic">No tasks found.</td></tr>`;
             } else {
                 tasksToRender.forEach(task => {
                     const taskActionKey = Object.keys(window.__taskActionCache).length;
@@ -1387,9 +1411,10 @@ function parseBreakTimeClient(v){
                     // Replace option removed from Assigned Tasks UI as requested.
                     const taskReplaceHTML = '';
                     const displayTaskType = task.taskType || task.templateTaskType || task.type || '-';
+                    const taskAdminActionsHTML = isAdmin ? `<td class="py-4 px-6 admin-task-actions-col"><button type="button" onclick="openTaskAdminActionsByKey(${taskActionKey})" class="bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-300 px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap" title="Edit or delete this task"><i class="fas fa-sliders"></i> Edit / Delete</button></td>` : '';
                     tr.innerHTML = `
                         <td class="py-4 px-6 font-bold text-[#112a2e]">${escapeHtml(displayTaskType)}</td>
-                        <td class="py-4 px-6 font-bold text-[#112a2e]">${escapeHtml(displayTaskName)}${replacementForToday ? '<div class="text-[10px] text-[#0f766e] font-semibold mt-1">Replacement approved</div>' : ''}</td>
+                        <td class="py-4 px-6 font-bold text-[#112a2e]"><button type="button" class="task-name-details text-left font-bold text-[#112a2e] hover:text-[#0f766e] hover:underline underline-offset-4 cursor-pointer" onclick="openTaskDetailsByKey(${taskActionKey})" title="Click to view task details">${escapeHtml(displayTaskName)}</button>${replacementForToday ? '<div class="text-[10px] text-[#0f766e] font-semibold mt-1">Replacement approved</div>' : ''}</td>
                          <td class="py-4 px-6 font-bold text-[#0f766e]">${escapeHtml(task.frequency||'One-time')}</td>
                          <td class="py-4 px-6 text-[#259b94] font-bold ${isHOD ? '' : 'hidden'}">${isHOD ? escapeHtml(task.assignedTo || '-') : ''}</td>
                          <td class="py-4 px-6 text-[#4b6d70] font-semibold">${escapeHtml(task.assignedBy || '-')}</td>
@@ -1400,7 +1425,7 @@ function parseBreakTimeClient(v){
                         <td class="py-4 px-6">${timeSpentHTML}</td>
                         <td class="py-4 px-6">${empStatusHTML}</td>
                         <td class="py-4 px-6">${hodStatusHTML}</td>
-                        ${(isHOD || isAdmin || (!isHOD && !isAdmin)) ? `<td class="py-4 px-3 whitespace-nowrap">${isAdmin ? `<button type="button" onclick="openEditTaskModalByKey(${taskActionKey})" class="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-2 py-1.5 rounded-lg text-xs font-bold mr-1" title="Edit Task"><i class="fas fa-pen-to-square"></i> Edit</button><button type="button" onclick="deleteAssignedTaskByKey(${taskActionKey})" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-2 py-1.5 rounded-lg text-xs font-bold" title="Delete Task"><i class="fas fa-trash"></i> Delete</button>` : ''}${taskReplaceHTML}</td>` : ''}
+                        ${taskAdminActionsHTML}
                     `;
                     tbody.appendChild(tr);
                 });
@@ -1413,6 +1438,64 @@ function parseBreakTimeClient(v){
             const hit = list.slice().reverse().find(r => String(r.status||'').toLowerCase()==='approved' && String(r.date||'').slice(0,10)===ymd && String(r.replacementTask||'').trim());
             return hit ? String(hit.replacementTask).trim() : '';
         }
+        function openTaskDetailsByKey(key){
+            const task=window.__taskActionCache?.[key];
+            if(!task){alert('Task details abhi available nahi hain. Refresh karke dobara try karein.');return;}
+            const role=String(document.getElementById('displayRole')?.innerText||'');
+            const isAdmin=isFullAdminRole(role);
+            const title=document.getElementById('taskDetailsTitle');
+            const summary=document.getElementById('taskDetailsSummary');
+            const logsBox=document.getElementById('taskDetailsEmployeeUpdates');
+            const editBtn=document.getElementById('taskDetailsAdminEdit');
+            if(title)title.textContent=task.taskName||'Task Details';
+            const summaryRows=[
+                ['Employee',task.assignedTo||task.employee||'-'],
+                ['Task Type',task.taskType||task.templateTaskType||task.type||'-'],
+                ['Frequency',task.frequency||'One-time'],
+                ['Timeline',(task.startDate||'-')+' → '+(task.endDate||'-')],
+                ['Assigned By',task.assignedBy||'-'],
+                ['Status',task.empStatus||'Pending'],
+                ['Task Description',task.description||task.details||'No task description added.']
+            ];
+            if(summary)summary.innerHTML=summaryRows.map(([label,value])=>`<div class="rounded-lg border border-gray-100 bg-gray-50 p-3"><div class="text-xs font-semibold text-gray-500 mb-1">${escapeHtml(label)}</div><div class="text-sm text-gray-800 whitespace-pre-wrap break-words">${escapeHtml(value)}</div></div>`).join('');
+            const employee=String(task.assignedTo||task.employee||'').trim().toLowerCase();
+            const taskName=String(task.taskName||'').trim().toLowerCase();
+            const taskId=String(task.taskId||'').trim();
+            const rowIndex=String(task.rowIndex||'').trim();
+            const logs=(Array.isArray(globalWorkLogs)?globalWorkLogs:[]).filter(w=>{
+                const who=String(w.Employee||w.employee||w.Username||w.username||'').trim().toLowerCase();
+                const name=String(w.Task||w.taskName||w.TaskName||w.task||'').trim().toLowerCase();
+                const logTaskId=String(w.TaskID||w.taskId||w.TaskId||'').trim();
+                const logRow=String(w.TaskRowIndex||w.taskRowIndex||'').trim();
+                const sameTask=(taskId&&logTaskId===taskId)||(rowIndex&&logRow===rowIndex)||(!logTaskId&&!logRow&&name===taskName);
+                return (!employee||who===employee)&&sameTask;
+            }).sort((a,b)=>String(b.WorkDate||b.workDate||b.Date||'').localeCompare(String(a.WorkDate||a.workDate||a.Date||'')));
+            if(logsBox){
+                logsBox.innerHTML=logs.length?logs.map(w=>`<article class="rounded-lg border border-[#dcebea] p-3 bg-white"><div class="flex flex-wrap justify-between gap-2 mb-2"><b class="text-sm text-[#2a4d53]">${escapeHtml(w.WorkDate||w.workDate||w.Date||'-')}</b><span class="text-xs font-semibold text-[#0f766e]">${Number(w.TimeSpentMins||w.timeSpent||0)} min</span></div><div class="text-sm whitespace-pre-wrap break-words text-gray-700">${escapeHtml(w.Description||w.description||'No description added.')}</div>${(w.DelayReason||w.delayReason)?`<div class="mt-2 text-xs text-amber-700">Delay reason: ${escapeHtml(w.DelayReason||w.delayReason)}</div>`:''}</article>`).join(''):'<div class="rounded-lg bg-gray-50 p-4 text-sm text-gray-500">Employee ne abhi tak is task ke liye koi Daily Work update add nahi ki.</div>';
+            }
+            if(editBtn){editBtn.style.display=isAdmin?'inline-flex':'none';editBtn.onclick=()=>{closeTaskDetailsModal();openEditTaskModalByKey(key);};}
+            const modal=document.getElementById('taskDetailsModal');if(modal)modal.style.display='block';
+        }
+        function closeTaskDetailsModal(){const modal=document.getElementById('taskDetailsModal');if(modal)modal.style.display='none';}
+
+        function openTaskAdminActionsByKey(key){
+            const role=String(document.getElementById('displayRole')?.innerText||'');
+            if(!isFullAdminRole(role)){alert('Task edit/delete ka access sirf Admin/Master Admin ko hai.');return;}
+            const task=window.__taskActionCache?.[key];
+            if(!task){alert('Task details abhi available nahi hain. Dashboard refresh karke dobara try karein.');return;}
+            let modal=document.getElementById('taskAdminActionsModal');
+            if(!modal){
+                modal=document.createElement('div');modal.id='taskAdminActionsModal';modal.className='fixed inset-0 z-[10020] bg-black/50 flex items-center justify-center p-4';
+                modal.innerHTML=`<div class="w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden"><div class="p-4 border-b flex items-center justify-between gap-3"><div><h3 class="font-extrabold text-[#112a2e]">Task Actions</h3><p id="taskAdminActionsName" class="text-xs text-gray-500 mt-1 break-words"></p></div><button type="button" onclick="closeTaskAdminActionsModal()" class="text-2xl text-gray-500" aria-label="Close">×</button></div><div class="p-4 grid grid-cols-1 gap-2"><button type="button" onclick="taskAdminActionEdit()" class="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-4 py-3 rounded-lg text-sm font-bold"><i class="fas fa-pen-to-square mr-2"></i>Edit Task</button><button type="button" onclick="taskAdminActionDelete()" class="w-full bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 px-4 py-3 rounded-lg text-sm font-bold"><i class="fas fa-trash mr-2"></i>Delete Task</button></div></div>`;
+                document.body.appendChild(modal);
+            }
+            window.__activeTaskAdminActionKey=key;
+            const name=document.getElementById('taskAdminActionsName');if(name)name.textContent=(task.taskName||'Task')+' · '+(task.assignedTo||'Employee');
+            modal.style.display='flex';
+        }
+        function closeTaskAdminActionsModal(){const m=document.getElementById('taskAdminActionsModal');if(m)m.style.display='none';}
+        function taskAdminActionEdit(){const key=window.__activeTaskAdminActionKey;closeTaskAdminActionsModal();openEditTaskModalByKey(key);}
+        function taskAdminActionDelete(){const key=window.__activeTaskAdminActionKey;closeTaskAdminActionsModal();deleteAssignedTaskByKey(key);}
         function openEditTaskModalByKey(key){ const task=window.__taskActionCache?.[key]; if(task) openEditTaskModal(task); }
         function deleteAssignedTaskByKey(key){ const task=window.__taskActionCache?.[key]; if(task) deleteAssignedTask(task.assignedTo,task.taskId,task.taskName,task.rowIndex); }
         function openTaskReplaceModal(task){
@@ -1990,7 +2073,7 @@ function parseBreakTimeClient(v){
                 const wb=XLSX.read(new Uint8Array(ev.target.result),{type:'array'}),ws=wb.Sheets[wb.SheetNames[0]],arr=XLSX.utils.sheet_to_json(ws,{defval:''});
                 if(!arr.length){document.getElementById('importPreview').innerHTML='<div class="bg-red-50 border border-red-200 rounded-lg p-3 font-semibold text-red-700">File mein data nahi hai.</div>';return;}
                 if(importCenterType==='attendance'){
-                    importCenterRows=arr.map(r=>({date:importExcelDate(r['Date']||r['date']),employee:String(r['Employee ID']||r['Employee']||r['Username']||r['username']||'').trim(),inTime:importExcelTime(r['In Time']||r['InTime']),outTime:importExcelTime(r['Out Time']||r['OutTime']),breakStart:importExcelTime(r['Break Start']||r['BreakStart']),breakEnd:importExcelTime(r['Break End']||r['BreakEnd']),leave:String(r['Leave/Weekoff']||r['Leave']||'').trim(),reason:String(r['Reason']||'').trim(),status:String(r['Approval Status']||'Approved').trim()})).filter(r=>r.date||r.employee);
+                    importCenterRows=arr.map(r=>({date:importExcelDate(r['Date']||r['date']),employee:String(r['Employee ID']||r['Employee']||r['Username']||r['username']||'').trim(),inTime:importExcelTime(r['In Time']||r['InTime']),outTime:importExcelTime(r['Out Time']||r['OutTime']),breakStart:importExcelTime(r['Break Start']||r['BreakStart']),breakEnd:importExcelTime(r['Break End']||r['BreakEnd']),leave:String(r['Leave/Weekoff']||r['Leave']||'').trim(),reason:String(r['Reason']||'').trim(),status:String(r['Approval']??r['Approval Status']??'').trim(),attendanceStatus:String(r['Status']??r['Attendance Status']??'').trim(),holidayName:String(r['Holiday Name']||r['Holiday']||'').trim(),holidayType:String(r['Holiday Type']||'Holiday').trim()})).filter(r=>r.date&&(r.employee||r.holidayName||r.attendanceStatus));
                     if(!importCenterRows.length)throw new Error('Valid attendance rows nahi mili.');
                     importPreviewRows(importCenterRows,'attendance');
                 } else if(importCenterType==='tasks'){
@@ -2072,8 +2155,12 @@ function parseBreakTimeClient(v){
         function downloadImportFormat(){
             const wb=XLSX.utils.book_new();
             if(importCenterType==='attendance'){
-                const ws=XLSX.utils.json_to_sheet([{'Date':'2026-09-22','Employee ID':'EMP001','In Time':'09:30:00 AM','Out Time':'06:30:00 PM','Break Start':'02:00:00 PM','Break End':'02:30:00 PM','Leave/Weekoff':'','Reason':'','Approval Status':'Approved'}]);
-                XLSX.utils.book_append_sheet(wb,ws,'Attendance'); XLSX.writeFile(wb,'Attendance_Import_Format.xlsx');
+                const rows=[
+                    {'Date':'2026-10-09','Employee ID':'EMP001','In Time':'09:30 AM','Out Time':'19:00','Break Start':'14:00','Break End':'14:30','Leave/Weekoff':'','Reason':'Regular duty','Approval Status':'Approved','Holiday Name':'','Holiday Type':''},
+                    {'Date':'2026-10-10','Employee ID':'EMP001','In Time':'','Out Time':'','Break Start':'','Break End':'','Leave/Weekoff':'Leave','Reason':'Leave request','Approval Status':'','Holiday Name':'','Holiday Type':''},
+                    {'Date':'2026-10-12','Employee ID':'','In Time':'','Out Time':'','Break Start':'','Break End':'','Leave/Weekoff':'','Reason':'','Approval Status':'','Holiday Name':'Example Holiday','Holiday Type':'Public Holiday'}
+                ];
+                const ws=XLSX.utils.json_to_sheet(rows); XLSX.utils.book_append_sheet(wb,ws,'Attendance & Holidays'); XLSX.writeFile(wb,'Attendance_Import_Format.xlsx');
             } else if(importCenterType==='tasks'){
                 // Exact Task Template import format. Repeat Template ID for each work row.
                 const rows=[
@@ -2155,7 +2242,8 @@ function parseBreakTimeClient(v){
             'Followup': ['Monthly Report','Event Report','Zimmedaran Details','Weekly Risala','User File','Others'],
             'File Work': ['Monthly Report','Event Report','Zimmedaran Details','Weekly Risala','User File','Master File - Report','Others'],
             'Meeting': ['Online Meeting','Physical Meeting'],
-            'Outdoor': ['Qafila','Tarbiyati Ijtima','Others']
+            'Outdoor': ['Qafila','Tarbiyati Ijtima','Others'],
+            'Department Optional Work': ['Others']
         };
         const QUICK_TEMPLATE_TYPE_OPTIONS = Object.keys(QUICK_TEMPLATE_TYPES);
         const QUICK_TEMPLATE_PRIORITY_OPTIONS = ['Medium','Normal','High','Urgent'];
@@ -2167,9 +2255,25 @@ function parseBreakTimeClient(v){
             const wrap=weight.closest('div');
             if(!wrap || !wrap.parentElement) return;
             const box=document.createElement('div');
-            box.className='mt-3';
-            box.innerHTML='<label class=\"block text-sm font-bold text-[#112a2e] mb-1\">Priority</label><select id=\"qtPriority\" class=\"w-full border border-gray-300 rounded-lg px-3 py-2 bg-white\"><option value=\"Medium\">Medium</option><option value=\"Normal\">Normal</option><option value=\"High\">High</option><option value=\"Urgent\">Urgent</option></select>';
+            box.className='mt-3'; box.id='qtPriorityWrap';
+            box.innerHTML='<label class=\"block text-sm font-bold text-[#112a2e] mb-1\">Priority</label><select id=\"qtPriority\" class=\"w-full border border-gray-300 rounded-lg px-3 py-2 bg-white\"><option value=\"Medium\">Medium</option><option value=\"Normal\">Normal</option><option value=\"High\">High</option><option value=\"Urgent\">Urgent</option><option value=\"Not Set\">Not Set</option></select>';
             wrap.parentElement.insertBefore(box,wrap);
+        }
+        function toggleQuickTemplateFrequencyFields_(){
+            const optional=String(document.getElementById('qtCategory')?.value||'').toLowerCase()==='department optional work';
+            const category=document.getElementById('qtName');
+            if(category){if(optional){category.value='Others';category.disabled=true;}else{category.disabled=!document.getElementById('qtCategory')?.value;}}
+            const freq=document.getElementById('qtFrequency');if(freq&&!freq.value)freq.value='One-time';
+            ['qtStartDayWrap','qtEndDayWrap'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=optional?'none':'';});
+            const start=document.getElementById('qtStartDay'),end=document.getElementById('qtEndDay');
+            if(start){start.disabled=optional;start.value=optional?'0':(start.value==='0'?'1':start.value);}
+            if(end){end.disabled=optional;end.value=optional?'0':(end.value==='0'?'31':end.value);}
+            const weight=document.getElementById('qtWeightage'),weightWrap=document.getElementById('qtWeightageWrap');
+            if(weight){weight.disabled=optional;weight.value=optional?'0':(weight.value==='0'?'10':weight.value);}
+            if(weightWrap)weightWrap.style.opacity=optional?'.65':'';
+            const priority=document.getElementById('qtPriority'),priorityWrap=document.getElementById('qtPriorityWrap');
+            if(priority){if(optional){if(!Array.from(priority.options).some(o=>o.value==='Not Set'))priority.add(new Option('Not Set','Not Set'));priority.value='Not Set';}else if(priority.value==='Not Set')priority.value='Normal';priority.disabled=optional;}
+            if(priorityWrap)priorityWrap.style.opacity=optional?'.65':'';
         }
         function resetQuickTemplateForm(){
             ensureQuickTemplatePriorityField();
@@ -2184,10 +2288,12 @@ function parseBreakTimeClient(v){
             if(cat){cat.innerHTML='<option value="">-- Select Task Category --</option>';cat.disabled=true;cat.value='';}
             if(other){other.value='';other.classList.add('hidden');}
             setQuickTemplateFieldLabels_();
-            ['qtTemplateId','qtFrequency','qtStartDay','qtEndDay'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+            ['qtTemplateId','qtStartDay','qtEndDay','qtDepartment','qtTaskNameDepartment'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+            const frequency=document.getElementById('qtFrequency');if(frequency)frequency.value='One-time';
             const w=document.getElementById('qtWeightage');if(w)w.value='10';
             const p=document.getElementById('qtPriority');if(p){p.innerHTML=QUICK_TEMPLATE_PRIORITY_OPTIONS.map(v=>`<option value="${v}">${v}</option>`).join('');p.value='Normal';}
             const btn=document.getElementById('qtSaveBtn');if(btn){btn.innerText='Save Template';btn.dataset.mode='create';}
+            toggleQuickTemplateFrequencyFields_();
         }
         function openQuickTemplateModal(){
             const role=String(document.getElementById('displayRole')?.innerText||'').toLowerCase(); if(!isFullAdminRole(role)){alert('Task Template add karne ka access sirf Admin ko hai.');return;}
@@ -2220,6 +2326,7 @@ function parseBreakTimeClient(v){
             catSel.disabled=!typeSel.value;
             if(typeSel.value && categories.includes(currentCat))catSel.value=currentCat;
             if(other){other.value='';other.classList.add('hidden');}
+            toggleQuickTemplateFrequencyFields_();
         }
         function handleQuickTemplateOtherType(){
             const type=document.getElementById('qtCategory'), other=document.getElementById('qtOtherType');
@@ -2249,12 +2356,12 @@ function parseBreakTimeClient(v){
             cat.value=(QUICK_TEMPLATE_TYPES[type.value]||[]).includes(taskCategory)?taskCategory:'';
             handleQuickTemplateOtherType();
             ensureQuickTemplatePriorityField();
-            document.getElementById('qtFrequency').value=t.repeat||'Monthly';document.getElementById('qtStartDay').value=Number(t.startDay)||1;document.getElementById('qtEndDay').value=Number(t.endDay)||31;document.getElementById('qtWeightage').value=Number(t.weightage)||10;
+            document.getElementById('qtFrequency').value=t.repeat||'Monthly';document.getElementById('qtStartDay').value=Number(t.startDay)||1;document.getElementById('qtEndDay').value=Number(t.endDay)||31;document.getElementById('qtWeightage').value=Number(t.weightage)||10;const dept=document.getElementById('qtDepartment');if(dept)dept.value=String(t.departmentName||'');const taskDept=document.getElementById('qtTaskNameDepartment');if(taskDept)taskDept.value=String(t.taskNameDepartment||'');toggleQuickTemplateFrequencyFields_();
             const priority=document.getElementById('qtPriority');if(priority)priority.value=['Medium','Normal','High','Urgent'].includes(String(t.priority||'Normal'))?String(t.priority||'Normal'):'Normal';
             const btn=document.getElementById('qtSaveBtn');btn.innerText='Update Template';btn.dataset.mode='edit';document.getElementById('quickTemplateModal').style.display='block';
         }
         function deleteQuickTaskTemplate(id,name){if(!id)return;if(!confirm(`Template "${name||id}" delete karna hai? Existing assigned tasks delete nahi honge.`))return;const fd=new FormData();fd.append('action','deleteCommonTaskTemplate');fd.append('templateId',id);fd.append('sessionToken',sessionToken);fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(d=>{if(d.status!=='success')throw new Error(d.message||'Delete failed');alert(d.message||'Template deleted.');quickTemplateDataCache.loadedAt=0;refreshAssignTemplateData(false,true);renderQuickTemplateList();}).catch(e=>alert(e.message||'Template delete failed.'));}
-        function renderQuickTemplateList(){const box=document.getElementById('quickTemplateList');if(!box)return;const list=(assignTemplateCache||[]).filter(t=>t.active!==false);if(!list.length){box.innerHTML='<div class="text-sm text-gray-500 p-3 border rounded-lg">No task templates found.</div>';return;}box.innerHTML=list.map(t=>`<div class="border border-gray-200 rounded-lg p-3 bg-gray-50"><div class="flex items-start justify-between gap-3"><div class="min-w-0"><b class="text-sm text-[#112a2e]">${escapeHtml(t.taskName||'Task')}</b><div class="text-xs text-gray-500 mt-1">Type: ${escapeHtml(t.taskType||'-')} • Category: ${escapeHtml(t.category||'-')} • Frequency: ${escapeHtml(t.repeat||'Monthly')} • Priority: ${escapeHtml(t.priority||'Normal')}</div><div class="text-xs text-gray-500">Date: ${Number(t.startDay)||1} to ${Number(t.endDay)||31} • Weightage: ${Number(t.weightage)||0}%</div></div><div class="flex gap-1 shrink-0"><button type="button" data-tpl-edit="${escapeHtml(t.templateId||'')}" class="px-2 py-1 rounded bg-blue-50 text-blue-700 text-xs font-bold">Edit</button><button type="button" data-tpl-delete="${escapeHtml(t.templateId||'')}" class="px-2 py-1 rounded bg-red-50 text-red-700 text-xs font-bold">Delete</button></div></div></div>`).join('');
+        function renderQuickTemplateList(){const box=document.getElementById('quickTemplateList');if(!box)return;const list=(assignTemplateCache||[]).filter(t=>t.active!==false);if(!list.length){box.innerHTML='<div class="text-sm text-gray-500 p-3 border rounded-lg">No task templates found.</div>';return;}box.innerHTML=list.map(t=>`<div class="border border-gray-200 rounded-lg p-3 bg-gray-50"><div class="flex items-start justify-between gap-3"><div class="min-w-0"><b class="text-sm text-[#112a2e]">${escapeHtml(t.taskName||'Task')}</b><div class="text-xs text-gray-500 mt-1">Type: ${escapeHtml(t.taskType||'-')} • Category: ${escapeHtml(t.category||'-')} • Frequency: ${escapeHtml(t.repeat||'Monthly')} • Priority: ${escapeHtml(t.priority||'Normal')}</div><div class="text-xs text-gray-500">${String(t.taskType||'').toLowerCase()==='department optional work'?'Dates: Not Required • Priority: Urgent on request • Weightage: Admin will set later':`Date: ${Number(t.startDay)||1} to ${Number(t.endDay)||31} • Weightage: ${Number(t.weightage)||0}%`}</div><div class="text-xs text-gray-500">Department: ${escapeHtml(t.departmentName||'-')}</div><div class="text-xs text-gray-500">Task Name Department: ${escapeHtml(t.taskNameDepartment||t.taskName||'-')}</div></div><div class="flex gap-1 shrink-0"><button type="button" data-tpl-edit="${escapeHtml(t.templateId||'')}" class="px-2 py-1 rounded bg-blue-50 text-blue-700 text-xs font-bold">Edit</button><button type="button" data-tpl-delete="${escapeHtml(t.templateId||'')}" class="px-2 py-1 rounded bg-red-50 text-red-700 text-xs font-bold">Delete</button></div></div></div>`).join('');
             box.querySelectorAll('[data-tpl-edit]').forEach(b=>b.onclick=()=>{const t=(assignTemplateCache||[]).find(x=>String(x.templateId)===String(b.dataset.tplEdit));if(t)editQuickTaskTemplate(t);});
             box.querySelectorAll('[data-tpl-delete]').forEach(b=>b.onclick=()=>{const t=(assignTemplateCache||[]).find(x=>String(x.templateId)===String(b.dataset.tplDelete));if(t)deleteQuickTaskTemplate(t.templateId,t.taskName);});
         }
@@ -2262,43 +2369,29 @@ function parseBreakTimeClient(v){
             ensureQuickTemplatePriorityField();
             const taskType=document.getElementById('qtCategory')?.value||'',
                 category=document.getElementById('qtName')?.value||'',
-                name=category,
+                name=(String(document.getElementById('qtCategory')?.value||'').toLowerCase()==='department optional work'?'Department Optional Work':(String(document.getElementById('qtTaskNameDepartment')?.value||'').trim()||category)),
                 frequency=document.getElementById('qtFrequency')?.value||'',
                 priority=document.getElementById('qtPriority')?.value||'Normal',
-                startDay=Number(document.getElementById('qtStartDay')?.value),
-                endDay=Number(document.getElementById('qtEndDay')?.value),
-                weightage=Number(document.getElementById('qtWeightage')?.value);
+                startField=document.getElementById('qtStartDay'), endField=document.getElementById('qtEndDay'),
+                weightField=document.getElementById('qtWeightage'),
+                departmentName=String(document.getElementById('qtDepartment')?.value||'').trim(),
+                taskNameDepartment=String(document.getElementById('qtTaskNameDepartment')?.value||'').trim();
+            let startDay=Number(startField?.value), endDay=Number(endField?.value), weightage=Number(weightField?.value), savePriority=priority;
             if(!taskType){alert('Task Type select karein.');return;}
             if(!category){alert('Task Category select karein.');return;}
             if(!frequency){alert('Task Frequency select karein.');return;}
-            if(!Number.isInteger(startDay)||startDay<1||startDay>31){alert('From Date mein 1 se 31 tak day digit dein.');return;}
-            if(!Number.isInteger(endDay)||endDay<1||endDay>31||endDay<startDay){alert('To Date mein valid day digit dein.');return;}
-            if(!Number.isFinite(weightage)||weightage<0||weightage>100){alert('Task Weightage 0 se 100% ke beech hona chahiye.');return;}
-
+            const optionalWork=String(taskType).toLowerCase()==='department optional work';
+            if(optionalWork){startDay=0;endDay=0;weightage=0;savePriority='Not Set';if(startField)startField.value='';if(endField)endField.value='';if(weightField)weightField.value='0';const p=document.getElementById('qtPriority');if(p)p.value='Not Set';}
+            else {
+                if(!Number.isInteger(startDay)||startDay<1||startDay>31){alert('From Date mein 1 se 31 tak day digit dein.');return;}
+                if(!Number.isInteger(endDay)||endDay<1||endDay>31||endDay<startDay){alert('To Date mein valid day digit dein.');return;}
+                if(!Number.isFinite(weightage)||weightage<0||weightage>100){alert('Task Weightage 0 se 100% ke beech hona chahiye.');return;}
+            }
+            if(!taskNameDepartment && !optionalWork){alert('Task Name Department fill karein.');return;}
             const btn=document.getElementById('qtSaveBtn');
             const templateId=document.getElementById('qtTemplateId')?.value||'';
-            const optimisticId=templateId||('local_'+Date.now());
-            const optimistic={
-                templateId:optimisticId,taskName:name,taskType,category,repeat:frequency,
-                priority,weightage,startDay,endDay,active:true,_optimistic:!templateId
-            };
-            btn.disabled=true;btn.innerText='Saving...';
-
-            // Update UI immediately. The Apps Script write continues in the background,
-            // so the Admin does not wait for the server round-trip to see the template.
-            const list=Array.isArray(assignTemplateCache)?assignTemplateCache.slice():[];
-            const idx=list.findIndex(x=>String(x.templateId)===String(optimisticId));
-            if(idx>=0)list[idx]=Object.assign({},list[idx],optimistic);
-            else list.unshift(optimistic);
-            assignTemplateCache=list;
-            quickTemplateDataCache.templates=list.slice();
-            quickTemplateDataCache.loadedAt=Date.now();
-            renderAssignTemplateSelect_();
-            renderQuickTemplateList();
-            resetQuickTemplateForm();
-            closeQuickTemplateModal();
-            btn.disabled=false;btn.innerText='Save Template';
-
+            const oldText=btn?.innerText||'Save Template';
+            if(btn){btn.disabled=true;btn.innerText='Saving...';}
             const fd=new FormData();
             fd.append('action','saveCommonTaskTemplate');
             fd.append('templateId',templateId);
@@ -2306,31 +2399,36 @@ function parseBreakTimeClient(v){
             fd.append('taskType',taskType);
             fd.append('category',category);
             fd.append('description','');
-            fd.append('priority',priority);
+            fd.append('priority',savePriority);
             fd.append('weightage',String(weightage));
+            fd.append('departmentName',departmentName);
+            fd.append('taskNameDepartment',taskNameDepartment);
             fd.append('startDay',String(startDay));
             fd.append('endDay',String(endDay));
             fd.append('frequency',frequency);
             fd.append('active','true');
             fd.append('worksJson',JSON.stringify([{frequency,category,workName:name,weightage:100}]));
             fd.append('sessionToken',sessionToken);
-
+            // Do not close/reset the form until the backend confirms the write.
             apiFetchJson_(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(d=>{
-                if(d.status!=='success')throw new Error(d.message||'Template save failed');
-                // Refresh once the backend write is confirmed; the immediate UI above
-                // means the user never waits for this refresh.
+                if(!d || d.status!=='success')throw new Error(d?.message||'Template Google Sheet mein save nahi hua.');
+                const savedId=String(d.templateId||templateId||'');
+                const saved={templateId:savedId,taskName:name,taskType,category,repeat:frequency,priority:savePriority,weightage,departmentName,taskNameDepartment,startDay,endDay,active:true};
+                const list=Array.isArray(assignTemplateCache)?assignTemplateCache.slice():[];
+                const idx=list.findIndex(x=>String(x.templateId)===savedId);
+                if(idx>=0)list[idx]=Object.assign({},list[idx],saved);else list.unshift(saved);
+                assignTemplateCache=list;
+                quickTemplateDataCache.templates=list.slice();
                 quickTemplateDataCache.loadedAt=0;
-                setTimeout(()=>refreshAssignTemplateData(true,true),250);
-            }).catch(e=>{
-                // Roll back only the optimistic item when the server rejects a new save.
-                if(!templateId){
-                    assignTemplateCache=(assignTemplateCache||[]).filter(x=>String(x.templateId)!==String(optimisticId));
-                    quickTemplateDataCache.templates=assignTemplateCache.slice();
-                    renderAssignTemplateSelect_();
+                renderAssignTemplateSelect_();renderQuickTemplateList();
+                resetQuickTemplateForm();closeQuickTemplateModal();
+                return refreshAssignTemplateData(true,true).then(()=>{
                     renderQuickTemplateList();
-                }
-                alert(e.message||'Template save failed.');
-            });
+                    alert(d.message||'Template Google Sheet mein successfully save ho gaya.');
+                });
+            }).catch(e=>{
+                alert((e&&e.message)||'Template save nahi hua. Form ko dobara check karke Save karein.');
+            }).finally(()=>{if(btn){btn.disabled=false;btn.innerText=oldText==='Update Template'?'Update Template':'Save Template';}});
         }
 
         function refreshAssignTemplateData(templatesOnly,forceRefresh){
@@ -2396,8 +2494,19 @@ function parseBreakTimeClient(v){
                 parent.style.maxWidth='100%';
                 parent.style.flex='1 1 100%';
             }
+            const allTemplates=(assignTemplateCache||[]).filter(x=>x.active!==false);
+            const deptSel=document.getElementById('assignDepartmentFilter');
+            const currentDept=deptSel?String(deptSel.value||''):'';
+            const departments=[...new Set(allTemplates.map(t=>String(t.departmentName||t.department||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+            if(deptSel){
+                const wanted=currentDept;
+                deptSel.innerHTML='<option value="">All Departments</option>'+departments.map(d=>`<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
+                deptSel.value=departments.includes(wanted)?wanted:'';
+            }
+            const chosenDept=deptSel?String(deptSel.value||''):'';
+            const templates=allTemplates.filter(t=>!chosenDept||String(t.departmentName||t.department||'').trim()===chosenDept);
             tSel.innerHTML='<option value="">-- Select Task Template --</option>';
-            (assignTemplateCache||[]).filter(x=>x.active!==false).forEach(t=>{
+            templates.forEach(t=>{
                 tSel.innerHTML+=`<option value="${String(t.templateId).replace(/"/g,'&quot;')}">${escapeHtml(t.taskName||'Task')} — ${escapeHtml(t.taskType||'')} — ${escapeHtml(t.category||'')}</option>`;
             });
 
@@ -2470,20 +2579,27 @@ function parseBreakTimeClient(v){
                 <div id="assignTemplateCount" class="px-3 py-2 text-xs text-gray-500">0 templates selected</div>`;
             const list=document.getElementById('assignTemplateCheckboxList');
             if(!list)return;
-            const templates=(assignTemplateCache||[]).filter(x=>x.active!==false);
-            if(!templates.length){
-                list.innerHTML='<div class="text-sm text-gray-500 p-2">No active templates found.</div>';
+            const filterDeptSel=document.getElementById('assignDepartmentFilter');
+            const filterChosenDept=filterDeptSel?String(filterDeptSel.value||''):'';
+            const filteredTemplates=(assignTemplateCache||[]).filter(t=>t.active!==false&&(!filterChosenDept||String(t.departmentName||t.department||'').trim()===filterChosenDept));
+            if(!filteredTemplates.length){
+                list.innerHTML='<div class="text-sm text-gray-500 p-2">Is Department ke liye koi active template nahi mila.</div>';
                 updateAssignTemplateCount(); return;
             }
-            list.innerHTML=templates.map(t=>`
-                <label class="flex items-center gap-3 p-2 rounded hover:bg-[#f0f8f8] cursor-pointer border-b border-gray-100">
-                    <input type="checkbox" class="assign-template-check w-4 h-4"
+            list.innerHTML=filteredTemplates.map(t=>{
+                const startDay=Number(t.startDay)||1, endDay=Number(t.endDay)||31;
+                const department=String(t.departmentName||t.department||'').trim()||'-';
+                return `<label class="flex items-start gap-3 p-3 rounded hover:bg-[#f0f8f8] cursor-pointer border-b border-gray-100">
+                    <input type="checkbox" class="assign-template-check w-4 h-4 mt-1 shrink-0"
                         value="${escapeHtml(t.templateId||'')}" onchange="updateAssignTemplateCount();updateSelectedTemplateDetails()">
-                    <span class="min-w-0">
+                    <span class="min-w-0 flex-1">
                         <b class="text-sm text-[#112a2e]">${escapeHtml(t.taskName||'Task')}</b>
-                        <span class="block text-xs text-gray-500">${escapeHtml(t.taskType||'-')} • ${escapeHtml(t.category||'-')} • ${escapeHtml(t.repeat||'-')} • ${escapeHtml(t.priority||'Normal')}</span>
+                        <span class="block text-xs text-gray-500 mt-1">Type: ${escapeHtml(t.taskType||'-')} • Category: ${escapeHtml(t.category||'-')} • Frequency: ${escapeHtml(t.repeat||'-')} • Priority: ${escapeHtml(t.priority||'Normal')}</span>
+                        <span class="block text-xs text-gray-500">Date: ${startDay} to ${endDay} • Weightage: ${Number(t.weightage)||0}%</span>
+                        <span class="block text-xs text-gray-500">Department: ${escapeHtml(department)}</span>
                     </span>
-                </label>`).join('');
+                </label>`;
+            }).join('');
             tSel.style.display='none';
             updateAssignTemplateCount();
         }
@@ -3550,12 +3666,14 @@ function parseBreakTimeClient(v){
         }
         function buildApprovalCenterItems(){
             const out=[];
-            // Direct employee attendance records (Punch In/Out) are approval items too.
+            // Only actual, pending attendance punches should enter Approval Center.
+            // Ordinary daily work minutes are notifications/system-overview updates, not approvals.
             (globalTeamAttendance||[]).forEach(r=>{
-                const status=String(r.status||'Pending');
-                if(!r.employee)return;
+                const status=String(r.status||'Pending').trim().toLowerCase();
+                if(!r.employee || !['pending','pending approval',''].includes(status))return;
+                if(!String(r.inTime||'').trim() && !String(r.outTime||'').trim())return;
                 const meta=attendanceMetaForUser(r.employee)||{};
-                out.push({key:'attendance-record|'+r.rowIndex,type:'attendance',typeLabel:'Attendance',employee:r.user||r.employee||'',employeeId:meta.employeeId||r.employeeId||'',task:'Attendance',date:r.date||'',details:`In: ${r.inTime||'-'} • Out: ${r.outTime||'-'} • ${r.reason||'-'}`,status:status,rowIndex:r.rowIndex,action:'attendanceRecord',targetUser:r.user||r.employee||''});
+                out.push({key:'attendance-record|'+r.rowIndex,type:'attendance',typeLabel:'Attendance',employee:r.user||r.employee||'',employeeId:meta.employeeId||r.employeeId||'',task:'Attendance',date:r.date||'',details:`In: ${r.inTime||'-'} • Out: ${r.outTime||'-'} • ${r.reason||'-'}`,status:'Pending',rowIndex:r.rowIndex,action:'attendanceRecord',targetUser:r.user||r.employee||''});
             });
             (globalAttendanceRequests||[]).forEach(r=>{
                 const status=String(r.status||'Pending');
@@ -3574,10 +3692,12 @@ function parseBreakTimeClient(v){
             // Keep globalPendingWorkLogs available for reports/follow-up, but never
             // create approval-center items from them.
             (globalAllTasks||[]).forEach(t=>{
-                const empStatus=String(t.empStatus||'').toLowerCase(), hodStatus=String(t.hodStatus||'').toLowerCase();
+                const empStatus=String(t.empStatus||'').trim().toLowerCase();
+                const hodStatus=String(t.hodStatus||'pending').trim().toLowerCase();
                 const meta=attendanceMetaForUser(t.assignedTo||t.employee||'')||{};
-                if(empStatus==='completion requested') out.push({key:'task-completion|'+(t.taskId||t.rowIndex),type:'task',typeLabel:'Task',employee:t.assignedTo||t.employee||'',employeeId:meta.employeeId||'',task:t.taskName||'Task',date:t.endDate||t.startDate||'',details:'Final Before/Completion approval required — separate from Daily Work approval',status:t.empStatus||'Completion Requested',rowIndex:t.rowIndex,taskId:t.taskId||'',action:'taskCompletion',targetUser:t.assignedTo||t.employee||'',approvalOwner:t.approvalOwner||''});
-                else if(String(t.assignedBy||'').trim() && ['pending','approved','rejected'].includes(hodStatus)) out.push({key:'task-approval|'+(t.taskId||t.rowIndex),type:'task',typeLabel:'Task',employee:t.assignedTo||t.employee||'',employeeId:meta.employeeId||'',task:t.taskName||'Task',date:t.startDate||'',details:'Task approval',status:t.hodStatus||'Pending',rowIndex:t.rowIndex,taskId:t.taskId||'',action:'taskApproval',targetUser:t.assignedTo||t.employee||'',approvalOwner:t.approvalOwner||''});
+                const isBeforeOrCompletion=/completion requested|before[ -]?completed|before completion/.test(empStatus);
+                const stillNeedsApproval=['pending','pending approval',''].includes(hodStatus) && !['approved','rejected'].includes(empStatus);
+                if(isBeforeOrCompletion && stillNeedsApproval) out.push({key:'task-completion|'+(t.taskId||t.rowIndex),type:'task',typeLabel:'Task',employee:t.assignedTo||t.employee||'',employeeId:meta.employeeId||'',task:t.taskName||'Task',date:t.endDate||t.startDate||'',details:'Before/Completed task approval required — daily work minutes do not require approval',status:'Pending',rowIndex:t.rowIndex,taskId:t.taskId||'',action:'taskCompletion',targetUser:t.assignedTo||t.employee||'',approvalOwner:t.approvalOwner||''});
             });
             return out;
         }
@@ -3762,7 +3882,8 @@ function parseBreakTimeClient(v){
                 if(/daily work.*approval|approval.*daily work/i.test(title+' '+String(n.text||''))) return;
                 const approvalTitle=/approval required|today urgent task request/i.test(title);
                 const employeeSchedule=/advance schedule request/i.test(title) && !approvalTitle;
-                items.push({type:'server',key:n.id,title:n.title,text:n.text,action:(action==='approval-center'||approvalTitle)?'approval-center':(employeeSchedule?'schedule-form':action),date:n.timestamp,priority:n.priority});
+                const minutesOnly=/(daily work|work log|minutes?|time spent)/i.test(title+' '+String(n.text||'')) && !approvalTitle && !/attendance|before[ -]?completed|task completed/i.test(title+' '+String(n.text||''));
+                items.push({type:'server',key:n.id,title:n.title,text:n.text,action:(action==='approval-center'||approvalTitle)?'approval-center':(minutesOnly?'system-overview':(employeeSchedule?'schedule-form':action)),date:n.timestamp,priority:n.priority});
             });
             if(role.includes('hod')||role.includes('admin')){
                 tasks.forEach(t=>{if(String(t.hodStatus||'').toLowerCase()==='pending'&&['completed','completion requested'].includes(String(t.empStatus||'').toLowerCase()))items.push({type:'task',key:t.taskId||t.rowIndex,title:'Task approval required',text:`${t.taskName||'Task'} — ${t.assignedTo||''}`,action:'approval-center',date:t.completedAt||t.endDate||t.startDate});});
@@ -3789,12 +3910,31 @@ function parseBreakTimeClient(v){
             count.innerText=unread.length;count.classList.toggle('hidden',unread.length===0);count.classList.toggle('flex',unread.length>0);if(label)label.innerText=unread.length?`${unread.length} unread`:'All read';
             list.innerHTML='';
             if(!items.length){list.innerHTML='<div class="p-5 text-center text-sm text-gray-500">No notifications.</div>';return;}
-            items.forEach(n=>{const id=notificationId(n),isRead=readIds.includes(id),row=document.createElement('button');row.type='button';row.className=`w-full text-left px-4 py-3 border-b transition ${isRead?'bg-white opacity-70 hover:bg-gray-50':'bg-[#f0fbf9] hover:bg-[#e7f7f4]'}`;const displayTime=isRead&&readMeta[id]?`Read ${formatNotificationDate(readMeta[id])}`:notificationTime(n);row.innerHTML=`<div class="flex items-start gap-2"><i class="fas fa-bell mt-1 ${isRead?'text-gray-400':'text-[#259b94]'}"></i><div class="min-w-0 flex-1"><div class="font-bold text-sm text-[#112a2e]">${n.title}${isRead?'':' <span class="ml-1 inline-block w-2 h-2 rounded-full bg-red-500 align-middle"></span>'}</div><div class="text-xs text-gray-600 mt-1">${n.text}</div><div class="text-[10px] text-gray-400 mt-1">${displayTime}</div></div></div>`;row.onclick=()=>{markNotificationRead(id);closeNotifications();if(n.action==='approval-center'){openApprovalAttendanceTaskModal();}else if(n.action==='task')openTaskReportModal();else if(n.action==='schedule-form'){openAdvanceScheduleModal();}else if(n.action==='schedule')openAdvanceScheduleApprovalModal();else if(n.action==='attendance-request')openAttendanceRequestsModal();else openOneViewModal();};list.appendChild(row);});
+            items.forEach(n=>{const id=notificationId(n),isRead=readIds.includes(id),row=document.createElement('button');row.type='button';row.className=`w-full text-left px-4 py-3 border-b transition ${isRead?'bg-white opacity-70 hover:bg-gray-50':'bg-[#f0fbf9] hover:bg-[#e7f7f4]'}`;const displayTime=isRead&&readMeta[id]?`Read ${formatNotificationDate(readMeta[id])}`:notificationTime(n);row.innerHTML=`<div class="flex items-start gap-2"><i class="fas fa-bell mt-1 ${isRead?'text-gray-400':'text-[#259b94]'}"></i><div class="min-w-0 flex-1"><div class="font-bold text-sm text-[#112a2e]">${n.title}${isRead?'':' <span class="ml-1 inline-block w-2 h-2 rounded-full bg-red-500 align-middle"></span>'}</div><div class="text-xs text-gray-600 mt-1">${n.text}</div><div class="text-[10px] text-gray-400 mt-1">${displayTime}</div></div></div>`;row.onclick=()=>{markNotificationRead(id);closeNotifications();if(n.action==='approval-center'){openApprovalAttendanceTaskModal();}else if(n.action==='system-overview'){const heading=document.getElementById('taskTableTitle');if(heading){heading.scrollIntoView({behavior:'smooth',block:'start'});heading.classList.add('ring-2','ring-teal-300');setTimeout(()=>heading.classList.remove('ring-2','ring-teal-300'),1800);}else if(typeof fetchDashboardDataSilently==='function'){fetchDashboardDataSilently();}}else if(n.action==='task')openTaskReportModal();else if(n.action==='schedule-form'){openAdvanceScheduleModal();}else if(n.action==='schedule')openAdvanceScheduleApprovalModal();else if(n.action==='attendance-request')openAttendanceRequestsModal();else openOneViewModal();};list.appendChild(row);});
         }
         const refreshPositionObserver_=new MutationObserver(()=>{if(document.getElementById('dashboard-section')?.style.display==='flex')addRefreshButton_();});
         refreshPositionObserver_.observe(document.body,{childList:true,subtree:true});
         document.addEventListener('click',function(e){const b=document.getElementById('notificationBtn'),p=document.getElementById('notificationPanel');if(p&&!p.classList.contains('hidden')&&b&&!b.contains(e.target)&&!p.contains(e.target))closeNotifications();});
-        setInterval(()=>{try{if(typeof renderNotifications==='function')renderNotifications();if(typeof fetchServerNotifications==='function'&&typeof approvalCenterRoleAllowed==='function'&&approvalCenterRoleAllowed())fetchServerNotifications();const m=document.getElementById('approvalAttendanceTaskModal');if(m&&m.style.display!=='none'&&typeof fetchApprovalCenterData==='function')fetchApprovalCenterData(true);}catch(e){}},3000);
+        // V83: reduce unnecessary polling (the previous 3-second loop caused repeated
+        // Apps Script/Sheets reads). Keep the dashboard responsive without hammering sync.
+        let _v83LastNotificationPoll = 0;
+        setInterval(()=>{
+            try {
+                if(document.visibilityState !== 'visible') return;
+                const dashboard=document.getElementById('dashboard-section');
+                if(!dashboard || dashboard.style.display==='none') return;
+                if(typeof renderNotifications==='function') renderNotifications();
+                const now=Date.now();
+                const panel=document.getElementById('notificationPanel');
+                const panelOpen=!!(panel && !panel.classList.contains('hidden'));
+                if(now-_v83LastNotificationPoll>=30000 && (panelOpen || (typeof approvalCenterRoleAllowed==='function' && approvalCenterRoleAllowed()))) {
+                    _v83LastNotificationPoll=now;
+                    if(typeof fetchServerNotifications==='function') fetchServerNotifications();
+                }
+                const modal=document.getElementById('approvalAttendanceTaskModal');
+                if(modal && modal.style.display!=='none' && typeof fetchApprovalCenterData==='function') fetchApprovalCenterData(true);
+            } catch(e) {}
+        },15000);
 
         // ================= TASK REPORT =================
 
@@ -4023,14 +4163,9 @@ function parseBreakTimeClient(v){
         }
         function openEmployeeProgressDirect(emp){
             const modal=document.getElementById('progressReportModal');
-            if(modal && modal.style.display!=='block') openProgressReportModal();
-            const sel=document.getElementById('progressReportEmployee');
-            if(sel){
-                const match=Array.from(sel.options).find(o=>String(o.value).toLowerCase()===String(emp).toLowerCase());
-                if(match) sel.value=match.value;
-            }
-            renderProgressReport();
-            setTimeout(()=>document.getElementById('progressReportDetails')?.scrollIntoView({behavior:'smooth',block:'start'}),80);
+            if(modal && modal.style.display!=='block'){openProgressReportModal(emp);}
+            else{const sel=document.getElementById('progressReportEmployee');if(sel){const match=Array.from(sel.options).find(o=>String(o.value).toLowerCase()===String(emp).toLowerCase());if(match)sel.value=match.value;}renderProgressReport();}
+            setTimeout(()=>document.getElementById('progressReportDetails')?.scrollIntoView({behavior:'smooth',block:'start'}),160);
         }
         function progressReportRange(){
             const raw=progressReportMonthKey(), p=raw.split('-');
@@ -4084,12 +4219,38 @@ function parseBreakTimeClient(v){
             progressReportRenderDetails(stats);
             window.currentProgressReport={range,stats,aw,tw};
         }
-        function openProgressReportModal(){
+        let progressReportSyncPromise=null;
+        async function refreshProgressReportData_(){
+            if(!sessionToken)return false;
+            if(progressReportSyncPromise)return progressReportSyncPromise;
+            progressReportSyncPromise=(async()=>{
+                const fd=new FormData();fd.append('action','getDashboardData');fd.append('sessionToken',sessionToken);fd.append('forceRefresh','1');
+                const data=await apiFetchJson_(GOOGLE_SCRIPT_URL,{method:'POST',body:fd,timeoutMs:60000});
+                if(!data||data.status!=='success')throw new Error(data?.message||'Progress Report data sync nahi ho saka.');
+                globalAllTasks=Array.isArray(data.tasks)?data.tasks:[];
+                globalTeamMembers=Array.isArray(data.teamMembers)?data.teamMembers:[];
+                globalTeamMemberMeta=Array.isArray(data.teamMemberMeta)?data.teamMemberMeta:[];
+                globalMonthlyFullAttendance=Array.isArray(data.monthlyFullAttendance)?data.monthlyFullAttendance:[];
+                globalTeamAttendance=Array.isArray(data.teamAttendance)?data.teamAttendance:[];
+                try{localStorage.setItem(dashboardCacheKey(document.getElementById('displayUser')?.innerText||''),JSON.stringify(data));}catch(_cacheErr){}
+                return true;
+            })().finally(()=>{progressReportSyncPromise=null;});
+            return progressReportSyncPromise;
+        }
+        function populateProgressReportEmployeeSelect_(preferred){
+            const sel=document.getElementById('progressReportEmployee'), role=String(document.getElementById('displayRole')?.innerText||'').toLowerCase();if(!sel)return;
+            const emps=progressReportEmployees();sel.innerHTML='';
+            if(role.includes('admin')||role.includes('hod'))sel.innerHTML='<option value="__ALL__">All Employees</option>'+emps.map(e=>`<option value="${progressReportEscape(e)}">${progressReportEscape(e)}</option>`).join('');
+            else sel.innerHTML=emps.map(e=>`<option value="${progressReportEscape(e)}">${progressReportEscape(e)}</option>`).join('');
+            if(preferred&&Array.from(sel.options).some(o=>String(o.value).toLowerCase()===String(preferred).toLowerCase()))sel.value=Array.from(sel.options).find(o=>String(o.value).toLowerCase()===String(preferred).toLowerCase()).value;
+        }
+        async function openProgressReportModal(preferredEmployee){
             document.getElementById('progressReportModal').style.display='block';
-            const month=document.getElementById('progressReportMonth'), n=new Date(); month.value=`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`;
-            const sel=document.getElementById('progressReportEmployee'), role=String(document.getElementById('displayRole')?.innerText||'').toLowerCase(); sel.innerHTML='';
-            const emps=progressReportEmployees(); if(role.includes('admin')||role.includes('hod')) sel.innerHTML='<option value="__ALL__">All Employees</option>'+emps.map(e=>`<option value="${progressReportEscape(e)}">${progressReportEscape(e)}</option>`).join(''); else sel.innerHTML=emps.map(e=>`<option value="${progressReportEscape(e)}">${progressReportEscape(e)}</option>`).join('');
-            document.getElementById('progressReportAttWeight').value=performanceWeights.attendance; document.getElementById('progressReportTaskWeight').value=performanceWeights.task; renderProgressReport();
+            const month=document.getElementById('progressReportMonth'), n=new Date(); if(!month.value)month.value=`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`;
+            document.getElementById('progressReportAttWeight').value=performanceWeights.attendance; document.getElementById('progressReportTaskWeight').value=performanceWeights.task;
+            const err=document.getElementById('progressReportError');if(err){err.textContent='Latest employee tasks aur attendance sync ho rahe hain…';err.classList.remove('hidden');}
+            try{await refreshProgressReportData_();populateProgressReportEmployeeSelect_(preferredEmployee);if(err)err.classList.add('hidden');renderProgressReport();}
+            catch(e){if(err){err.textContent=e.message||'Progress Report sync failed. Refresh karke dobara try karein.';err.classList.remove('hidden');}}
         }
         async function loadJsPdfForProgressReport(){
             if(window.jspdf?.jsPDF)return true;
@@ -4686,17 +4847,6 @@ function parseBreakTimeClient(v){
             const today=localDateKey(); if(from){from.value=today;from.min=today;from.max=today;} if(to){to.value=today;to.min=today;}
             to?.addEventListener('change',()=>{if(to.value<today)to.value=today;});
         }
-        function reorderUrgentTaskFields_(){
-            // UI-only change: keep both existing fields and their handlers, move Assign By above Task Template.
-            const modal=document.getElementById('emergencyTaskModal');
-            const assign=document.getElementById('emergencyTaskAssignBy');
-            const template=document.getElementById('emergencyTaskTemplate');
-            if(!modal||!assign||!template)return;
-            const fieldBox=(el)=>el.closest('.mb-4')||el.closest('.form-group')||el.parentElement;
-            const assignBox=fieldBox(assign),templateBox=fieldBox(template);
-            if(!assignBox||!templateBox||assignBox===templateBox||!templateBox.parentElement)return;
-            templateBox.parentElement.insertBefore(assignBox,templateBox);
-        }
         function openEmergencyTaskModal(){
             const todayKey=localDateKey();
             const selectedKey=document.getElementById('attendanceDate')?.value||todayKey;
@@ -4706,16 +4856,17 @@ function parseBreakTimeClient(v){
             const today=new Date();
             const label=document.getElementById('emergencyTaskToday');if(label)label.textContent=today.toLocaleDateString('en-IN',{day:'2-digit',month:'2-digit',year:'numeric'});
             ensureUrgentTaskDateFields_();
-            const sel=document.getElementById('emergencyTaskTemplate');if(sel)sel.innerHTML='<option value="">-- Select Task Template --</option>'+SELF_URGENT_TASK_TEMPLATES.map(x=>`<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join('');
+            const sel=document.getElementById('emergencyTaskTemplate');if(sel)sel.innerHTML='<option value="">Loading assigned templates...</option>';
+            const tfd=new FormData();tfd.append('action','getUrgentTaskTemplates');tfd.append('sessionToken',sessionToken);
+            apiFetchJson_(GOOGLE_SCRIPT_URL,{method:'POST',body:tfd}).then(d=>{const templates=Array.isArray(d.templates)?d.templates:[];emergencyTaskTemplateCache=templates;if(sel)sel.innerHTML='<option value="">-- Select Task Template --</option>'+templates.map(x=>`<option value="${escapeHtml(x.templateId||x.taskName)}">${escapeHtml(x.taskName)} — ${escapeHtml(x.taskType||'Task')} • ${escapeHtml(x.departmentName||'All Departments')}${x.assignedToEmployee?' • Assigned to you':''}</option>`).join('');if(sel&&!templates.length)sel.innerHTML='<option value="">No assigned templates found</option>';}).catch(()=>{if(sel)sel.innerHTML='<option value="">Templates load nahi hue</option>';});
             const cat=document.getElementById('emergencyTaskCategory');if(cat)cat.value='';
             const ab=document.getElementById('emergencyTaskAssignBy');if(ab)ab.value='';
             const from=document.getElementById('emergencyTaskFromDate'),to=document.getElementById('emergencyTaskToDate');if(from)from.value=todayKey;if(to){to.value=todayKey;to.min=todayKey;}
             document.getElementById('emergencyTaskDetails').value='';
             document.getElementById('emergencyTaskModal').style.display='block';
-            reorderUrgentTaskFields_();
-            emergencyTaskTemplateCache=SELF_URGENT_TASK_TEMPLATES.map(x=>({templateId:x,taskName:x,category:''}));
+            // The selected template list is loaded from the approved Master Sheet.
         }
-        function applyEmergencyTaskTemplate(){ const id=document.getElementById('emergencyTaskTemplate')?.value||''; const cat=document.getElementById('emergencyTaskCategory');if(cat)cat.value=''; }
+        function applyEmergencyTaskTemplate(){ const id=document.getElementById('emergencyTaskTemplate')?.value||''; const cat=document.getElementById('emergencyTaskCategory');if(cat)cat.value=''; const t=(emergencyTaskTemplateCache||[]).find(x=>String(x.taskName)===String(id)); if(t){const label=document.getElementById('emergencyTaskToday');if(label)label.title='Priority: Urgent • Weightage admin approval ke baad set karega.';} }
         function closeEmergencyTaskModal(){document.getElementById('emergencyTaskModal').style.display='none';}
         function submitEmergencyTaskRequest(){
             const todayKey=localDateKey();
@@ -4724,7 +4875,7 @@ function parseBreakTimeClient(v){
             const nonWorking=isLogWorkNonWorkingDate(todayKey);
             if(nonWorking){ alert(`Today Urgent Task frozen: ${nonWorking}.`); updateTodayUrgentTaskButtonState(); return; }
             const templateId=document.getElementById('emergencyTaskTemplate')?.value||'',assignBy=document.getElementById('emergencyTaskAssignBy')?.value||'',details=document.getElementById('emergencyTaskDetails')?.value.trim()||'',fromDate=document.getElementById('emergencyTaskFromDate')?.value||todayKey,toDate=document.getElementById('emergencyTaskToDate')?.value||todayKey;
-            if(!SELF_URGENT_TASK_TEMPLATES.includes(templateId)){alert('Task Template select karein.');return;}
+            const chosenTemplate=(emergencyTaskTemplateCache||[]).find(x=>String(x.templateId||x.taskName)===String(templateId));if(!templateId||!chosenTemplate){alert('Apni assigned task template select karein.');return;}
             if(fromDate!==todayKey){alert('From Date sirf current date ho sakti hai.');return;}
             if(!toDate||toDate<todayKey){alert('To Date current date ya uske baad select karein.');return;}
             if(!assignBy){alert('Assign By select karein.');return;}
@@ -4756,7 +4907,8 @@ function parseBreakTimeClient(v){
             if(!date){alert('Please select future date.');return;}
             if(['3 Days Qafila','Tarbiyati Ijtima'].includes(type) && (!endDate||endDate<date)){alert('From Date aur To Date sahi select karein.');return;}
             if(type==='Meeting'&&mode==='Online'&&(!meetingFrom||!meetingTo)){alert('Online Meeting ke liye From aur To time select karein.');return;}
-            if(type==='Meeting Journey'&&(!journeyStart||!journeyComplete)){alert('Journey Start aur Journey Complete time select karein.');return;}
+            if(type==='Meeting Journey'&&(!journeyStart||!journeyComplete)){alert('Journey Start aur Journey Complete ki date aur time select karein.');return;}
+            if(type==='Meeting Journey'&&journeyStart&&journeyComplete&&new Date(journeyComplete).getTime()<=new Date(journeyStart).getTime()){alert('Journey Complete ka date/time, Journey Start ke baad hona chahiye.');return;}
             const btn=document.getElementById('advanceScheduleBtn'); btn.disabled=true; btn.innerText='Submitting...';
             const fd=new FormData(); fd.append('action','advanceScheduleRequest'); fd.append('requestDate',date); fd.append('endDate',endDate); fd.append('requestType',type); fd.append('reason',reason); fd.append('location',scheduleLocation); fd.append('weekoffDate',weekoffDate); fd.append('meetingMode',mode); fd.append('meetingFrom',meetingFrom); fd.append('meetingTo',meetingTo); fd.append('journeyStart',journeyStart); fd.append('journeyComplete',journeyComplete); fd.append('sessionToken',sessionToken);
             fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:fd}).then(r=>r.json()).then(data=>{
